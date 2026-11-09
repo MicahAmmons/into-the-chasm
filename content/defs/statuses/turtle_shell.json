@@ -1,0 +1,18 @@
+{
+  "Id": "turtle_shell",
+  "Name": "Turtle Shell",
+  "Description": "Aspect of the Turtle: takes 30% less damage.",
+  "Icon": "",
+  "IsBuff": true,
+  "DefaultDuration": 2,
+  "Stacks": false,
+  "DamageTakenPercent": -30,
+  "DamageDealtPercent": 0,
+  "ApChange": 0,
+  "MpChange": 0,
+  "Rooted": false,
+  "TickAt": "StartOfTurn",
+  "TickDamage": 0,
+  "TickElement": "",
+  "TickHeal": 0
+}

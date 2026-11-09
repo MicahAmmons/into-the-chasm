@@ -34,8 +34,8 @@
     }
   ],
   "Spawn": {
-    "Q": 27,
-    "R": 7
+    "Q": 21,
+    "R": 12
   },
   "PlayerCombatStarts": [],
   "EnemyCombatStarts": [],

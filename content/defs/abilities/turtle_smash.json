@@ -1,0 +1,27 @@
+{
+  "Id": "turtle_smash",
+  "Name": "Turtle Smash",
+  "Description": "A shell-first charge.",
+  "Icon": "",
+  "ApCost": 2,
+  "MinRange": 1,
+  "MaxRange": 1,
+  "NeedsLineOfSight": true,
+  "Target": "Enemy",
+  "Area": "Single",
+  "AreaSize": 0,
+  "Cooldown": 0,
+  "UsesPerTurn": 0,
+  "Effects": [
+    {
+      "$type": "Damage",
+      "AffectsEnemies": true,
+      "AffectsAllies": false,
+      "Min": 2,
+      "Max": 4,
+      "Element": ""
+    }
+  ],
+  "Animation": "Attack",
+  "HitDelayMs": 400
+}

@@ -1,0 +1,31 @@
+{
+  "Id": "fire_ooze",
+  "Name": "Fire Ooze",
+  "Description": "Ported: keeps max range, lobs lava at the highest-HP enemy.",
+  "Animation": "fire_ooze",
+  "Icon": "",
+  "Element": "fire",
+  "Health": 4,
+  "AP": 2,
+  "MP": 3,
+  "Initiative": 3,
+  "Resistances": [],
+  "Abilities": [
+    "lava_ball"
+  ],
+  "AiPriorities": [
+    {
+      "$type": "KeepAtRange",
+      "Target": "HighestHpEnemy",
+      "UseAbilityRange": "lava_ball",
+      "Distance": 4
+    },
+    {
+      "$type": "UseAbility",
+      "Ability": "lava_ball",
+      "Target": "HighestHpEnemy"
+    }
+  ],
+  "SummonApCost": 2,
+  "SummonRange": 2
+}

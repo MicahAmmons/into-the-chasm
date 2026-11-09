@@ -1,0 +1,27 @@
+{
+  "Id": "turtle_shell",
+  "Name": "Aspect of the Turtle",
+  "Description": "Grants an ally the Turtle Shell (30% less damage).",
+  "Icon": "",
+  "ApCost": 2,
+  "MinRange": 0,
+  "MaxRange": 3,
+  "NeedsLineOfSight": false,
+  "Target": "Ally",
+  "Area": "Single",
+  "AreaSize": 0,
+  "Cooldown": 2,
+  "UsesPerTurn": 0,
+  "Effects": [
+    {
+      "$type": "ApplyStatus",
+      "AffectsEnemies": false,
+      "AffectsAllies": true,
+      "Status": "turtle_shell",
+      "Duration": 0,
+      "Chance": 100
+    }
+  ],
+  "Animation": "Attack",
+  "HitDelayMs": 400
+}

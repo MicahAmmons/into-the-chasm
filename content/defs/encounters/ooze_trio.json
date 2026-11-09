@@ -1,0 +1,22 @@
+{
+  "Id": "ooze_trio",
+  "Name": "Ooze trio",
+  "Monsters": [
+    {
+      "Monster": "frost_ooze",
+      "Count": 1
+    },
+    {
+      "Monster": "fire_ooze",
+      "Count": 1
+    },
+    {
+      "Monster": "earth_ooze",
+      "Count": 1
+    }
+  ],
+  "CanFlee": true,
+  "Respawn": "Respawns",
+  "OnVictory": [],
+  "OnDefeat": []
+}

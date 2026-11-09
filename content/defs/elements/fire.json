@@ -1,0 +1,24 @@
+{
+  "Id": "fire",
+  "Name": "Fire",
+  "Color": "#ff7a3d",
+  "DamageTakenFrom": [
+    {
+      "Element": "ice",
+      "Percent": -40
+    },
+    {
+      "Element": "earth",
+      "Percent": -20
+    },
+    {
+      "Element": "water",
+      "Percent": 40
+    },
+    {
+      "Element": "electricity",
+      "Percent": 20
+    }
+  ],
+  "Notes": "Ported from JustPlaying Resistance.json: superEffective=-40, mildlyEffective=-20, superVulnerable=+40, mildlyVulnerable=+20."
+}

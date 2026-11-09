@@ -1,0 +1,41 @@
+{
+  "Id": "turtle",
+  "Name": "Turtle",
+  "Description": "The first summon. Tanky, shields allies. Affinity will unlock the Aspect of the Turtle out of combat.",
+  "Animation": "turtle",
+  "Icon": "",
+  "Element": "",
+  "Health": 12,
+  "AP": 4,
+  "MP": 2,
+  "Initiative": 6,
+  "Resistances": [],
+  "Abilities": [
+    "turtle_smash",
+    "turtle_shell"
+  ],
+  "AiPriorities": [
+    {
+      "$type": "UseAbility",
+      "Ability": "turtle_shell",
+      "Target": "LowestHpAlly"
+    },
+    {
+      "$type": "UseAbility",
+      "Ability": "turtle_smash",
+      "Target": "NearestEnemy"
+    },
+    {
+      "$type": "MoveToward",
+      "Target": "NearestEnemy",
+      "StopAtDistance": 1
+    },
+    {
+      "$type": "UseAbility",
+      "Ability": "turtle_smash",
+      "Target": "NearestEnemy"
+    }
+  ],
+  "SummonApCost": 3,
+  "SummonRange": 2
+}

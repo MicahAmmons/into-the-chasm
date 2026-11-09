@@ -1,0 +1,40 @@
+{
+  "Id": "earth_ooze",
+  "Name": "Earth Ooze",
+  "Description": "Roots enemies from range and keeps its distance; flees when hurt. (Original \"always run away first\" made fights endless.)",
+  "Animation": "earth_ooze",
+  "Icon": "icons/monsters/EarthOoze.png",
+  "Element": "earth",
+  "Health": 2,
+  "AP": 2,
+  "MP": 3,
+  "Initiative": 4,
+  "Resistances": [],
+  "Abilities": [
+    "grasping_root"
+  ],
+  "AiPriorities": [
+    {
+      "$type": "UseAbility",
+      "Ability": "grasping_root",
+      "Target": "NearestEnemy"
+    },
+    {
+      "$type": "MoveAway",
+      "WhenHpBelowPercent": 50
+    },
+    {
+      "$type": "KeepAtRange",
+      "Target": "NearestEnemy",
+      "UseAbilityRange": "grasping_root",
+      "Distance": 4
+    },
+    {
+      "$type": "UseAbility",
+      "Ability": "grasping_root",
+      "Target": "NearestEnemy"
+    }
+  ],
+  "SummonApCost": 2,
+  "SummonRange": 2
+}

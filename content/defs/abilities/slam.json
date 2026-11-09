@@ -1,0 +1,27 @@
+{
+  "Id": "slam",
+  "Name": "Slam",
+  "Description": "A heavy icy slam. (Ported: Frost Ooze, 1-3, range 1.)",
+  "Icon": "",
+  "ApCost": 1,
+  "MinRange": 1,
+  "MaxRange": 1,
+  "NeedsLineOfSight": true,
+  "Target": "Enemy",
+  "Area": "Single",
+  "AreaSize": 0,
+  "Cooldown": 0,
+  "UsesPerTurn": 0,
+  "Effects": [
+    {
+      "$type": "Damage",
+      "AffectsEnemies": true,
+      "AffectsAllies": false,
+      "Min": 1,
+      "Max": 3,
+      "Element": "ice"
+    }
+  ],
+  "Animation": "Attack",
+  "HitDelayMs": 400
+}

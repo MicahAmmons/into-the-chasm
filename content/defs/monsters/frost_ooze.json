@@ -1,0 +1,35 @@
+{
+  "Id": "frost_ooze",
+  "Name": "Frost Ooze",
+  "Description": "Ported: rushes the closest enemy and slams. (Old: attack closest, else move closest.)",
+  "Animation": "frost_ooze",
+  "Icon": "",
+  "Element": "ice",
+  "Health": 6,
+  "AP": 2,
+  "MP": 4,
+  "Initiative": 20,
+  "Resistances": [],
+  "Abilities": [
+    "slam"
+  ],
+  "AiPriorities": [
+    {
+      "$type": "UseAbility",
+      "Ability": "slam",
+      "Target": "NearestEnemy"
+    },
+    {
+      "$type": "MoveToward",
+      "Target": "NearestEnemy",
+      "StopAtDistance": 1
+    },
+    {
+      "$type": "UseAbility",
+      "Ability": "slam",
+      "Target": "NearestEnemy"
+    }
+  ],
+  "SummonApCost": 2,
+  "SummonRange": 2
+}

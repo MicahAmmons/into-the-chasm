@@ -1,0 +1,16 @@
+{
+  "Id": "light",
+  "Name": "Light",
+  "Color": "#fff6c9",
+  "DamageTakenFrom": [
+    {
+      "Element": "dark",
+      "Percent": -40
+    },
+    {
+      "Element": "dark",
+      "Percent": 40
+    }
+  ],
+  "Notes": "Ported from JustPlaying Resistance.json: superEffective=-40, mildlyEffective=-20, superVulnerable=+40, mildlyVulnerable=+20."
+}

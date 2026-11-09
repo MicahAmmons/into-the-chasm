@@ -1,0 +1,35 @@
+{
+  "Id": "lava_ball",
+  "Name": "Lava Ball",
+  "Description": "Lobs molten goo. (Ported: Fire Ooze, 1, range 6.) Added: 50% burn.",
+  "Icon": "",
+  "ApCost": 1,
+  "MinRange": 2,
+  "MaxRange": 6,
+  "NeedsLineOfSight": true,
+  "Target": "Enemy",
+  "Area": "Single",
+  "AreaSize": 0,
+  "Cooldown": 0,
+  "UsesPerTurn": 0,
+  "Effects": [
+    {
+      "$type": "Damage",
+      "AffectsEnemies": true,
+      "AffectsAllies": false,
+      "Min": 1,
+      "Max": 1,
+      "Element": "fire"
+    },
+    {
+      "$type": "ApplyStatus",
+      "AffectsEnemies": true,
+      "AffectsAllies": false,
+      "Status": "burn",
+      "Duration": 0,
+      "Chance": 50
+    }
+  ],
+  "Animation": "Attack",
+  "HitDelayMs": 600
+}

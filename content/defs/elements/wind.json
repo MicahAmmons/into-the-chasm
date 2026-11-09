@@ -1,0 +1,24 @@
+{
+  "Id": "wind",
+  "Name": "Wind",
+  "Color": "#d6f5d0",
+  "DamageTakenFrom": [
+    {
+      "Element": "acid",
+      "Percent": -40
+    },
+    {
+      "Element": "metal",
+      "Percent": -20
+    },
+    {
+      "Element": "earth",
+      "Percent": 40
+    },
+    {
+      "Element": "ice",
+      "Percent": 20
+    }
+  ],
+  "Notes": "Ported from JustPlaying Resistance.json: superEffective=-40, mildlyEffective=-20, superVulnerable=+40, mildlyVulnerable=+20."
+}

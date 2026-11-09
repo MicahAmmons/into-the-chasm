@@ -1,0 +1,24 @@
+{
+  "Id": "electricity",
+  "Name": "Electricity",
+  "Color": "#ffe65c",
+  "DamageTakenFrom": [
+    {
+      "Element": "water",
+      "Percent": -40
+    },
+    {
+      "Element": "fire",
+      "Percent": -20
+    },
+    {
+      "Element": "metal",
+      "Percent": 40
+    },
+    {
+      "Element": "acid",
+      "Percent": 20
+    }
+  ],
+  "Notes": "Ported from JustPlaying Resistance.json: superEffective=-40, mildlyEffective=-20, superVulnerable=+40, mildlyVulnerable=+20."
+}

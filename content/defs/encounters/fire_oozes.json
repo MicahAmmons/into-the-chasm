@@ -1,0 +1,14 @@
+{
+  "Id": "fire_oozes",
+  "Name": "Fire oozes",
+  "Monsters": [
+    {
+      "Monster": "fire_ooze",
+      "Count": 2
+    }
+  ],
+  "CanFlee": true,
+  "Respawn": "Respawns",
+  "OnVictory": [],
+  "OnDefeat": []
+}

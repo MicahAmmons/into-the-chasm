@@ -1,0 +1,18 @@
+{
+  "Id": "burn",
+  "Name": "Burn",
+  "Description": "Takes fire damage at the start of each turn.",
+  "Icon": "icons/aspects/acidIcon.png",
+  "IsBuff": false,
+  "DefaultDuration": 3,
+  "Stacks": true,
+  "DamageTakenPercent": 0,
+  "DamageDealtPercent": 0,
+  "ApChange": 0,
+  "MpChange": 0,
+  "Rooted": false,
+  "TickAt": "StartOfTurn",
+  "TickDamage": 1,
+  "TickElement": "fire",
+  "TickHeal": 0
+}
