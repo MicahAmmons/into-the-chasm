@@ -4,6 +4,7 @@
     <ProjectReference Include="..\Chasm.Core\Chasm.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="FontStashSharp.MonoGame" Version="1.6.2" />
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.6" />
   </ItemGroup>
   <ItemGroup>
