@@ -3,8 +3,12 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <AssemblyName>ChasmTools</AssemblyName>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Chasm.Game\Chasm.Game.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="ImGui.NET" Version="1.91.6.1" />
   </ItemGroup>
 </Project>

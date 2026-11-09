@@ -26,16 +26,25 @@ public sealed class Canvas : IDisposable
         UpdateDestination();
     }
 
+    /// <summary>
+    /// Window area the canvas is fitted into. Null = the whole window. Editors set this so their
+    /// side panels sit beside the map instead of covering it.
+    /// </summary>
+    public Func<Rectangle>? Region { get; set; }
+
     public void UpdateDestination()
     {
         var pp = _device.PresentationParameters;
-        float scale = Math.Min(pp.BackBufferWidth / (float)Width, pp.BackBufferHeight / (float)Height);
+        var area = Region?.Invoke() ?? new Rectangle(0, 0, pp.BackBufferWidth, pp.BackBufferHeight);
+        if (area.Width <= 0 || area.Height <= 0) area = new Rectangle(0, 0, pp.BackBufferWidth, pp.BackBufferHeight);
+        float scale = Math.Min(area.Width / (float)Width, area.Height / (float)Height);
         int w = (int)(Width * scale), h = (int)(Height * scale);
-        Destination = new Rectangle((pp.BackBufferWidth - w) / 2, (pp.BackBufferHeight - h) / 2, w, h);
+        Destination = new Rectangle(area.X + (area.Width - w) / 2, area.Y + (area.Height - h) / 2, w, h);
     }
 
     public Vector2 WindowToCanvas(Point window)
     {
+        UpdateDestination();
         var d = Destination;
         if (d.Width == 0 || d.Height == 0) return Vector2.Zero;
         return new Vector2((window.X - d.X) * Width / (float)d.Width, (window.Y - d.Y) * Height / (float)d.Height);
