@@ -2,23 +2,28 @@
   "Id": "f1_0_0",
   "Name": "Waking Meadow",
   "Floor": 1,
+  "X": 0,
+  "Y": 0,
   "Layers": [
     {
       "Texture": "tiles/floor1/0_0_0/LowerRocks_0_0_0.png",
       "Kind": "Background",
-      "Opacity": 1.0
+      "Opacity": 1
     },
     {
       "Texture": "tiles/floor1/0_0_0/0_0_0.png",
       "Kind": "Background",
-      "Opacity": 1.0
+      "Opacity": 1
     },
     {
       "Texture": "tiles/floor1/0_0_0/ForeDarkFog_0_0_0.png",
       "Kind": "Foreground",
-      "Opacity": 1.0
+      "Opacity": 1
     }
   ],
+  "PaintRegions": [],
+  "LocalMaterials": [],
+  "Props": [],
   "BackgroundColor": "#1a1d2e",
   "Exits": [
     {
@@ -36,106 +41,9 @@
       "Prompt": "Continue to the next area?"
     }
   ],
-  "Spawn": {
-    "Q": 15,
-    "R": 0
-  },
-  "PlayerCombatStarts": [
-    {
-      "Q": 6,
-      "R": 2
-    },
-    {
-      "Q": 7,
-      "R": 1
-    },
-    {
-      "Q": 10,
-      "R": 0
-    },
-    {
-      "Q": 13,
-      "R": -1
-    },
-    {
-      "Q": 14,
-      "R": -2
-    },
-    {
-      "Q": 18,
-      "R": -1
-    },
-    {
-      "Q": 21,
-      "R": 0
-    },
-    {
-      "Q": 22,
-      "R": -1
-    },
-    {
-      "Q": 23,
-      "R": 3
-    },
-    {
-      "Q": 23,
-      "R": 7
-    },
-    {
-      "Q": 24,
-      "R": 6
-    }
-  ],
-  "EnemyCombatStarts": [
-    {
-      "Q": 9,
-      "R": 0
-    },
-    {
-      "Q": 10,
-      "R": -1
-    },
-    {
-      "Q": 10,
-      "R": 1
-    },
-    {
-      "Q": 11,
-      "R": 0
-    },
-    {
-      "Q": 17,
-      "R": -1
-    },
-    {
-      "Q": 18,
-      "R": -2
-    },
-    {
-      "Q": 18,
-      "R": 0
-    },
-    {
-      "Q": 19,
-      "R": -1
-    },
-    {
-      "Q": 22,
-      "R": 3
-    },
-    {
-      "Q": 23,
-      "R": 2
-    },
-    {
-      "Q": 23,
-      "R": 4
-    },
-    {
-      "Q": 24,
-      "R": 3
-    }
-  ],
+  "Spawn": "15,0",
+  "PlayerCombatStarts": "6,2 7,1 10,0 13,-1 14,-2 18,-1 21,0 22,-1 23,3 23,7 24,6",
+  "EnemyCombatStarts": "9,0 10,-1 10,1 11,0 17,-1 18,-2 18,0 19,-1 22,3 23,2 23,4 24,3",
   "WalkMap": [
     "# # # # # # # # # # # # # # # #",
     " # # # # # # # # # # # # # # #",
@@ -175,13 +83,6 @@
   "Placements": [
     {
       "$type": "Figure",
-      "Id": "figure_1",
-      "Cell": {
-        "Q": 16,
-        "R": -2
-      },
-      "VisibleWhen": [],
-      "BlocksMovement": true,
       "Name": "Figure",
       "Animation": "cloud_figure",
       "Greeting": [
@@ -314,8 +215,13 @@
       ],
       "OffersRest": true,
       "OffersFastTravel": true,
-      "EncounterRange": 3
+      "EncounterRange": 3,
+      "Id": "figure_1",
+      "Cell": "16,-2",
+      "VisibleWhen": [],
+      "BlocksMovement": true
     }
   ],
-  "Notes": "Ported from JustPlaying MapTile_0_0_0.json. Old monsters: ['FireOoze']. Test floor (will be rebuilt)."
+  "OnMap": true,
+  "Notes": "Ported from JustPlaying MapTile_0_0_0.json. Old monsters: [\u0027FireOoze\u0027]. Test floor (will be rebuilt)."
 }

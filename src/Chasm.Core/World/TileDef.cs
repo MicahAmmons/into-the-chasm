@@ -43,21 +43,35 @@ public enum CombatStart { None, Player, Enemy }
 [Tooltip("One screen of a floor.")]
 public sealed class TileDef : Def
 {
-    [Range(0, 9999), Tooltip("Which floor this Tile belongs to.")]
-    public int Floor { get; set; } = 1;
+    [Range(0, 9999), Tooltip("Which floor this Tile belongs to. Empty = a sketch tile (no floor yet).")]
+    public int? Floor { get; set; } = 1;
 
-    [Tooltip("Drawn in order; first is furthest back.")]
+    [Tooltip("Position on the floor's map. Neighbours by X/Y connect automatically. Empty = not on the map.")]
+    public int? X { get; set; }
+    public int? Y { get; set; }
+
+    [Tooltip("Full-screen images drawn behind everything, in order (hand-painted tile art).")]
     public List<TileLayerDef> Layers { get; set; } = new();
+
+    [Hidden, Tooltip("Materials painted onto cells. List order = stacking order.")]
+    public List<PaintRegion> PaintRegions { get; set; } = new();
+
+    [Tooltip("Materials only this tile uses (and everything a sketch tile uses). Referenced as 'local:<id>'.")]
+    public List<MaterialDef> LocalMaterials { get; set; } = new();
+
+    [Hidden] public List<PropDef> Props { get; set; } = new();
 
     [Tooltip("Colour behind all layers, as #RRGGBB.")]
     public string BackgroundColor { get; set; } = "#1a1d2e";
 
+    [Tooltip("Extra / special exits. Tiles with X and Y connect to their neighbours automatically; use this for anything else.")]
     public List<TileExitDef> Exits { get; set; } = new();
 
     [Tooltip("Where the player appears when arriving by teleport / new game.")]
     public CellCoord Spawn { get; set; } = new(16, 1);
 
-    public List<CellCoord> PlayerCombatStarts { get; set; } = new();
+    [Hidden] public List<CellCoord> PlayerCombatStarts { get; set; } = new();
+    [Hidden, Tooltip("Cells where enemies are placed at random when a fight starts.")]
     public List<CellCoord> EnemyCombatStarts { get; set; } = new();
 
     /// <summary>
@@ -67,8 +81,22 @@ public sealed class TileDef : Def
     [Hidden]
     public List<string> WalkMap { get; set; } = new();
 
-    [Tooltip("Objects placed on cells: items, interactables, NPCs, monster groups...")]
+    [Hidden, Tooltip("Objects placed on cells: items, interactables, NPCs, monster groups...")]
     public List<Placement> Placements { get; set; } = new();
+
+    /// <summary>The id a tile with this floor/position gets, e.g. floor 4, (3,-1) -> "f4_3_m1".</summary>
+    public static string IdFor(int floor, int x, int y) => $"f{floor}_{N(x)}_{N(y)}";
+    private static string N(int v) => v < 0 ? $"m{-v}" : v.ToString();
+
+    public bool OnMap => Floor is not null && X is not null && Y is not null;
+
+    /// <summary>Finds a material by region reference: floor library id, or "local:id".</summary>
+    public MaterialDef? FindMaterial(string reference, FloorDef? floor)
+    {
+        if (reference.StartsWith("local:", StringComparison.Ordinal))
+            return LocalMaterials.FirstOrDefault(m => m.Id == reference[6..]);
+        return floor?.Materials.FirstOrDefault(m => m.Id == reference);
+    }
 
     // ---- walkability helpers (not saved) ----
 
@@ -143,6 +171,15 @@ public sealed class TileDef : Def
         foreach (var p in Placements)
             if (!IsoGrid.InTile(p.Cell)) yield return $"Placement '{p.Id}' is outside the tile.";
         if (!IsWalkable(Spawn)) yield return $"Spawn cell {Spawn} is not walkable.";
+        FloorDef? floor = Floor is int f ? registry.All<FloorDef>().FirstOrDefault(x => x.Number == f) : null;
+        foreach (var r in PaintRegions)
+            if (FindMaterial(r.Material, floor) is null) yield return $"Paint region '{r.Id}' uses missing material '{r.Material}'.";
+        if (OnMap)
+        {
+            var me = this;
+            var clash = registry.All<TileDef>().FirstOrDefault(t => t.Id != me.Id && t.Floor == me.Floor && t.X == me.X && t.Y == me.Y);
+            if (clash is not null) yield return $"Tile '{clash.Id}' already sits at floor {Floor} ({X},{Y}).";
+        }
     }
 }
 
@@ -154,7 +191,22 @@ public sealed class FloorDef : Def
     [Range(0, 9999)] public int Number { get; set; } = 1;
     [Ref(typeof(TileDef)), Tooltip("Where you arrive on this floor by default.")]
     public string EntryTile { get; set; } = "";
-    [Tooltip("Tint of the cloud layer separating floors, #RRGGBB.")]
-    public string CloudColor { get; set; } = "#c8d2e6";
     [Multiline] public string Theme { get; set; } = "";
+
+    [Group("Clouds"), Tooltip("Clouds below: cliffs fade down into these.")]
+    public CloudLayerDef LowerClouds { get; set; } = new() { Line = 0.7f };
+    [Group("Clouds"), Tooltip("Clouds above: walls fade up into these.")]
+    public CloudLayerDef UpperClouds { get; set; } = new() { Line = 0.12f, Enabled = false };
+
+    [Group("Look"), Range(0, 64), Tooltip("Default soft edge (pixels) for painted regions.")]
+    public int DefaultFeather { get; set; } = 6;
+    [Group("Look")] public string BackgroundColor { get; set; } = "#1a1d2e";
+    [Group("Look"), Tooltip("Not wired up yet.")] public string AmbientTint { get; set; } = "#ffffff";
+    [Group("Look"), Tooltip("Not wired up yet.")] public string FogColor { get; set; } = "#000000";
+    [Group("Look"), Tooltip("Not wired up yet.")] public string Music { get; set; } = "";
+    [Group("Look"), Ref(typeof(Combat.EncounterDef)), Tooltip("Not wired up yet.")]
+    public List<string> DefaultEncounters { get; set; } = new();
+
+    [Tooltip("The floor's texture library. Every tile on this floor can paint with these.")]
+    public List<MaterialDef> Materials { get; set; } = new();
 }

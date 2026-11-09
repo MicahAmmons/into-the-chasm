@@ -15,21 +15,22 @@
   "Effects": [
     {
       "$type": "Damage",
-      "AffectsEnemies": true,
-      "AffectsAllies": false,
       "Min": 1,
       "Max": 1,
-      "Element": "earth"
+      "Element": "earth",
+      "AffectsEnemies": true,
+      "AffectsAllies": false
     },
     {
       "$type": "ApplyStatus",
-      "AffectsEnemies": true,
-      "AffectsAllies": false,
       "Status": "rooted",
       "Duration": 0,
-      "Chance": 50
+      "Chance": 50,
+      "AffectsEnemies": true,
+      "AffectsAllies": false
     }
   ],
   "Animation": "Attack",
-  "HitDelayMs": 400
+  "HitDelayMs": 400,
+  "Notes": ""
 }

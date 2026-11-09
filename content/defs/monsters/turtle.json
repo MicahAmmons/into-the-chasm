@@ -52,7 +52,7 @@
         "BonusMp": 0,
         "GrantAbility": "",
         "GrantAspect": "",
-        "Message": "The turtle trusts you more. (+1 use per rest, +3 HP)"
+        "Message": "The turtle trusts you more. (\u002B1 use per rest, \u002B3 HP)"
       },
       {
         "XpRequired": 40,
@@ -63,8 +63,9 @@
         "BonusMp": 0,
         "GrantAbility": "",
         "GrantAspect": "aspect_of_the_turtle",
-        "Message": "The turtle's patience becomes yours."
+        "Message": "The turtle\u0027s patience becomes yours."
       }
     ]
-  }
+  },
+  "Notes": ""
 }

@@ -43,6 +43,8 @@ public static class ChasmJson
             TypeInfoResolver = resolver,
         };
         options.Converters.Add(new JsonStringEnumConverter());
+        options.Converters.Add(new Grid.CellCoordJsonConverter());
+        options.Converters.Add(new Grid.CellListJsonConverter());
         return options;
     }
 

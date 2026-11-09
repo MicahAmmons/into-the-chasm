@@ -14,5 +14,6 @@
   "TickAt": "StartOfTurn",
   "TickDamage": 0,
   "TickElement": "",
-  "TickHeal": 0
+  "TickHeal": 0,
+  "Notes": ""
 }

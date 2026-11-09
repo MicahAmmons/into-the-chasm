@@ -2,13 +2,18 @@
   "Id": "f2_1_m1",
   "Name": "Floor 2 (1,-1)",
   "Floor": 2,
+  "X": 1,
+  "Y": -1,
   "Layers": [
     {
       "Texture": "tiles/floor2/1_-1_1/1_-1_1.png",
       "Kind": "Background",
-      "Opacity": 1.0
+      "Opacity": 1
     }
   ],
+  "PaintRegions": [],
+  "LocalMaterials": [],
+  "Props": [],
   "BackgroundColor": "#1a1d2e",
   "Exits": [
     {
@@ -33,12 +38,9 @@
       "Prompt": "Continue to the next area?"
     }
   ],
-  "Spawn": {
-    "Q": 16,
-    "R": 1
-  },
-  "PlayerCombatStarts": [],
-  "EnemyCombatStarts": [],
+  "Spawn": "16,1",
+  "PlayerCombatStarts": "",
+  "EnemyCombatStarts": "",
   "WalkMap": [
     "# # # . . . # # # # . . . # # #",
     " # # # . . . # # # . . . # # #",
@@ -76,5 +78,6 @@
     " # # # # # # # # # # # # # # #"
   ],
   "Placements": [],
+  "OnMap": true,
   "Notes": "Ported from JustPlaying MapTile_1_-1_1.json. Old monsters: []. Test floor (will be rebuilt)."
 }

@@ -5,9 +5,8 @@
   "PlayerAnimation": "",
   "PlayerWalkSpeed": 220,
   "DayLengthMinutes": 10,
+  "MinutesPerFight": 1,
   "NightStartsAt": 0.65,
-  "InteractRange": 1,
-  "Notes": "PlayerAnimation is empty until player art exists (the player draws as a placeholder).",
   "NewGameOutcomes": [
     {
       "$type": "Message",
@@ -19,8 +18,16 @@
       ]
     }
   ],
+  "InteractRange": 1,
   "PlayerBaseHp": 20,
   "PlayerBaseAp": 6,
   "PlayerBaseMp": 3,
-  "PlayerInitiative": 10
+  "PlayerInitiative": 10,
+  "XpForFirstLevel": 20,
+  "XpGrowth": 1.5,
+  "HpPerLevel": 2,
+  "HpXpPerDamage": 1,
+  "ApXpPerPoint": 1,
+  "MpXpPerCell": 1,
+  "Notes": "PlayerAnimation is empty until player art exists (the player draws as a placeholder)."
 }

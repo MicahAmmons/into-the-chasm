@@ -2,23 +2,28 @@
   "Id": "f1_m1_m1",
   "Name": "Windy Bluffs",
   "Floor": 1,
+  "X": -1,
+  "Y": -1,
   "Layers": [
     {
       "Texture": "tiles/floor1/-1_-1_0/LowerRocks_-1_-1_0.png",
       "Kind": "Background",
-      "Opacity": 1.0
+      "Opacity": 1
     },
     {
       "Texture": "tiles/floor1/-1_-1_0/-1_-1_0.png",
       "Kind": "Background",
-      "Opacity": 1.0
+      "Opacity": 1
     },
     {
       "Texture": "tiles/floor1/-1_-1_0/ForeDarkFog_-1_-1_0.png",
       "Kind": "Foreground",
-      "Opacity": 1.0
+      "Opacity": 1
     }
   ],
+  "PaintRegions": [],
+  "LocalMaterials": [],
+  "Props": [],
   "BackgroundColor": "#1a1d2e",
   "Exits": [
     {
@@ -36,102 +41,9 @@
       "Prompt": "Continue to the next area?"
     }
   ],
-  "Spawn": {
-    "Q": 16,
-    "R": 1
-  },
-  "PlayerCombatStarts": [
-    {
-      "Q": 7,
-      "R": 2
-    },
-    {
-      "Q": 9,
-      "R": 4
-    },
-    {
-      "Q": 11,
-      "R": 2
-    },
-    {
-      "Q": 14,
-      "R": 5
-    },
-    {
-      "Q": 16,
-      "R": 3
-    },
-    {
-      "Q": 18,
-      "R": 1
-    },
-    {
-      "Q": 20,
-      "R": -1
-    },
-    {
-      "Q": 22,
-      "R": -3
-    },
-    {
-      "Q": 21,
-      "R": 4
-    },
-    {
-      "Q": 23,
-      "R": 2
-    },
-    {
-      "Q": 25,
-      "R": 0
-    }
-  ],
-  "EnemyCombatStarts": [
-    {
-      "Q": 6,
-      "R": 2
-    },
-    {
-      "Q": 8,
-      "R": 4
-    },
-    {
-      "Q": 10,
-      "R": 2
-    },
-    {
-      "Q": 13,
-      "R": 5
-    },
-    {
-      "Q": 15,
-      "R": 3
-    },
-    {
-      "Q": 17,
-      "R": 1
-    },
-    {
-      "Q": 19,
-      "R": -1
-    },
-    {
-      "Q": 21,
-      "R": -3
-    },
-    {
-      "Q": 20,
-      "R": 4
-    },
-    {
-      "Q": 22,
-      "R": 2
-    },
-    {
-      "Q": 24,
-      "R": 0
-    }
-  ],
+  "Spawn": "16,1",
+  "PlayerCombatStarts": "7,2 9,4 11,2 14,5 16,3 18,1 20,-1 22,-3 21,4 23,2 25,0",
+  "EnemyCombatStarts": "6,2 8,4 10,2 13,5 15,3 17,1 19,-1 21,-3 20,4 22,2 24,0",
   "WalkMap": [
     "# . . . # # # # # # # # # # # #",
     " . . . # # # # # # # # # # # #",
@@ -171,13 +83,6 @@
   "Placements": [
     {
       "$type": "Interactable",
-      "Id": "windy_ledge",
-      "Cell": {
-        "Q": 22,
-        "R": 5
-      },
-      "VisibleWhen": [],
-      "BlocksMovement": false,
       "Label": "Windy ledge",
       "Sprite": "",
       "Animation": "",
@@ -215,10 +120,7 @@
                   "$type": "ChangeTile",
                   "Tile": "f2_0_0",
                   "UseArrivalCell": false,
-                  "ArrivalCell": {
-                    "Q": 0,
-                    "R": 0
-                  }
+                  "ArrivalCell": "0,0"
                 }
               ],
               "IfNo": []
@@ -234,31 +136,33 @@
               "Speaker": "",
               "Pages": [
                 "The wind surges strongly up the bluffs...",
-                "If you stepped off, you'd be sent flying...",
+                "If you stepped off, you\u0027d be sent flying...",
                 "Perhaps you could make yourself heavier..."
               ]
             }
           ]
         }
       ],
-      "FallbackMessage": ""
+      "FallbackMessage": "",
+      "Id": "windy_ledge",
+      "Cell": "22,5",
+      "VisibleWhen": [],
+      "BlocksMovement": false
     },
     {
       "$type": "MonsterGroup",
-      "Id": "monsters_1",
-      "Cell": {
-        "Q": 15,
-        "R": 1
-      },
-      "VisibleWhen": [],
-      "BlocksMovement": false,
       "Encounter": "ooze_trio",
       "Patrol": "Stay",
-      "PatrolPoints": [],
+      "PatrolPoints": "",
       "WalkSpeed": 70,
       "PauseSeconds": 2,
-      "Aggressive": true
+      "Aggressive": true,
+      "Id": "monsters_1",
+      "Cell": "15,1",
+      "VisibleWhen": [],
+      "BlocksMovement": false
     }
   ],
-  "Notes": "Ported from JustPlaying MapTile_-1_-1_0.json. Old monsters: ['FireOoze']. Test floor (will be rebuilt)."
+  "OnMap": true,
+  "Notes": "Ported from JustPlaying MapTile_-1_-1_0.json. Old monsters: [\u0027FireOoze\u0027]. Test floor (will be rebuilt)."
 }

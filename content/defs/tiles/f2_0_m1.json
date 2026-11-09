@@ -1,9 +1,13 @@
 {
   "Id": "f2_0_m1",
   "Name": "Test tile f2_0_m1",
-  "Notes": "Placeholder test tile (no art yet). Created so every exit links 1:1.",
   "Floor": 2,
+  "X": 0,
+  "Y": -1,
   "Layers": [],
+  "PaintRegions": [],
+  "LocalMaterials": [],
+  "Props": [],
   "BackgroundColor": "#2a2f45",
   "Exits": [
     {
@@ -14,12 +18,9 @@
       "Prompt": "Continue to the next area?"
     }
   ],
-  "Spawn": {
-    "Q": 15,
-    "R": 2
-  },
-  "PlayerCombatStarts": [],
-  "EnemyCombatStarts": [],
+  "Spawn": "15,2",
+  "PlayerCombatStarts": "",
+  "EnemyCombatStarts": "",
   "WalkMap": [
     "# # # # # # . . . . # # # # # #",
     " # # # # # . . . . . # # # # #",
@@ -56,5 +57,7 @@
     "# # # # # # . . . . # # # # # #",
     " # # # # # . . . . . # # # # #"
   ],
-  "Placements": []
+  "Placements": [],
+  "OnMap": true,
+  "Notes": "Placeholder test tile (no art yet). Created so every exit links 1:1."
 }

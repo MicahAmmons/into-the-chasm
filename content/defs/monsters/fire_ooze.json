@@ -27,5 +27,12 @@
     }
   ],
   "SummonApCost": 2,
-  "SummonRange": 2
+  "SummonRange": 2,
+  "Summon": {
+    "BaseDailyUses": 1,
+    "BaseOnField": 1,
+    "XpPerSummon": 10,
+    "AffinityLevels": []
+  },
+  "Notes": ""
 }

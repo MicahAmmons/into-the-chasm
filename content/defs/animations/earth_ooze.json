@@ -21,7 +21,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         }
       ]
     },
@@ -44,7 +44,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         }
       ]
     },
@@ -67,7 +67,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         }
       ]
     },
@@ -90,7 +90,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         }
       ]
     },
@@ -113,10 +113,10 @@
           "YOffset": 0,
           "Crossfade": true,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         }
       ]
     }
   ],
-  "Notes": "Ported from JustPlaying AnimationData.json \"EarthOoze\"."
+  "Notes": "Ported from JustPlaying AnimationData.json \u0022EarthOoze\u0022."
 }

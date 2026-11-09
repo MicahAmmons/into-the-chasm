@@ -15,13 +15,14 @@
   "Effects": [
     {
       "$type": "ApplyStatus",
-      "AffectsEnemies": false,
-      "AffectsAllies": true,
       "Status": "turtle_shell",
       "Duration": 0,
-      "Chance": 100
+      "Chance": 100,
+      "AffectsEnemies": false,
+      "AffectsAllies": true
     }
   ],
   "Animation": "Attack",
-  "HitDelayMs": 400
+  "HitDelayMs": 400,
+  "Notes": ""
 }

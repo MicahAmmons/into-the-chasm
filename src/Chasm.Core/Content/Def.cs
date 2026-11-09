@@ -10,10 +10,12 @@ namespace Chasm.Core.Content;
 public abstract class Def
 {
     /// <summary>Unique, stable id. Also the file name. Other content refers to this, so avoid renaming.</summary>
+    [System.Text.Json.Serialization.JsonPropertyOrder(-100)]
     [Tooltip("Unique id, also the file name. Other content refers to it by this id, so avoid renaming it later.")]
     [Order(-100)]
     public string Id { get; set; } = "";
 
+    [System.Text.Json.Serialization.JsonPropertyOrder(-99)]
     [Tooltip("Human readable name shown in game and in editor lists.")]
     [Order(-99)]
     public string Name { get; set; } = "";
@@ -23,6 +25,7 @@ public abstract class Def
     [Tooltip("Your own notes. Never shown in game.")]
     public string Notes { get; set; } = "";
 
+    [System.Text.Json.Serialization.JsonIgnore]
     public string DisplayName => string.IsNullOrWhiteSpace(Name) ? Id : Name;
 
     /// <summary>

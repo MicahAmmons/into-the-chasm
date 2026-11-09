@@ -349,7 +349,7 @@ public partial class WorldScene : Scene, IRuleHost
     {
         var edges = IsoGrid.EdgesOf(cell);
         if (edges == Edge.None || Player.IsMoving) return;
-        foreach (var exit in Tile.Exits)
+        foreach (var exit in TileLinks.ExitsFor(Session.Defs, Tile))
         {
             if ((edges & exit.Edge) == 0 || (_suppressedEdges & exit.Edge) != 0) continue;
             _suppressedEdges |= exit.Edge;

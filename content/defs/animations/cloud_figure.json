@@ -21,10 +21,10 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "CloudMovement",
-          "Scale": 1.0
+          "Scale": 1
         }
       ]
     }
   ],
-  "Notes": "Ported from JustPlaying AnimationData.json \"TestCase\"."
+  "Notes": "Ported from JustPlaying AnimationData.json \u0022TestCase\u0022."
 }

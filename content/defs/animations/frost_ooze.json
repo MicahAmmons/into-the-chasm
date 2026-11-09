@@ -21,7 +21,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         }
       ]
     },
@@ -44,7 +44,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         }
       ]
     },
@@ -67,7 +67,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         }
       ]
     },
@@ -90,7 +90,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         }
       ]
     },
@@ -113,7 +113,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         },
         {
           "Texture": "monsters/frost_ooze/FrostOozeIdle.png",
@@ -131,7 +131,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         },
         {
           "Texture": "monsters/frost_ooze/FrostOozeIdle.png",
@@ -149,7 +149,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         },
         {
           "Texture": "monsters/frost_ooze/FrostOozeIdle.png",
@@ -167,7 +167,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         },
         {
           "Texture": "monsters/frost_ooze/FrostOozeIdle.png",
@@ -185,10 +185,10 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         }
       ]
     }
   ],
-  "Notes": "Ported from JustPlaying AnimationData.json \"FrostOoze\"."
+  "Notes": "Ported from JustPlaying AnimationData.json \u0022FrostOoze\u0022."
 }

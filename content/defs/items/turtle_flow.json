@@ -1,6 +1,6 @@
 {
   "Id": "turtle_flow",
-  "Name": "Turtle's Flow",
+  "Name": "Turtle\u0027s Flow",
   "Description": "A shimmering breath of cloud. Consume it to bond with the turtle.",
   "Category": "Consumable",
   "Icon": "",
@@ -33,5 +33,7 @@
     }
   ],
   "NoUseMessage": "",
+  "CombatAbility": "",
+  "ConsumedInCombat": true,
   "Notes": "Milestone 1: using it unlocks the Turtle summon."
 }

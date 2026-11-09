@@ -1,7 +1,7 @@
 {
   "Id": "earth_ooze",
   "Name": "Earth Ooze",
-  "Description": "Roots enemies from range and keeps its distance; flees when hurt. (Original \"always run away first\" made fights endless.)",
+  "Description": "Roots enemies from range and keeps its distance; flees when hurt. (Original \u0022always run away first\u0022 made fights endless.)",
   "Animation": "earth_ooze",
   "Icon": "icons/monsters/EarthOoze.png",
   "Element": "earth",
@@ -36,5 +36,12 @@
     }
   ],
   "SummonApCost": 2,
-  "SummonRange": 2
+  "SummonRange": 2,
+  "Summon": {
+    "BaseDailyUses": 1,
+    "BaseOnField": 1,
+    "XpPerSummon": 10,
+    "AffinityLevels": []
+  },
+  "Notes": ""
 }

@@ -15,13 +15,14 @@
   "Effects": [
     {
       "$type": "Damage",
-      "AffectsEnemies": true,
-      "AffectsAllies": false,
       "Min": 1,
       "Max": 3,
-      "Element": "ice"
+      "Element": "ice",
+      "AffectsEnemies": true,
+      "AffectsAllies": false
     }
   ],
   "Animation": "Attack",
-  "HitDelayMs": 400
+  "HitDelayMs": 400,
+  "Notes": ""
 }

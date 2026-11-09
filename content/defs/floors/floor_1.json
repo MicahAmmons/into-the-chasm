@@ -3,7 +3,31 @@
   "Name": "Floor 1",
   "Number": 1,
   "EntryTile": "f1_0_0",
-  "CloudColor": "#c8d2e6",
   "Theme": "",
+  "LowerClouds": {
+    "Enabled": true,
+    "Line": 0.7,
+    "FadeLength": 0.15,
+    "Texture": "backgrounds/clouds/Cloud1.png",
+    "Tint": "#ffffff",
+    "Speed": 20,
+    "Opacity": 1
+  },
+  "UpperClouds": {
+    "Enabled": false,
+    "Line": 0.12,
+    "FadeLength": 0.15,
+    "Texture": "backgrounds/clouds/Cloud1.png",
+    "Tint": "#ffffff",
+    "Speed": 20,
+    "Opacity": 1
+  },
+  "DefaultFeather": 6,
+  "BackgroundColor": "#1a1d2e",
+  "AmbientTint": "#ffffff",
+  "FogColor": "#000000",
+  "Music": "",
+  "DefaultEncounters": [],
+  "Materials": [],
   "Notes": "Ported from JustPlaying."
 }

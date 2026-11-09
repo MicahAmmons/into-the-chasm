@@ -9,5 +9,7 @@
   "ShowInQuickBar": true,
   "UseRules": [],
   "NoUseMessage": "It smells sweet. Something bigger than you would love this.",
+  "CombatAbility": "",
+  "ConsumedInCombat": true,
   "Notes": "Milestone 1: fed to the Turtle Beast."
 }

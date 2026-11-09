@@ -2,23 +2,28 @@
   "Id": "f1_m1_0",
   "Name": "Thick Grass",
   "Floor": 1,
+  "X": -1,
+  "Y": 0,
   "Layers": [
     {
       "Texture": "tiles/floor1/-1_0_0/LowerRocks_-1_0_0.png",
       "Kind": "Background",
-      "Opacity": 1.0
+      "Opacity": 1
     },
     {
       "Texture": "tiles/floor1/-1_0_0/-1_0_0.png",
       "Kind": "Background",
-      "Opacity": 1.0
+      "Opacity": 1
     },
     {
       "Texture": "tiles/floor1/-1_0_0/ForeDarkFog_-1_0_0.png",
       "Kind": "Foreground",
-      "Opacity": 1.0
+      "Opacity": 1
     }
   ],
+  "PaintRegions": [],
+  "LocalMaterials": [],
+  "Props": [],
   "BackgroundColor": "#1a1d2e",
   "Exits": [
     {
@@ -36,158 +41,9 @@
       "Prompt": "Continue to the next area?"
     }
   ],
-  "Spawn": {
-    "Q": 16,
-    "R": 1
-  },
-  "PlayerCombatStarts": [
-    {
-      "Q": 17,
-      "R": -8
-    },
-    {
-      "Q": 15,
-      "R": -2
-    },
-    {
-      "Q": 15,
-      "R": 0
-    },
-    {
-      "Q": 16,
-      "R": -1
-    },
-    {
-      "Q": 15,
-      "R": 2
-    },
-    {
-      "Q": 16,
-      "R": 1
-    },
-    {
-      "Q": 15,
-      "R": 4
-    },
-    {
-      "Q": 16,
-      "R": 3
-    },
-    {
-      "Q": 15,
-      "R": 6
-    },
-    {
-      "Q": 16,
-      "R": 5
-    },
-    {
-      "Q": 16,
-      "R": 6
-    },
-    {
-      "Q": 22,
-      "R": 3
-    },
-    {
-      "Q": 17,
-      "R": 11
-    }
-  ],
-  "EnemyCombatStarts": [
-    {
-      "Q": 15,
-      "R": -9
-    },
-    {
-      "Q": 15,
-      "R": -8
-    },
-    {
-      "Q": 16,
-      "R": -9
-    },
-    {
-      "Q": 16,
-      "R": -8
-    },
-    {
-      "Q": 17,
-      "R": -9
-    },
-    {
-      "Q": 19,
-      "R": 2
-    },
-    {
-      "Q": 20,
-      "R": 1
-    },
-    {
-      "Q": 21,
-      "R": 0
-    },
-    {
-      "Q": 19,
-      "R": 4
-    },
-    {
-      "Q": 24,
-      "R": 0
-    },
-    {
-      "Q": 20,
-      "R": 5
-    },
-    {
-      "Q": 16,
-      "R": 10
-    },
-    {
-      "Q": 25,
-      "R": 1
-    },
-    {
-      "Q": 17,
-      "R": 10
-    },
-    {
-      "Q": 21,
-      "R": 6
-    },
-    {
-      "Q": 18,
-      "R": 10
-    },
-    {
-      "Q": 26,
-      "R": 2
-    },
-    {
-      "Q": 17,
-      "R": 12
-    },
-    {
-      "Q": 18,
-      "R": 12
-    },
-    {
-      "Q": 24,
-      "R": 6
-    },
-    {
-      "Q": 25,
-      "R": 5
-    },
-    {
-      "Q": 26,
-      "R": 4
-    },
-    {
-      "Q": 27,
-      "R": 3
-    }
-  ],
+  "Spawn": "16,1",
+  "PlayerCombatStarts": "17,-8 15,-2 15,0 16,-1 15,2 16,1 15,4 16,3 15,6 16,5 16,6 22,3 17,11",
+  "EnemyCombatStarts": "15,-9 15,-8 16,-9 16,-8 17,-9 19,2 20,1 21,0 19,4 24,0 20,5 16,10 25,1 17,10 21,6 18,10 26,2 17,12 18,12 24,6 25,5 26,4 27,3",
   "WalkMap": [
     "# # # # # # # # # # # # # # # #",
     " # # # # # # # # # # # # # # #",
@@ -227,11 +83,12 @@
   "Placements": [
     {
       "$type": "ItemPickup",
+      "Item": "glow_berry",
+      "Count": 1,
+      "OneTime": true,
+      "AlsoOnPickup": [],
       "Id": "item_berry",
-      "Cell": {
-        "Q": 14,
-        "R": 3
-      },
+      "Cell": "14,3",
       "VisibleWhen": [
         {
           "$type": "Flag",
@@ -240,37 +97,22 @@
           "Value": 0
         }
       ],
-      "BlocksMovement": false,
-      "Item": "glow_berry",
-      "Count": 1,
-      "OneTime": true,
-      "AlsoOnPickup": []
+      "BlocksMovement": false
     },
     {
       "$type": "MonsterGroup",
-      "Id": "monsters_1",
-      "Cell": {
-        "Q": 17,
-        "R": -3
-      },
-      "VisibleWhen": [],
-      "BlocksMovement": false,
       "Encounter": "fire_oozes",
       "Patrol": "BackAndForth",
-      "PatrolPoints": [
-        {
-          "Q": 16,
-          "R": -7
-        },
-        {
-          "Q": 18,
-          "R": 2
-        }
-      ],
+      "PatrolPoints": "16,-7 18,2",
       "WalkSpeed": 60,
       "PauseSeconds": 2.5,
-      "Aggressive": false
+      "Aggressive": false,
+      "Id": "monsters_1",
+      "Cell": "17,-3",
+      "VisibleWhen": [],
+      "BlocksMovement": false
     }
   ],
-  "Notes": "Ported from JustPlaying MapTile_-1_0_0.json. Old monsters: ['FireOoze']. Test floor (will be rebuilt)."
+  "OnMap": true,
+  "Notes": "Ported from JustPlaying MapTile_-1_0_0.json. Old monsters: [\u0027FireOoze\u0027]. Test floor (will be rebuilt)."
 }

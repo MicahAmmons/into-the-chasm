@@ -18,5 +18,6 @@
   "CanFlee": true,
   "Respawn": "Respawns",
   "OnVictory": [],
-  "OnDefeat": []
+  "OnDefeat": [],
+  "Notes": ""
 }

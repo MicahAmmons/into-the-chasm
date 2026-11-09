@@ -21,7 +21,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         },
         {
           "Texture": "monsters/turtle/Turtle_Idle_SS.png",
@@ -39,7 +39,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         },
         {
           "Texture": "monsters/turtle/Turtle_Idle_SS.png",
@@ -57,7 +57,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         },
         {
           "Texture": "monsters/turtle/Turtle_Idle_SS.png",
@@ -75,7 +75,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         },
         {
           "Texture": "monsters/turtle/Turtle_Idle_SS.png",
@@ -93,7 +93,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         }
       ]
     },
@@ -116,7 +116,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         },
         {
           "Texture": "monsters/turtle/Turtle_Walk_SS.png",
@@ -134,7 +134,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         },
         {
           "Texture": "monsters/turtle/Turtle_Walk_SS.png",
@@ -152,7 +152,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         },
         {
           "Texture": "monsters/turtle/Turtle_Walk_SS.png",
@@ -170,7 +170,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         }
       ]
     },
@@ -193,7 +193,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         },
         {
           "Texture": "monsters/turtle/Turtle_Move_Start_Trans_SS.png",
@@ -211,7 +211,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         },
         {
           "Texture": "monsters/turtle/Turtle_Move_Start_Trans_SS.png",
@@ -229,7 +229,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         },
         {
           "Texture": "monsters/turtle/Turtle_Move_Start_Trans_SS.png",
@@ -247,7 +247,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         }
       ]
     },
@@ -270,7 +270,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         },
         {
           "Texture": "monsters/turtle/Turtle_Move_Start_Trans_SS.png",
@@ -288,7 +288,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         },
         {
           "Texture": "monsters/turtle/Turtle_Move_Start_Trans_SS.png",
@@ -306,7 +306,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         },
         {
           "Texture": "monsters/turtle/Turtle_Move_Start_Trans_SS.png",
@@ -324,7 +324,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         }
       ]
     },
@@ -347,7 +347,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         },
         {
           "Texture": "monsters/turtle/Turtle_Attack_SS.png",
@@ -365,7 +365,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         },
         {
           "Texture": "monsters/turtle/Turtle_Attack_SS.png",
@@ -383,7 +383,7 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         },
         {
           "Texture": "monsters/turtle/Turtle_Attack_SS.png",
@@ -401,10 +401,10 @@
           "YOffset": 0,
           "Crossfade": false,
           "Shader": "None",
-          "Scale": 1.0
+          "Scale": 1
         }
       ]
     }
   ],
-  "Notes": "Ported from JustPlaying AnimationData.json \"Turtle\"."
+  "Notes": "Ported from JustPlaying AnimationData.json \u0022Turtle\u0022."
 }

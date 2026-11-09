@@ -5,6 +5,21 @@ using Chasm.Tools.ImGuiHost;
 using Chasm.Tools.Scenes;
 
 // Developer launcher. --mode map|world|content|combat [--arg <tile id>] jumps straight into a tool.
+// --resave: load every content file and write it back in the current format (after format changes).
+if (args.Contains("--resave"))
+{
+    Chasm.Core.Serialization.ChasmJson.RegisterAssembly(typeof(ChasmGame).Assembly);
+    var paths = Chasm.Game.Assets.ContentPaths.Resolve();
+    var reg = new Chasm.Core.Content.DefRegistry();
+    reg.LoadAll(paths.Defs);
+    foreach (var e in reg.LoadErrors) Console.WriteLine($"[load error] {e}");
+    int n = 0;
+    foreach (var t in Chasm.Core.Content.DefRegistry.DefTypes)
+        foreach (var d in reg.All(t).ToList()) { if (d is Chasm.Core.World.TileDef td) td.CommitWalkable(); reg.Save(d); n++; }
+    Console.WriteLine($"Re-saved {n} content files.");
+    return;
+}
+
 var options = GameOptions.FromArgs(args, new GameOptions { WindowTitle = $"{GameInfo.Title} - Tools", WindowWidth = 1800, WindowHeight = 1000 });
 using var game = new ChasmGame(options, s =>
 {

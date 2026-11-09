@@ -20,5 +20,5 @@
       "Percent": 20
     }
   ],
-  "Notes": "Ported from JustPlaying Resistance.json: superEffective=-40, mildlyEffective=-20, superVulnerable=+40, mildlyVulnerable=+20."
+  "Notes": "Ported from JustPlaying Resistance.json: superEffective=-40, mildlyEffective=-20, superVulnerable=\u002B40, mildlyVulnerable=\u002B20."
 }

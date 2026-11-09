@@ -2,13 +2,18 @@
   "Id": "f2_0_0",
   "Name": "Floor 2 (0,0)",
   "Floor": 2,
+  "X": 0,
+  "Y": 0,
   "Layers": [
     {
       "Texture": "tiles/floor2/0_0_1/0_0_1.png",
       "Kind": "Background",
-      "Opacity": 1.0
+      "Opacity": 1
     }
   ],
+  "PaintRegions": [],
+  "LocalMaterials": [],
+  "Props": [],
   "BackgroundColor": "#1a1d2e",
   "Exits": [
     {
@@ -19,22 +24,9 @@
       "Prompt": "Continue to the next area?"
     }
   ],
-  "Spawn": {
-    "Q": 17,
-    "R": -1
-  },
-  "PlayerCombatStarts": [
-    {
-      "Q": 21,
-      "R": -2
-    }
-  ],
-  "EnemyCombatStarts": [
-    {
-      "Q": 20,
-      "R": -1
-    }
-  ],
+  "Spawn": "17,-1",
+  "PlayerCombatStarts": "21,-2",
+  "EnemyCombatStarts": "20,-1",
   "WalkMap": [
     "# # # # # # # # # # # # # # # #",
     " # # # # # # # # # # # # # # #",
@@ -74,13 +66,6 @@
   "Placements": [
     {
       "$type": "Figure",
-      "Id": "figure_2",
-      "Cell": {
-        "Q": 18,
-        "R": -2
-      },
-      "VisibleWhen": [],
-      "BlocksMovement": true,
       "Name": "Figure",
       "Animation": "cloud_figure",
       "Greeting": [
@@ -90,8 +75,13 @@
       "TalkRules": [],
       "OffersRest": true,
       "OffersFastTravel": true,
-      "EncounterRange": 3
+      "EncounterRange": 3,
+      "Id": "figure_2",
+      "Cell": "18,-2",
+      "VisibleWhen": [],
+      "BlocksMovement": true
     }
   ],
-  "Notes": "Ported from JustPlaying MapTile_0_0_1.json. Old monsters: ['EarthOoze']. Had trigger PathToLevel2 (wind/turtle aspect message) - see placements. Test floor (will be rebuilt)."
+  "OnMap": true,
+  "Notes": "Ported from JustPlaying MapTile_0_0_1.json. Old monsters: [\u0027EarthOoze\u0027]. Had trigger PathToLevel2 (wind/turtle aspect message) - see placements. Test floor (will be rebuilt)."
 }

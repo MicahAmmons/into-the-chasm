@@ -2,38 +2,43 @@
   "Id": "f1_0_m1",
   "Name": "Turtle Rise",
   "Floor": 1,
+  "X": 0,
+  "Y": -1,
   "Layers": [
     {
       "Texture": "tiles/floor1/0_-1_0/LowerRocks_0_-1_0.png",
       "Kind": "Background",
-      "Opacity": 1.0
+      "Opacity": 1
     },
     {
       "Texture": "tiles/floor1/0_-1_0/0_-1_0.png",
       "Kind": "Background",
-      "Opacity": 1.0
+      "Opacity": 1
     },
     {
       "Texture": "tiles/floor1/0_-1_0/GlowMound1_0_-1_0.png",
       "Kind": "Background",
-      "Opacity": 1.0
+      "Opacity": 1
     },
     {
       "Texture": "tiles/floor1/0_-1_0/GlowMound2_0_-1_0.png",
       "Kind": "Background",
-      "Opacity": 1.0
+      "Opacity": 1
     },
     {
       "Texture": "tiles/floor1/0_-1_0/GlowMound3_0_-1_0.png",
       "Kind": "Background",
-      "Opacity": 1.0
+      "Opacity": 1
     },
     {
       "Texture": "tiles/floor1/0_-1_0/ForeDarkFog_0_-1_0.png",
       "Kind": "Foreground",
-      "Opacity": 1.0
+      "Opacity": 1
     }
   ],
+  "PaintRegions": [],
+  "LocalMaterials": [],
+  "Props": [],
   "BackgroundColor": "#1a1d2e",
   "Exits": [
     {
@@ -51,106 +56,9 @@
       "Prompt": "Continue to the next area?"
     }
   ],
-  "Spawn": {
-    "Q": 16,
-    "R": 1
-  },
-  "PlayerCombatStarts": [
-    {
-      "Q": 6,
-      "R": -2
-    },
-    {
-      "Q": 7,
-      "R": -1
-    },
-    {
-      "Q": 17,
-      "R": -5
-    },
-    {
-      "Q": 17,
-      "R": 0
-    },
-    {
-      "Q": 17,
-      "R": 2
-    },
-    {
-      "Q": 17,
-      "R": 7
-    },
-    {
-      "Q": 24,
-      "R": 2
-    }
-  ],
-  "EnemyCombatStarts": [
-    {
-      "Q": 6,
-      "R": -3
-    },
-    {
-      "Q": 5,
-      "R": -1
-    },
-    {
-      "Q": 8,
-      "R": -2
-    },
-    {
-      "Q": 7,
-      "R": 0
-    },
-    {
-      "Q": 16,
-      "R": -6
-    },
-    {
-      "Q": 16,
-      "R": -4
-    },
-    {
-      "Q": 18,
-      "R": -6
-    },
-    {
-      "Q": 18,
-      "R": -4
-    },
-    {
-      "Q": 16,
-      "R": 6
-    },
-    {
-      "Q": 16,
-      "R": 8
-    },
-    {
-      "Q": 18,
-      "R": 6
-    },
-    {
-      "Q": 23,
-      "R": 1
-    },
-    {
-      "Q": 18,
-      "R": 8
-    },
-    {
-      "Q": 23,
-      "R": 3
-    },
-    {
-      "Q": 25,
-      "R": 1
-    },
-    {
-      "Q": 25,
-      "R": 3
-    }
-  ],
+  "Spawn": "16,1",
+  "PlayerCombatStarts": "6,-2 7,-1 17,-5 17,0 17,2 17,7 24,2",
+  "EnemyCombatStarts": "6,-3 5,-1 8,-2 7,0 16,-6 16,-4 18,-6 18,-4 16,6 16,8 18,6 23,1 18,8 23,3 25,1 25,3",
   "WalkMap": [
     "# # # # # # # . . . # # # # # #",
     " # # # # # # # . . . # # # # #",
@@ -190,13 +98,6 @@
   "Placements": [
     {
       "$type": "Interactable",
-      "Id": "turtle_beast",
-      "Cell": {
-        "Q": 16,
-        "R": -2
-      },
-      "VisibleWhen": [],
-      "BlocksMovement": true,
       "Label": "Turtle Beast",
       "Sprite": "",
       "Animation": "turtle",
@@ -268,37 +169,26 @@
           ]
         }
       ],
-      "FallbackMessage": "An enormous, ancient turtle. It looks hungry."
+      "FallbackMessage": "An enormous, ancient turtle. It looks hungry.",
+      "Id": "turtle_beast",
+      "Cell": "16,-2",
+      "VisibleWhen": [],
+      "BlocksMovement": true
     },
     {
       "$type": "MonsterGroup",
-      "Id": "monsters_1",
-      "Cell": {
-        "Q": 15,
-        "R": 6
-      },
-      "VisibleWhen": [],
-      "BlocksMovement": false,
       "Encounter": "lone_frost_ooze",
       "Patrol": "Loop",
-      "PatrolPoints": [
-        {
-          "Q": 19,
-          "R": 5
-        },
-        {
-          "Q": 15,
-          "R": 2
-        },
-        {
-          "Q": 13,
-          "R": 5
-        }
-      ],
+      "PatrolPoints": "19,5 15,2 13,5",
       "WalkSpeed": 50,
       "PauseSeconds": 3,
-      "Aggressive": false
+      "Aggressive": false,
+      "Id": "monsters_1",
+      "Cell": "15,6",
+      "VisibleWhen": [],
+      "BlocksMovement": false
     }
   ],
-  "Notes": "Ported from JustPlaying MapTile_0_-1_0.json. Old monsters: ['FireOoze']. Test floor (will be rebuilt)."
+  "OnMap": true,
+  "Notes": "Ported from JustPlaying MapTile_0_-1_0.json. Old monsters: [\u0027FireOoze\u0027]. Test floor (will be rebuilt)."
 }
