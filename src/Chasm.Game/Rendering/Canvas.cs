@@ -11,7 +11,7 @@ namespace Chasm.Game.Rendering;
 public sealed class Canvas : IDisposable
 {
     private readonly GraphicsDevice _device;
-    public RenderTarget2D Target { get; }
+    public RenderTarget2D Target { get; private set; }
     public int Width => GameInfo.CanvasWidth;
     public int Height => GameInfo.CanvasHeight;
 
@@ -93,6 +93,15 @@ public sealed class Canvas : IDisposable
         batch.Begin(SpriteSortMode.Deferred, BlendState.Opaque, Zoom > 1.5f ? SamplerState.PointClamp : SamplerState.LinearClamp, null, Scissor);
         batch.Draw(Target, Destination, Color.White);
         batch.End();
+    }
+
+    /// <summary>Recreates the canvas render target (part of "Reset display").</summary>
+    public void Rebuild()
+    {
+        Target.Dispose();
+        Target = new RenderTarget2D(_device, GameInfo.CanvasWidth, GameInfo.CanvasHeight, false,
+            SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+        UpdateDestination();
     }
 
     public void Dispose() => Target.Dispose();

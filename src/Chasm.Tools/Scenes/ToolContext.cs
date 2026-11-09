@@ -18,6 +18,12 @@ public static class ToolContext
         _initialized = true;
     }
 
+    private static void OpenFolder(string path)
+    {
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = path, UseShellExecute = true }); }
+        catch (Exception e) { Console.WriteLine($"Couldn't open {path}: {e.Message}"); }
+    }
+
     /// <summary>The top menu bar every tool shows. Returns false if the tool asked to close.</summary>
     public static void MenuBar(GameServices s, string title, Action? extraMenus = null)
     {
@@ -29,6 +35,9 @@ public static class ToolContext
             if (ImGui.MenuItem("Map Editor")) s.Scenes.ResetTo(new MapEditorScene());
             if (ImGui.MenuItem("World Sandbox")) s.Scenes.ResetTo(new WorldSandboxScene(null));
             if (ImGui.MenuItem("Combat Sandbox")) s.Scenes.ResetTo(new CombatSandboxScene(null));
+            ImGui.Separator();
+            if (ImGui.MenuItem("Reset display", "F9")) s.Game.ResetDisplay();
+            if (ImGui.MenuItem("Open log file folder")) OpenFolder(Path.GetDirectoryName(Chasm.Game.Diagnostics.Log.FilePath)!);
             ImGui.Separator();
             if (ImGui.MenuItem("Quit")) s.Game.Exit();
             ImGui.EndMenu();

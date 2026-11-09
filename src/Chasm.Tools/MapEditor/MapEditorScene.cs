@@ -299,7 +299,7 @@ public sealed partial class MapEditorScene : Scene
         _statusTime -= dt;
         ToolContext.MenuBar(Services, _tile is null ? "Map Editor" : $"Map Editor - {(_isNewTile ? "(new)" : _tile.Id)}{(HasUnsaved ? " *" : "")}", Menus);
 
-        if (_tile is null) { StartDialog(); ToolContext.Wizards.Draw(); return; }
+        if (_tile is null) { StartDialog(); DeletePopup(); ToolContext.Wizards.Draw(); return; }
 
         LeftToolbar();
         RightPanelGui();
@@ -438,7 +438,13 @@ public sealed partial class MapEditorScene : Scene
                 if (search.Length > 0 && !t.Id.Contains(search, StringComparison.OrdinalIgnoreCase) && !t.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase)) continue;
                 string pos = t.X is int x && t.Y is int y ? $"({x},{y})" : "";
                 if (ImGui.Selectable($"   {t.DisplayName}  {pos}##{t.Id}")) chosen(t);
-                if (ImGui.IsItemHovered()) ImGui.SetTooltip(t.Id);
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip($"{t.Id}\nRight-click for more");
+                if (ImGui.BeginPopupContextItem($"ctx_{t.Id}"))
+                {
+                    if (ImGui.MenuItem("Open")) chosen(t);
+                    if (ImGui.MenuItem("Delete...")) AskDelete(t);
+                    ImGui.EndPopup();
+                }
             }
         }
     }
@@ -453,6 +459,12 @@ public sealed partial class MapEditorScene : Scene
         if (ImGui.MenuItem("Redo", "Ctrl+Y", false, _historyIndex < _history.Count - 1)) Redo();
         if (ImGui.MenuItem("Revert to saved", null, false, _tile is not null && !_isNewTile && HasUnsaved))
             Open(Services.Defs.Get<TileDef>(_tile!.Id));
+        if (_tile is not null && _isNewTile)
+        {
+            if (ImGui.MenuItem("Discard this new tile")) { WriteRecovery(); _tile = null; _history.Clear(); _recoveries = null; }
+        }
+        else if (ImGui.MenuItem("Delete this tile...", null, false, _tile is not null && Services.Defs.Exists(typeof(TileDef), _tile.Id)))
+            AskDelete(Services.Defs.Get<TileDef>(_tile!.Id));
         ImGui.Separator();
         if (ImGui.MenuItem("Play this tile (World Sandbox)", null, false, _tile is not null && !_isNewTile))
         {
@@ -465,6 +477,7 @@ public sealed partial class MapEditorScene : Scene
     private void Popups()
     {
         NewFloorPopup();
+        DeletePopup();
         if (_askUnsaved) { ImGui.OpenPopup("Unsaved changes"); _askUnsaved = false; }
         if (!ImGui.BeginPopupModal("Unsaved changes", ImGuiWindowFlags.AlwaysAutoResize)) return;
         ImGui.Text("This tile (or its floor) has unsaved changes.");

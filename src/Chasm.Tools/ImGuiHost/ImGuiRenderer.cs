@@ -100,7 +100,8 @@ public sealed class ImGuiRenderer : IDisposable
     private void UpdateInput()
     {
         var io = ImGui.GetIO();
-        if (!_game.IsActive) return;
+        bool focused = _game is Chasm.Game.Hosting.ChasmGame cg ? cg.HasFocus : _game.IsActive;
+        if (!focused) return;
         var mouse = Mouse.GetState();
         var kb = Keyboard.GetState();
         io.AddMousePosEvent(mouse.X, mouse.Y);

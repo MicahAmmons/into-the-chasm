@@ -30,6 +30,18 @@ public sealed class ChasmGame : Microsoft.Xna.Framework.Game
     public GameServices Svc { get; private set; } = null!;
     public GameOptions Options => _options;
 
+    static ChasmGame()
+    {
+        // MonoGame's SDL library has a different file name per platform; let our own SDL calls find it.
+        System.Runtime.InteropServices.NativeLibrary.SetDllImportResolver(typeof(ChasmGame).Assembly, (name, asm, path) =>
+        {
+            if (name != "SDL2") return IntPtr.Zero;
+            foreach (var candidate in new[] { "SDL2", "libSDL2-2.0.so.0", "libSDL2.so", "libSDL2-2.0.0.dylib", "libSDL2.dylib" })
+                if (System.Runtime.InteropServices.NativeLibrary.TryLoad(candidate, asm, path, out var handle)) return handle;
+            return IntPtr.Zero;
+        });
+    }
+
     public ChasmGame(GameOptions options, Func<GameServices, Scene> firstScene, IHostExtension? extension = null)
     {
         _options = options;
@@ -54,30 +66,69 @@ public sealed class ChasmGame : Microsoft.Xna.Framework.Game
     protected override void Initialize()
     {
         base.Initialize();
+        Diagnostics.Log.Start(Window.Title);
         Window.ClientSizeChanged += OnClientSizeChanged;
         Exiting += (_, _) => Svc?.Scenes.ExitAll();
-        Activated += (_, _) => { _resyncFrames = 3; Svc?.TileVisuals.InvalidateAll(); };
-        GraphicsDevice.DeviceReset += (_, _) => Svc?.TileVisuals.InvalidateAll();
+        Activated += (_, _) => { Diagnostics.Log.Write($"Focus gained (IsActive={IsActive}, window {Window.ClientBounds.Size})"); Svc?.TileVisuals.InvalidateAll(); };
+        Deactivated += (_, _) => Diagnostics.Log.Write("Focus lost");
+        GraphicsDevice.DeviceReset += (_, _) => { Diagnostics.Log.Write("Graphics device reset"); Svc?.TileVisuals.InvalidateAll(); };
         FitWindowToScreen();
-        _resyncFrames = 3;
     }
 
     private bool _resizing;
-    private int _resyncFrames;
+    private int _sizeMismatchFrames;
+
+    /// <summary>
+    /// Whether the window has the keyboard/mouse. MonoGame's IsActive can get stuck "false" after
+    /// alt-tabbing on some Windows setups, which made every click and key press ignored; so we also
+    /// ask SDL directly whether the window has input focus.
+    /// </summary>
+    public bool HasFocus
+    {
+        get
+        {
+            if (IsActive) return true;
+            if (_sdlFlagsBroken) return true; // can't tell: never block input
+            try { return (SDL_GetWindowFlags(Window.Handle) & (SdlWindowInputFocus | SdlWindowMouseFocus)) != 0; }
+            catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException) { _sdlFlagsBroken = true; return true; }
+        }
+    }
+
+    private bool _sdlFlagsBroken;
+    private const uint SdlWindowInputFocus = 0x200, SdlWindowMouseFocus = 0x400;
+
+    [System.Runtime.InteropServices.DllImport("SDL2", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private static extern uint SDL_GetWindowFlags(IntPtr window);
+
+    /// <summary>
+    /// "Turn it off and on again" for the display (F9, or Tools > Reset display): resizes the back
+    /// buffer to the window, rebuilds the canvas and re-bakes all tile art.
+    /// </summary>
+    public void ResetDisplay()
+    {
+        Diagnostics.Log.Write($"Display reset requested (window {Window.ClientBounds.Size}, backbuffer {GraphicsDevice.PresentationParameters.BackBufferWidth}x{GraphicsDevice.PresentationParameters.BackBufferHeight})");
+        SyncBackBuffer(force: true);
+        Svc?.Canvas.Rebuild();
+        Svc?.TileVisuals.InvalidateAll();
+    }
 
     /// <summary>
     /// Keeps the back buffer the same size as the window. Without this, maximizing, restoring or
     /// alt-tabbing can leave the drawing surface at the old size and the picture looks scrambled.
     /// </summary>
-    private void OnClientSizeChanged(object? sender, EventArgs e) => SyncBackBuffer();
+    private void OnClientSizeChanged(object? sender, EventArgs e)
+    {
+        Diagnostics.Log.Write($"Window resized to {Window.ClientBounds.Size}");
+        SyncBackBuffer();
+    }
 
-    private void SyncBackBuffer()
+    private void SyncBackBuffer(bool force = false)
     {
         if (_resizing) return;
         var bounds = Window.ClientBounds;
-        if (bounds.Width <= 0 || bounds.Height <= 0) return; // minimized
+        if (bounds.Width < 200 || bounds.Height < 150) return; // minimized / mid-transition: never shrink the surface to nothing
         var pp = GraphicsDevice.PresentationParameters;
-        if (pp.BackBufferWidth == bounds.Width && pp.BackBufferHeight == bounds.Height) return;
+        if (!force && pp.BackBufferWidth == bounds.Width && pp.BackBufferHeight == bounds.Height) return;
         _resizing = true;
         _graphics.PreferredBackBufferWidth = bounds.Width;
         _graphics.PreferredBackBufferHeight = bounds.Height;
@@ -114,6 +165,9 @@ public sealed class ChasmGame : Microsoft.Xna.Framework.Game
     [System.Runtime.InteropServices.DllImport("SDL2", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
     private static extern void SDL_MaximizeWindow(IntPtr window);
 
+    [System.Runtime.InteropServices.DllImport("SDL2", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private static extern void SDL_SetWindowSize(IntPtr window, int w, int h);
+
     protected override void LoadContent()
     {
         _batch = new SpriteBatch(GraphicsDevice);
@@ -147,18 +201,33 @@ public sealed class ChasmGame : Microsoft.Xna.Framework.Game
     protected override void Update(GameTime gameTime)
     {
         float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
-        // A few frames after start / regaining focus, make sure the back buffer matches the window.
-        if (_resyncFrames > 0) { _resyncFrames--; SyncBackBuffer(); }
+        // Self-heal: if the drawing surface and the window disagree for a moment (missed resize
+        // event after alt-tab / minimize), fix it.
+        var pp0 = GraphicsDevice.PresentationParameters;
+        var cb = Window.ClientBounds;
+        if (cb.Width >= 200 && cb.Height >= 150 && (pp0.BackBufferWidth != cb.Width || pp0.BackBufferHeight != cb.Height))
+        {
+            if (++_sizeMismatchFrames >= 5) { Diagnostics.Log.Write($"Back buffer {pp0.BackBufferWidth}x{pp0.BackBufferHeight} != window {cb.Size}; fixing"); SyncBackBuffer(); _sizeMismatchFrames = 0; }
+        }
+        else _sizeMismatchFrames = 0;
         Svc.TotalTime = gameTime.TotalGameTime.TotalSeconds;
         Svc.Textures.ProcessHotReload();
         Svc.DefReload.Process();
-        Svc.Input.Update(Svc.Canvas, IsActive);
+        Svc.Input.Update(Svc.Canvas, HasFocus);
+        if (Svc.Input.KeyPressed(Microsoft.Xna.Framework.Input.Keys.F9)) ResetDisplay();
         _extension?.BeginFrame(dt);
         Svc.Scenes.ApplyPending();
         if (Svc.Scenes.Count == 0) { Exit(); return; }
         Svc.Scenes.Update(dt);
 
         _frameCount++;
+        // Dev-only reproduction of alt-tab / minimize: CHASM_SIM_ALTTAB=1 shrinks the window, then restores it.
+        if (Environment.GetEnvironmentVariable("CHASM_SIM_ALTTAB") == "1")
+        {
+            if (_frameCount == 20) { SDL_SetWindowSize(Window.Handle, 160, 90); Console.WriteLine($"[sim] shrunk, bounds {Window.ClientBounds}"); }
+            if (_frameCount == 45) { SDL_SetWindowSize(Window.Handle, 1600, 900); Console.WriteLine($"[sim] restored, bounds {Window.ClientBounds}"); }
+            if (_frameCount % 15 == 0) Console.WriteLine($"[sim] f{_frameCount} active={IsActive} window={Window.ClientBounds.Size} backbuffer={GraphicsDevice.PresentationParameters.BackBufferWidth}x{GraphicsDevice.PresentationParameters.BackBufferHeight}");
+        }
         if (_options.ExitAfterFrames is int limit && _frameCount >= limit && (_options.ScreenshotPath is null || _screenshotTaken))
         {
             Console.WriteLine($"[smoke-test] Ran {_frameCount} frames, exiting cleanly.");
