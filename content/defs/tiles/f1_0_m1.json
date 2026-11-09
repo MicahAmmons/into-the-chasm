@@ -6,32 +6,32 @@
   "Y": -1,
   "Layers": [
     {
-      "Texture": "tiles/floor1/0_-1_0/LowerRocks_0_-1_0.png",
+      "Texture": "Original Art/tiles/floor1/0_-1_0/LowerRocks_0_-1_0.png",
       "Kind": "Background",
       "Opacity": 1
     },
     {
-      "Texture": "tiles/floor1/0_-1_0/0_-1_0.png",
+      "Texture": "Original Art/tiles/floor1/0_-1_0/0_-1_0.png",
       "Kind": "Background",
       "Opacity": 1
     },
     {
-      "Texture": "tiles/floor1/0_-1_0/GlowMound1_0_-1_0.png",
+      "Texture": "Original Art/tiles/floor1/0_-1_0/GlowMound1_0_-1_0.png",
       "Kind": "Background",
       "Opacity": 1
     },
     {
-      "Texture": "tiles/floor1/0_-1_0/GlowMound2_0_-1_0.png",
+      "Texture": "Original Art/tiles/floor1/0_-1_0/GlowMound2_0_-1_0.png",
       "Kind": "Background",
       "Opacity": 1
     },
     {
-      "Texture": "tiles/floor1/0_-1_0/GlowMound3_0_-1_0.png",
+      "Texture": "Original Art/tiles/floor1/0_-1_0/GlowMound3_0_-1_0.png",
       "Kind": "Background",
       "Opacity": 1
     },
     {
-      "Texture": "tiles/floor1/0_-1_0/ForeDarkFog_0_-1_0.png",
+      "Texture": "Original Art/tiles/floor1/0_-1_0/ForeDarkFog_0_-1_0.png",
       "Kind": "Foreground",
       "Opacity": 1
     }

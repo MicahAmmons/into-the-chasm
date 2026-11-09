@@ -6,7 +6,7 @@
       "State": "Idle",
       "Layers": [
         {
-          "Texture": "monsters/turtle/Turtle_Idle_SS.png",
+          "Texture": "Original Art/monsters/turtle/Turtle_Idle_SS.png",
           "Row": 5,
           "FrameCount": 8,
           "FrameWidth": 76,
@@ -24,7 +24,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/turtle/Turtle_Idle_SS.png",
+          "Texture": "Original Art/monsters/turtle/Turtle_Idle_SS.png",
           "Row": 4,
           "FrameCount": 8,
           "FrameWidth": 76,
@@ -42,7 +42,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/turtle/Turtle_Idle_SS.png",
+          "Texture": "Original Art/monsters/turtle/Turtle_Idle_SS.png",
           "Row": 3,
           "FrameCount": 8,
           "FrameWidth": 76,
@@ -60,7 +60,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/turtle/Turtle_Idle_SS.png",
+          "Texture": "Original Art/monsters/turtle/Turtle_Idle_SS.png",
           "Row": 2,
           "FrameCount": 8,
           "FrameWidth": 76,
@@ -78,7 +78,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/turtle/Turtle_Idle_SS.png",
+          "Texture": "Original Art/monsters/turtle/Turtle_Idle_SS.png",
           "Row": 1,
           "FrameCount": 8,
           "FrameWidth": 76,
@@ -101,7 +101,7 @@
       "State": "Walk",
       "Layers": [
         {
-          "Texture": "monsters/turtle/Turtle_Walk_SS.png",
+          "Texture": "Original Art/monsters/turtle/Turtle_Walk_SS.png",
           "Row": 4,
           "FrameCount": 4,
           "FrameWidth": 76,
@@ -119,7 +119,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/turtle/Turtle_Walk_SS.png",
+          "Texture": "Original Art/monsters/turtle/Turtle_Walk_SS.png",
           "Row": 3,
           "FrameCount": 4,
           "FrameWidth": 76,
@@ -137,7 +137,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/turtle/Turtle_Walk_SS.png",
+          "Texture": "Original Art/monsters/turtle/Turtle_Walk_SS.png",
           "Row": 2,
           "FrameCount": 4,
           "FrameWidth": 76,
@@ -155,7 +155,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/turtle/Turtle_Walk_SS.png",
+          "Texture": "Original Art/monsters/turtle/Turtle_Walk_SS.png",
           "Row": 1,
           "FrameCount": 4,
           "FrameWidth": 76,
@@ -178,7 +178,7 @@
       "State": "EndWalk",
       "Layers": [
         {
-          "Texture": "monsters/turtle/Turtle_Move_Start_Trans_SS.png",
+          "Texture": "Original Art/monsters/turtle/Turtle_Move_Start_Trans_SS.png",
           "Row": 4,
           "FrameCount": 7,
           "FrameWidth": 76,
@@ -196,7 +196,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/turtle/Turtle_Move_Start_Trans_SS.png",
+          "Texture": "Original Art/monsters/turtle/Turtle_Move_Start_Trans_SS.png",
           "Row": 3,
           "FrameCount": 7,
           "FrameWidth": 76,
@@ -214,7 +214,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/turtle/Turtle_Move_Start_Trans_SS.png",
+          "Texture": "Original Art/monsters/turtle/Turtle_Move_Start_Trans_SS.png",
           "Row": 2,
           "FrameCount": 7,
           "FrameWidth": 76,
@@ -232,7 +232,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/turtle/Turtle_Move_Start_Trans_SS.png",
+          "Texture": "Original Art/monsters/turtle/Turtle_Move_Start_Trans_SS.png",
           "Row": 1,
           "FrameCount": 7,
           "FrameWidth": 76,
@@ -255,7 +255,7 @@
       "State": "StartWalk",
       "Layers": [
         {
-          "Texture": "monsters/turtle/Turtle_Move_Start_Trans_SS.png",
+          "Texture": "Original Art/monsters/turtle/Turtle_Move_Start_Trans_SS.png",
           "Row": 4,
           "FrameCount": 7,
           "FrameWidth": 76,
@@ -273,7 +273,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/turtle/Turtle_Move_Start_Trans_SS.png",
+          "Texture": "Original Art/monsters/turtle/Turtle_Move_Start_Trans_SS.png",
           "Row": 3,
           "FrameCount": 7,
           "FrameWidth": 76,
@@ -291,7 +291,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/turtle/Turtle_Move_Start_Trans_SS.png",
+          "Texture": "Original Art/monsters/turtle/Turtle_Move_Start_Trans_SS.png",
           "Row": 2,
           "FrameCount": 7,
           "FrameWidth": 76,
@@ -309,7 +309,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/turtle/Turtle_Move_Start_Trans_SS.png",
+          "Texture": "Original Art/monsters/turtle/Turtle_Move_Start_Trans_SS.png",
           "Row": 1,
           "FrameCount": 7,
           "FrameWidth": 76,
@@ -332,7 +332,7 @@
       "State": "Attack",
       "Layers": [
         {
-          "Texture": "monsters/turtle/Turtle_Attack_SS.png",
+          "Texture": "Original Art/monsters/turtle/Turtle_Attack_SS.png",
           "Row": 1,
           "FrameCount": 4,
           "FrameWidth": 76,
@@ -350,7 +350,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/turtle/Turtle_Attack_SS.png",
+          "Texture": "Original Art/monsters/turtle/Turtle_Attack_SS.png",
           "Row": 2,
           "FrameCount": 4,
           "FrameWidth": 76,
@@ -368,7 +368,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/turtle/Turtle_Attack_SS.png",
+          "Texture": "Original Art/monsters/turtle/Turtle_Attack_SS.png",
           "Row": 3,
           "FrameCount": 4,
           "FrameWidth": 76,
@@ -386,7 +386,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/turtle/Turtle_Attack_SS.png",
+          "Texture": "Original Art/monsters/turtle/Turtle_Attack_SS.png",
           "Row": 4,
           "FrameCount": 4,
           "FrameWidth": 76,

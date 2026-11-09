@@ -4,7 +4,7 @@
   "Description": "A berry that glows faintly, like the sky.",
   "Category": "Quest",
   "Icon": "",
-  "WorldSprite": "props/GlowMound.png",
+  "WorldSprite": "Original Art/props/GlowMound.png",
   "Stackable": true,
   "ShowInQuickBar": true,
   "UseRules": [],

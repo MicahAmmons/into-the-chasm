@@ -101,7 +101,7 @@ public sealed class CloudLayerDef
     public float Line { get; set; } = 0.65f;
     [Range(0, 1), Tooltip("How far (fraction of screen height) textures take to fade out past the line.")]
     public float FadeLength { get; set; } = 0.15f;
-    [Texture] public string Texture { get; set; } = "backgrounds/clouds/Cloud1.png";
+    [Texture] public string Texture { get; set; } = "Original Art/backgrounds/clouds/Cloud1.png";
     public string Tint { get; set; } = "#ffffff";
     [Range(0, 2000), Tooltip("Pixels per second, drifting right and wrapping around.")]
     public float Speed { get; set; } = 20;

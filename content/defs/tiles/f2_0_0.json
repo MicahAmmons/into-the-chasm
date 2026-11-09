@@ -6,7 +6,7 @@
   "Y": 0,
   "Layers": [
     {
-      "Texture": "tiles/floor2/0_0_1/0_0_1.png",
+      "Texture": "Original Art/tiles/floor2/0_0_1/0_0_1.png",
       "Kind": "Background",
       "Opacity": 1
     }

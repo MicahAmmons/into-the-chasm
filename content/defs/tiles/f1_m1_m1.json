@@ -6,17 +6,17 @@
   "Y": -1,
   "Layers": [
     {
-      "Texture": "tiles/floor1/-1_-1_0/LowerRocks_-1_-1_0.png",
+      "Texture": "Original Art/tiles/floor1/-1_-1_0/LowerRocks_-1_-1_0.png",
       "Kind": "Background",
       "Opacity": 1
     },
     {
-      "Texture": "tiles/floor1/-1_-1_0/-1_-1_0.png",
+      "Texture": "Original Art/tiles/floor1/-1_-1_0/-1_-1_0.png",
       "Kind": "Background",
       "Opacity": 1
     },
     {
-      "Texture": "tiles/floor1/-1_-1_0/ForeDarkFog_-1_-1_0.png",
+      "Texture": "Original Art/tiles/floor1/-1_-1_0/ForeDarkFog_-1_-1_0.png",
       "Kind": "Foreground",
       "Opacity": 1
     }
