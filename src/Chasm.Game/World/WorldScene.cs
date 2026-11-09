@@ -24,7 +24,7 @@ namespace Chasm.Game.World;
 /// Implements <see cref="IRuleHost"/> so rules can show messages, move the player, etc.
 /// The World Sandbox wraps this same scene with editing panels.
 /// </summary>
-public class WorldScene : Scene, IRuleHost
+public partial class WorldScene : Scene, IRuleHost
 {
     private const float FadeSeconds = 0.35f;
 
@@ -62,6 +62,12 @@ public class WorldScene : Scene, IRuleHost
         LoadTile(tileId, Session.PlayerPosition == Vector2.Zero ? null : Session.PlayerPosition, null);
 
         if (Environment.GetEnvironmentVariable("CHASM_DEBUG_GRID") == "1") ShowGrid = true;
+        if (!Session.World.IsSet("game_started"))
+        {
+            Session.World.Set("game_started", 1);
+            var ctx = Context();
+            foreach (var o in cfg.NewGameOutcomes) o.Execute(ctx);
+        }
         Session.Defs.Changed += OnDefChanged;
         _defSub = new Unsub(() => Session.Defs.Changed -= OnDefChanged);
     }
@@ -97,6 +103,7 @@ public class WorldScene : Scene, IRuleHost
         _lastCell = Player.Cell;
         _suppressedEdges = IsoGrid.EdgesOf(_lastCell); // don't instantly re-prompt on arrival
         _pendingInteract = null;
+        ResetGroups();
     }
 
     private Vector2 SnapToWalkable(Vector2 pos)
@@ -129,6 +136,7 @@ public class WorldScene : Scene, IRuleHost
     public bool IsActive(Placement p)
     {
         if (Session.World.IsSet(WorldState.PlacementKey(Tile.Id, p.Id, "gone"))) return false;
+        if (p is MonsterGroupPlacement && DefeatedToday(p)) return false;
         return p.VisibleWhen.Count == 0 || Rules.AllPass(p.VisibleWhen, Context(p));
     }
 
@@ -153,6 +161,12 @@ public class WorldScene : Scene, IRuleHost
                 if (Rules.RunFirst(inter.Rules, ctx) is null && !string.IsNullOrWhiteSpace(inter.FallbackMessage))
                     ShowMessage(new[] { inter.FallbackMessage }, null);
                 break;
+            case MonsterGroupPlacement group:
+                AskToFight(group);
+                break;
+            case FigurePlacement figure:
+                TalkToFigure(figure);
+                break;
         }
     }
 
@@ -161,13 +175,13 @@ public class WorldScene : Scene, IRuleHost
         // Prefer things whose sprite box contains the mouse; fall back to the cell under it.
         var cell = IsoGrid.CellAt(canvasPos);
         return ActivePlacements.Where(p => !IsHidden(p))
-            .OrderByDescending(p => IsoGrid.CellCenter(p.Cell).Y)
-            .FirstOrDefault(p => p.Cell == cell || SpriteBounds(p).Contains((int)canvasPos.X, (int)canvasPos.Y));
+            .OrderByDescending(p => PositionOf(p).Y)
+            .FirstOrDefault(p => CellOf(p) == cell || SpriteBounds(p).Contains((int)canvasPos.X, (int)canvasPos.Y));
     }
 
     private XRect SpriteBounds(Placement p)
     {
-        var c = IsoGrid.CellCenter(p.Cell);
+        var c = PositionOf(p);
         var size = SpriteSize(p);
         int yOff = p is InteractablePlacement ip ? ip.SpriteYOffset : 0;
         return new XRect((int)c.X - size.X / 2, (int)c.Y - size.Y + 12 - yOff, size.X, size.Y);
@@ -182,7 +196,7 @@ public class WorldScene : Scene, IRuleHost
             float scale = p is ItemPickupPlacement ? Math.Min(1f, 64f / Math.Max(t.Width, t.Height)) : 1f;
             return new((int)(t.Width * scale), (int)(t.Height * scale));
         }
-        return p is ItemPickupPlacement ? new(60, 48) : new(110, 80);
+        return p switch { ItemPickupPlacement => new(60, 48), MonsterGroupPlacement => new(90, 80), FigurePlacement => new(70, 120), _ => new(110, 80) };
     }
 
     private string? SpriteKey(Placement p) => p switch
@@ -197,6 +211,8 @@ public class WorldScene : Scene, IRuleHost
     {
         ItemPickupPlacement ip => Session.Defs.TryGet<ItemDef>(ip.Item, out var i) ? i.DisplayName : ip.Item,
         InteractablePlacement ip => ip.Label,
+        MonsterGroupPlacement g => GroupLabel(g),
+        FigurePlacement f => f.Name,
         _ => p.Id,
     };
 
@@ -211,7 +227,9 @@ public class WorldScene : Scene, IRuleHost
         if (ClockRunning) Session.Clock.Advance(dt);
         if (input.Pressed(InputAction.DebugOverlay)) _statsOverlay.Visible = !_statsOverlay.Visible;
         if (input.Pressed(InputAction.DebugCells)) ShowGrid = !ShowGrid;
-        if (input.Pressed(InputAction.Rest)) Rest();
+        if (input.Pressed(InputAction.Rest)) AskRest();
+        UpdateQuickBarKeys();
+        UpdateGroups(dt);
 
         Hovered = input.MouseInCanvas && !input.MouseCapturedByUi ? PlacementAt(input.MouseCanvas.ToNumerics()) : null;
 
@@ -220,6 +238,8 @@ public class WorldScene : Scene, IRuleHost
 
         Player.Update(dt);
         Session.PlayerPosition = Player.Position;
+        CheckGroupContact();
+        CheckFigures();
 
         var cell = Player.Cell;
         if (cell != _lastCell)
@@ -234,11 +254,12 @@ public class WorldScene : Scene, IRuleHost
 
     protected virtual void OnClick(Vector2 point)
     {
+        if (QuickBarClick(point)) return;
         if (Hovered is { } target)
         {
             if (InRange(target)) { Player.Stop(); Interact(target); return; }
             _pendingInteract = target;
-            WalkTo(IsoGrid.CellCenter(target.Cell));
+            WalkTo(PositionOf(target));
             return;
         }
         _pendingInteract = null;
@@ -252,7 +273,7 @@ public class WorldScene : Scene, IRuleHost
         if (result.Waypoints.Count == 0) OnArrived();
     }
 
-    private bool InRange(Placement p) => p.Cell.ManhattanTo(Player.Cell) <= Math.Max(1, Session.Config.InteractRange) || p.Cell == Player.Cell;
+    private bool InRange(Placement p) => CellOf(p).ManhattanTo(Player.Cell) <= Math.Max(1, Session.Config.InteractRange) || CellOf(p) == Player.Cell;
 
     private void OnArrived()
     {
@@ -330,15 +351,17 @@ public class WorldScene : Scene, IRuleHost
     }
 
     public void ChangeTile(string tileId, CellCoord? arrivalCell) => BeginChange(tileId, null, arrivalCell);
-    public virtual void StartEncounter(string encounterId) => ShowMessage(new[] { $"(Combat '{encounterId}' would start here.)" }, null);
     public virtual void StartDialogue(string dialogueId) => ShowMessage(new[] { $"(Dialogue '{dialogueId}' would start here.)" }, null);
 
     public void Rest()
     {
-        Session.Clock.Rest();
-        Session.Stats.Add(StatKeys.Rests);
-        ShowMessage(new[] { $"You rest for half a day. It is now day {Session.Clock.Day}, {(Session.Clock.IsNight ? "night" : "daytime")}." }, null);
+        Session.Rest();
+        ShowMessage(new[] { $"You rest for half a day. Your summons recover. It is now day {Session.Clock.Day}, {(Session.Clock.IsNight ? "night" : "daytime")}." }, null);
     }
+
+    public void Confirm(string question, Action<bool> answered) => Services.Scenes.Push(new ConfirmScene(question, answered));
+
+    public void AskRest() => Confirm("Rest for half a day? Your summons recover their uses.", yes => { if (yes) Rest(); });
 
     // ------------------------------------------------------------------ draw
 
@@ -348,8 +371,10 @@ public class WorldScene : Scene, IRuleHost
         TileRenderer.QueueLayers(_queue, s, Tile);
         if (ShowGrid) TileRenderer.QueueWalkGrid(_queue, s, Tile);
 
+        DrawGroupsAndFigures();
         foreach (var p in ActivePlacements)
         {
+            if (p is MonsterGroupPlacement or FigurePlacement) continue;
             if (IsHidden(p))
             {
                 if (ShowGrid) TileRenderer.QueueCell(_queue, s, p.Cell, new XColor(200, 120, 255) * 0.5f);
@@ -381,6 +406,8 @@ public class WorldScene : Scene, IRuleHost
 
         batch.Begin();
         Hud.DrawDay(batch, s.Draw, Session.Clock);
+        DrawPlayerHud(batch);
+        DrawQuickBar(batch);
         if (_fade > 0) s.Draw.Rect(batch, new XRect(0, 0, 1920, 1080), XColor.Black * _fade);
         batch.End();
 

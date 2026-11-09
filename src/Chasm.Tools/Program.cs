@@ -14,7 +14,7 @@ using var game = new ChasmGame(options, s =>
         "map" => new MapEditorScene(options.StartArgument),
         "world" => new WorldSandboxScene(options.StartArgument),
         "content" => new ContentBrowserScene(options.StartArgument),
-        "combat" => new CombatSandboxScene(),
+        "combat" => new CombatSandboxScene(options.StartArgument),
         _ => (Scene)new LauncherScene(),
     };
 }, new ImGuiExtension());

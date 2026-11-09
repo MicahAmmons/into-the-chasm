@@ -18,6 +18,8 @@ public interface IRuleHost
     void StartEncounter(string encounterId);
     void StartDialogue(string dialogueId);
     void Rest();
+    /// <summary>Asks the player a yes/no question; the answer arrives later.</summary>
+    void Confirm(string question, Action<bool> answered);
 }
 
 /// <summary>Everything a condition can read and an outcome can change.</summary>
@@ -29,6 +31,7 @@ public sealed class RuleContext
     public required StatsTracker Stats { get; init; }
     public required EventBus Events { get; init; }
     public required Session.DayClock Clock { get; init; }
+    public required Progression.PlayerProgress Progress { get; init; }
     public IRuleHost? Host { get; init; }
 
     /// <summary>Where the player is right now (for "player is in tile X" / "near cell Y").</summary>

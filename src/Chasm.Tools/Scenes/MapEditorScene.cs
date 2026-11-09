@@ -387,6 +387,8 @@ public sealed class MapEditorScene : Scene
     {
         "itempickup" => "item",
         "interactable" => "obj",
+        "monstergroup" => "monsters",
+        "figure" => "figure",
         var s => s,
     };
 
@@ -455,8 +457,18 @@ public sealed class MapEditorScene : Scene
                 {
                     ItemPickupPlacement ip => s.Defs.TryGet<ItemDef>(ip.Item, out var it2) ? it2.DisplayName : "Item?",
                     InteractablePlacement ip => (ip.Invisible ? "(hidden) " : "") + ip.Label,
-                    _ => pl.Id,
+                    FigurePlacement f => f.Name,
+                    _ => pl.Describe(s.Defs),
                 };
+                if (pl is MonsterGroupPlacement mg && mg.Patrol != PatrolMode.Stay && mg.PatrolPoints.Count > 0)
+                {
+                    var pts = new List<CellCoord> { mg.Cell };
+                    pts.AddRange(mg.PatrolPoints);
+                    if (mg.Patrol == PatrolMode.Loop) pts.Add(mg.Cell);
+                    for (int i = 0; i + 1 < pts.Count; i++)
+                        s.Draw.Line(b, IsoGrid.CellCenter(pts[i]), IsoGrid.CellCenter(pts[i + 1]), new Color(255, 120, 100) * 0.8f, 3);
+                    foreach (var pt in mg.PatrolPoints) s.Draw.DiamondOutline(b, IsoGrid.CellCenter(pt), 60, 30, new Color(255, 120, 100), 2);
+                }
                 if (s.Textures.IsPlaceholder(tex)) s.Draw.Placeholder(b, rect, label);
                 else
                 {

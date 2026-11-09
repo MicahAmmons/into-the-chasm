@@ -164,6 +164,7 @@ public sealed class MonsterDef : Def
 
     [Group("As a summon"), Tooltip("AP the player spends to summon it.")] public int SummonApCost { get; set; } = 2;
     [Group("As a summon"), Tooltip("Max cells away from the player it can be summoned.")] public int SummonRange { get; set; } = 2;
+    [Group("As a summon")] public Progression.SummonSettings Summon { get; set; } = new();
 }
 
 public enum RespawnRule

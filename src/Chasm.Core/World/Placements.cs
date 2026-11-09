@@ -68,3 +68,49 @@ public sealed class InteractablePlacement : Placement
     public string FallbackMessage { get; set; } = "";
     public override string Describe(DefRegistry d) => $"{(Invisible ? "Hidden " : "")}Interactable: {Label}";
 }
+
+public enum PatrolMode
+{
+    [Label("Stand still")] Stay,
+    [Label("Loop through the points")] Loop,
+    [Label("Walk back and forth")] BackAndForth,
+}
+
+/// <summary>
+/// A visible monster group in the world. Walks its patrol; hovering shows everything in the group;
+/// clicking it (or touching it, if aggressive) starts the fight.
+/// </summary>
+[TypeId("MonsterGroup"), Label("Monster group (encounter)")]
+public sealed class MonsterGroupPlacement : Placement
+{
+    [Ref(typeof(Combat.EncounterDef)), Required] public string Encounter { get; set; } = "";
+    public PatrolMode Patrol { get; set; } = PatrolMode.Loop;
+    [Tooltip("Cells to walk between, starting from the placement's own cell. Use 'Pick' to click them on the map.")]
+    public List<CellCoord> PatrolPoints { get; set; } = new();
+    [Range(10, 600)] public float WalkSpeed { get; set; } = 70;
+    [Range(0, 60), Tooltip("Seconds to pause at each point.")] public float PauseSeconds { get; set; } = 2;
+    [Tooltip("Fight starts as soon as the player touches it (no prompt).")]
+    public bool Aggressive { get; set; }
+    public override string Describe(DefRegistry d) =>
+        $"Monsters: {(d.TryGet<Combat.EncounterDef>(Encounter, out var e) ? e.DisplayName : "?")}{(Aggressive ? " (aggressive)" : "")}";
+}
+
+/// <summary>
+/// The Figure: narrator, respawn point and fast-travel network. Coming near one makes it your
+/// respawn point and adds it to the travel list. Interacting offers Talk / Rest / Travel.
+/// </summary>
+[TypeId("Figure"), Label("The Figure (respawn + fast travel)")]
+public sealed class FigurePlacement : Placement
+{
+    public string Name { get; set; } = "Figure";
+    [Ref(typeof(Animation.AnimationDef))] public string Animation { get; set; } = "cloud_figure";
+    [Tooltip("What the Figure says when you choose Talk (if no rule below passes).")]
+    public List<string> Greeting { get; set; } = new() { "..." };
+    [Tooltip("Hints / quest lines: first passing rule runs when you choose Talk.")]
+    public List<RuleDef> TalkRules { get; set; } = new();
+    public bool OffersRest { get; set; } = true;
+    public bool OffersFastTravel { get; set; } = true;
+    [Range(0, 10), Tooltip("Coming this close counts as 'encountered' (sets respawn point).")]
+    public int EncounterRange { get; set; } = 3;
+    public override string Describe(DefRegistry d) => $"Figure: {Name}";
+}

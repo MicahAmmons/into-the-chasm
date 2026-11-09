@@ -18,7 +18,7 @@ public sealed class LauncherScene : Scene
         ("Content Browser", "Every item, monster, animation, tile, floor... Create, edit, duplicate.", () => new ContentBrowserScene()),
         ("Map Editor", "Paint walkable cells, exits, combat starts. Place items, interactables, monsters.", () => new MapEditorScene()),
         ("World Sandbox", "Walk any tile with live panels: give items, set flags, change the clock.", () => new WorldSandboxScene(null)),
-        ("Combat Sandbox", "Pick monsters and a team, then fight on any tile.", () => new CombatSandboxScene()),
+        ("Combat Sandbox", "Pick monsters and a team, then fight on any tile.", () => new CombatSandboxScene(null)),
     };
 
     public override void Update(float dt)

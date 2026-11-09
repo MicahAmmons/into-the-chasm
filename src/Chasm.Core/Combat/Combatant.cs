@@ -34,6 +34,8 @@ public sealed class Combatant
     public string Element { get; set; } = "";
 
     public List<StatusInstance> Statuses { get; } = new();
+    /// <summary>Abilities beyond the monster definition (affinity rewards, the player's aspects).</summary>
+    public List<string> ExtraAbilities { get; } = new();
     public Dictionary<string, int> Cooldowns { get; } = new();
     public Dictionary<string, int> UsesThisTurn { get; } = new();
 

@@ -26,6 +26,21 @@ public sealed class GameConfigDef : Def
     [Range(0, 1), Tooltip("Fraction of the day when night begins (0.65 = last 35% is night).")]
     public float NightStartsAt { get; set; } = 0.65f;
 
+    [Tooltip("Runs once when a new game starts (opening message, starting items...).")]
+    public List<Rules.Outcome> NewGameOutcomes { get; set; } = new();
+
     [Range(0, 5), Tooltip("How many cells away the player can interact with objects.")]
     public int InteractRange { get; set; } = 1;
+
+    [Group("Player starting stats"), Range(1, 9999)] public int PlayerBaseHp { get; set; } = 20;
+    [Group("Player starting stats"), Range(0, 99)] public int PlayerBaseAp { get; set; } = 6;
+    [Group("Player starting stats"), Range(0, 99)] public int PlayerBaseMp { get; set; } = 3;
+    [Group("Player starting stats"), Range(0, 999)] public int PlayerInitiative { get; set; } = 10;
+
+    [Group("Growth"), Range(1, 100000), Tooltip("XP for the first level of HP / AP / MP.")] public int XpForFirstLevel { get; set; } = 20;
+    [Group("Growth"), Range(1, 10), Tooltip("Each next level needs this many times more XP.")] public float XpGrowth { get; set; } = 1.5f;
+    [Group("Growth"), Range(1, 100)] public int HpPerLevel { get; set; } = 2;
+    [Group("Growth"), Tooltip("HP XP per point of damage taken in a fight you WIN.")] public float HpXpPerDamage { get; set; } = 1;
+    [Group("Growth"), Tooltip("AP XP per AP spent in combat.")] public float ApXpPerPoint { get; set; } = 1;
+    [Group("Growth"), Tooltip("MP XP per cell walked in combat.")] public float MpXpPerCell { get; set; } = 1;
 }

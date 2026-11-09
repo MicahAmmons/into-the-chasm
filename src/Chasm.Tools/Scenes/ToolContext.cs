@@ -27,7 +27,7 @@ public static class ToolContext
             if (ImGui.MenuItem("Content Browser")) s.Scenes.ResetTo(new ContentBrowserScene());
             if (ImGui.MenuItem("Map Editor")) s.Scenes.ResetTo(new MapEditorScene());
             if (ImGui.MenuItem("World Sandbox")) s.Scenes.ResetTo(new WorldSandboxScene(null));
-            if (ImGui.MenuItem("Combat Sandbox")) s.Scenes.ResetTo(new CombatSandboxScene());
+            if (ImGui.MenuItem("Combat Sandbox")) s.Scenes.ResetTo(new CombatSandboxScene(null));
             ImGui.Separator();
             if (ImGui.MenuItem("Quit")) s.Game.Exit();
             ImGui.EndMenu();

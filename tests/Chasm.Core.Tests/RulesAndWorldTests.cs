@@ -19,6 +19,8 @@ public class RulesAndWorldTests
         public void StartEncounter(string encounterId) { }
         public void StartDialogue(string dialogueId) { }
         public void Rest() { }
+        public bool Answer { get; set; } = true;
+        public void Confirm(string question, Action<bool> answered) { Messages.Add("?" + question); answered(Answer); }
     }
 
     private static (GameSession, RuleContext, FakeHost) NewSession()

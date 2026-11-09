@@ -69,6 +69,7 @@ public sealed class CombatEngine
             MaxHp = setup.PlayerMaxHp, Hp = Math.Min(setup.PlayerHp, setup.PlayerMaxHp),
             BaseAp = setup.PlayerAp, BaseMp = setup.PlayerMp, Initiative = setup.PlayerInitiative, Cell = setup.PlayerCell,
         });
+        Player.ExtraAbilities.AddRange(setup.Summons.PlayerAbilities);
         foreach (var (monster, cell) in setup.Enemies)
             Add(CreateMonster(monster, Team.Enemy, CombatantKind.Monster, cell, null));
     }
@@ -140,7 +141,7 @@ public sealed class CombatEngine
     }
 
     public IEnumerable<AbilityDef> Abilities(Combatant c) =>
-        (c.Monster?.Abilities ?? new List<string>())
+        (c.Monster?.Abilities ?? new List<string>()).Concat(c.ExtraAbilities).Distinct()
         .Select(id => Defs.TryGet<AbilityDef>(id, out var a) ? a : null).Where(a => a is not null)!;
 
     public bool HasLineOfSight(CellCoord from, CellCoord to)
@@ -356,6 +357,9 @@ public sealed class CombatEngine
         var def = Defs.Get<MonsterDef>(monsterId);
         summoner.Ap -= def.SummonApCost;
         var unit = Add(CreateMonster(monsterId, summoner.Team, CombatantKind.Summon, cell, summoner.Id));
+        var bonus = SummonPolicy.BonusFor(monsterId);
+        unit.MaxHp += bonus.Hp; unit.Hp += bonus.Hp; unit.BaseAp += bonus.Ap; unit.BaseMp += bonus.Mp;
+        unit.ExtraAbilities.AddRange(bonus.Abilities);
         unit.Ap = unit.BaseAp;
         unit.Mp = unit.BaseMp;
         // Acts right after its summoner (newest first).

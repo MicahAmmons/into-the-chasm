@@ -20,10 +20,22 @@ public interface ISummonPolicy
     IEnumerable<string> Summonable { get; }
     bool CanSummon(string monsterId, int alreadyOnField, out string reason);
     void OnSummoned(string monsterId);
+
+    /// <summary>Extra stats / abilities a summon gets from the player's affinity with it.</summary>
+    SummonBonus BonusFor(string monsterId) => SummonBonus.None;
+
+    /// <summary>Abilities the player can cast (from learned aspects).</summary>
+    IEnumerable<string> PlayerAbilities => Array.Empty<string>();
 }
 
-public sealed class UnlimitedSummons(IEnumerable<string> monsters, int maxPerType = 1) : ISummonPolicy
+public sealed record SummonBonus(int Hp, int Ap, int Mp, IReadOnlyList<string> Abilities)
 {
+    public static readonly SummonBonus None = new(0, 0, 0, Array.Empty<string>());
+}
+
+public sealed class UnlimitedSummons(IEnumerable<string> monsters, int maxPerType = 1, IEnumerable<string>? playerAbilities = null) : ISummonPolicy
+{
+    public IEnumerable<string> PlayerAbilities { get; } = playerAbilities?.ToList() ?? new List<string>();
     private readonly List<string> _monsters = monsters.ToList();
     public IEnumerable<string> Summonable => _monsters;
     public bool CanSummon(string id, int onField, out string reason)
