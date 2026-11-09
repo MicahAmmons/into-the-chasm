@@ -33,7 +33,7 @@ public static class TileRenderer
         floor ??= s.TileVisuals.FloorOf(tile);
         var bg = ParseColor(floor?.BackgroundColor ?? tile.BackgroundColor, new Color(26, 29, 46));
         if (opacity >= 1f) q.Add(RenderLayer.Background, 0, b => s.Draw.Rect(b, new Rectangle(0, 0, 1920, 1080), bg));
-        if (floor is not null)
+        if (floor is not null && opacity >= 1f)
         {
             q.Add(RenderLayer.Background, 0, b => CloudRenderer.Draw(b, s, floor.UpperClouds, lower: false));
             q.Add(RenderLayer.Background, 0, b => CloudRenderer.Draw(b, s, floor.LowerClouds, lower: true));

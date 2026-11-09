@@ -1,3 +1,4 @@
+using Chasm.Tools.MapEditor;
 using Chasm.Core.Content;
 using Chasm.Core.Grid;
 using Chasm.Core.Items;

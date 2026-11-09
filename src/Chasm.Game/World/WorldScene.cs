@@ -147,6 +147,10 @@ public partial class WorldScene : Scene, IRuleHost
         _lastCell = Player.Cell;
         _suppressedEdges = IsoGrid.EdgesOf(_lastCell); // don't instantly re-prompt on arrival
         _pendingInteract = null;
+        _insideTriggers.Clear();
+        _firedThisVisit.Clear();
+        foreach (var p in ActivePlacements.OfType<InteractablePlacement>())
+            if (p.Trigger == InteractTrigger.Proximity ? p.Cell.ManhattanTo(_lastCell) <= p.Radius : p.Cell == _lastCell) _insideTriggers.Add(p.Id);
         ResetGroups();
         if (Services is not null) MarkSaveDirty();
     }
@@ -187,7 +191,35 @@ public partial class WorldScene : Scene, IRuleHost
 
     private bool IsHidden(Placement p) => p is InteractablePlacement { Invisible: true };
 
-    public IEnumerable<Placement> ActivePlacements => Tile.Placements.Where(IsActive);
+    /// <summary>Interactions attached to props, kept on the prop's current cell.</summary>
+    private IEnumerable<InteractablePlacement> PropInteractions =>
+        Tile.Props.Where(p => p.Interaction is not null).Select(p =>
+        {
+            p.Interaction!.Cell = IsoGrid.CellAt(new Vector2(p.X, p.Y));
+            if (string.IsNullOrEmpty(p.Interaction.Id)) p.Interaction.Id = p.Id + "_interaction";
+            return p.Interaction;
+        });
+
+    private bool IsPropInteraction(Placement p) => Tile.Props.Any(x => x.Interaction == p);
+
+    public IEnumerable<Placement> ActivePlacements => Tile.Placements.Concat(PropInteractions).Where(IsActive);
+
+    // Proximity / step-on bookkeeping: who the player is currently inside, and what already fired this visit.
+    private readonly HashSet<string> _insideTriggers = new();
+    private readonly HashSet<string> _firedThisVisit = new();
+
+    private void CheckAreaTriggers(CellCoord cell)
+    {
+        foreach (var p in ActivePlacements.OfType<InteractablePlacement>().ToList())
+        {
+            if (p.Trigger is not (InteractTrigger.StepOn or InteractTrigger.Proximity)) continue;
+            bool inside = p.Trigger == InteractTrigger.StepOn ? p.Cell == cell : p.Cell.ManhattanTo(cell) <= p.Radius;
+            if (!inside) { _insideTriggers.Remove(p.Id); continue; }
+            if (!_insideTriggers.Add(p.Id)) continue;              // already inside: only fire on entering
+            if (!p.Repeat && !_firedThisVisit.Add(p.Id)) continue; // once per visit
+            Interact(p);
+        }
+    }
 
     public void Interact(Placement p)
     {
@@ -300,8 +332,7 @@ public partial class WorldScene : Scene, IRuleHost
         {
             _lastCell = cell;
             _suppressedEdges &= IsoGrid.EdgesOf(cell);
-            foreach (var p in ActivePlacements.OfType<InteractablePlacement>().Where(p => p.Trigger == InteractTrigger.StepOn && p.Cell == cell).ToList())
-                Interact(p);
+            CheckAreaTriggers(cell);
             CheckExits(cell);
         }
     }
@@ -338,7 +369,7 @@ public partial class WorldScene : Scene, IRuleHost
     private void InteractNearest()
     {
         var target = ActivePlacements
-            .Where(p => !(p is InteractablePlacement { Trigger: InteractTrigger.StepOn }))
+            .Where(p => !(p is InteractablePlacement { Trigger: InteractTrigger.StepOn or InteractTrigger.Proximity }))
             .Where(InRange)
             .OrderBy(p => p.Cell.ManhattanTo(Player.Cell))
             .FirstOrDefault();
@@ -430,6 +461,7 @@ public partial class WorldScene : Scene, IRuleHost
         foreach (var p in ActivePlacements)
         {
             if (p is MonsterGroupPlacement or FigurePlacement || p is InteractablePlacement { Invisible: false } ia && !string.IsNullOrEmpty(ia.Animation)) continue;
+            if (IsPropInteraction(p)) continue; // the prop itself is the visual
             if (IsHidden(p))
             {
                 if (ShowGrid) TileRenderer.QueueCell(_queue, s, p.Cell, new XColor(200, 120, 255) * 0.5f);

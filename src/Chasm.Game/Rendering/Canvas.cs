@@ -32,15 +32,47 @@ public sealed class Canvas : IDisposable
     /// </summary>
     public Func<Rectangle>? Region { get; set; }
 
+    /// <summary>Editor zoom (1 = fit the region) and pan (window pixels). The game leaves these alone.</summary>
+    public float Zoom { get; set; } = 1f;
+    public Vector2 Pan { get; set; }
+
+    /// <summary>The window area the canvas may draw into this frame.</summary>
+    public Rectangle Area { get; private set; }
+
     public void UpdateDestination()
     {
         var pp = _device.PresentationParameters;
         var area = Region?.Invoke() ?? new Rectangle(0, 0, pp.BackBufferWidth, pp.BackBufferHeight);
         if (area.Width <= 0 || area.Height <= 0) area = new Rectangle(0, 0, pp.BackBufferWidth, pp.BackBufferHeight);
-        float scale = Math.Min(area.Width / (float)Width, area.Height / (float)Height);
+        Area = area;
+        float scale = Math.Min(area.Width / (float)Width, area.Height / (float)Height) * Zoom;
         int w = (int)(Width * scale), h = (int)(Height * scale);
-        Destination = new Rectangle(area.X + (area.Width - w) / 2, area.Y + (area.Height - h) / 2, w, h);
+        var center = area.Center.ToVector2() + Pan;
+        Destination = new Rectangle((int)(center.X - w / 2f), (int)(center.Y - h / 2f), w, h);
     }
+
+    /// <summary>Zoom around a window point so the canvas point under it stays put.</summary>
+    public void ZoomAround(Point window, float newZoom)
+    {
+        UpdateDestination();
+        newZoom = Math.Clamp(newZoom, 0.2f, 8f);
+        var canvasPt = WindowToCanvas(window);
+        Zoom = newZoom;
+        UpdateDestination();
+        var after = CanvasToWindow(canvasPt);
+        Pan += new Vector2(window.X, window.Y) - after;
+        UpdateDestination();
+    }
+
+    public Vector2 CanvasToWindow(Vector2 canvas)
+    {
+        var d = Destination;
+        return new Vector2(d.X + canvas.X * d.Width / (float)Width, d.Y + canvas.Y * d.Height / (float)Height);
+    }
+
+    public void ResetView() { Zoom = 1f; Pan = Vector2.Zero; }
+
+    private static readonly RasterizerState Scissor = new() { ScissorTestEnable = true, CullMode = CullMode.None };
 
     public Vector2 WindowToCanvas(Point window)
     {
@@ -57,7 +89,8 @@ public sealed class Canvas : IDisposable
         _device.SetRenderTarget(null);
         UpdateDestination();
         _device.Clear(Color.Black);
-        batch.Begin(SpriteSortMode.Deferred, BlendState.Opaque, SamplerState.LinearClamp);
+        _device.ScissorRectangle = Area;
+        batch.Begin(SpriteSortMode.Deferred, BlendState.Opaque, Zoom > 1.5f ? SamplerState.PointClamp : SamplerState.LinearClamp, null, Scissor);
         batch.Draw(Target, Destination, Color.White);
         batch.End();
     }

@@ -30,6 +30,29 @@ Tools can jump straight to a tool: `--mode map|world|combat|content [--arg <tile
 - **Placement**: something put on a cell (item, interactable, monster group, the Figure).
 - **Rule**: "when these *conditions* are all true, do these *outcomes*". Used everywhere.
 
+## The Map Editor
+
+`--mode map` (or the **Map Editor** launch profile). Start with **New tile** or open an existing one.
+
+- **Floor** (left): pick the floor the tile belongs to, or leave it as a *sketch* (no floor). With a floor you can put
+  the tile on the floor map at **X / Y**; neighbours by X/Y connect automatically (east = X+1, south = Y+1).
+- **Floor properties**: the floor's texture library (*materials*: PNG + rotation + tint + flips + cloud fade) and other
+  floor-wide settings. **Lower / Upper clouds**: cloud line (0 = top, 1 = bottom), fade length, texture, tint, speed.
+  Floor changes affect every tile on the floor and are saved with the tile (Ctrl+S).
+- **Walkable / Player start / Enemy spawn cells**: click or drag; the first cell you press decides. Right-drag clears.
+- **Paint texture**: select cells, then **Paint** with a material. Each paint becomes a *region*; reorder regions to
+  change stacking, set layer (behind / in front of characters), feather and opacity. Materials can be floor-wide or
+  local to the tile ("Move to floor library" promotes them).
+- **Place art (props)**: pick a PNG from the archive (or **Import PNG...** from anywhere on your computer), click to
+  place, drag to move. Props can carry an interaction.
+- **Add interaction**: click a cell, choose a trigger; *proximity* lets you drag the radius. Then fill in its rules.
+- **Reference tile**: overlay another tile (opacity slider), browse it read-only, copy its materials/regions/props/objects.
+- **View**: grid, markers, cloud lines, *neighbouring tiles* (zoom out to see them around the edges).
+- Undo / redo: Ctrl+Z / Ctrl+Y. Trackpad: two-finger scroll pans, Ctrl+scroll (pinch) zooms, Space+drag pans, F = fit.
+
+Screen textures: paint them as **2208x2208** squares; they're centred on the screen and cover it at any rotation
+(smaller textures repeat).
+
 ## Making content (no code needed)
 
 Open **Tools > Content Browser** (or the **New** menu anywhere). Every content type has a form; required

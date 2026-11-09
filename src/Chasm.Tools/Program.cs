@@ -1,3 +1,4 @@
+using Chasm.Tools.MapEditor;
 using Chasm.Core;
 using Chasm.Game.Hosting;
 using Chasm.Game.Scenes;

@@ -1,3 +1,4 @@
+using Chasm.Tools.MapEditor;
 using Chasm.Game.Hosting;
 using Chasm.Tools.Editing;
 using ImGuiNET;

@@ -46,6 +46,7 @@ public enum InteractTrigger
 {
     [Label("Player presses Interact / clicks it")] Interact,
     [Label("Player steps onto the cell")] StepOn,
+    [Label("Player comes within the radius")] Proximity,
 }
 
 /// <summary>
@@ -65,6 +66,10 @@ public sealed class InteractablePlacement : Placement
     public bool Invisible { get; set; }
     public int SpriteYOffset { get; set; }
     public InteractTrigger Trigger { get; set; } = InteractTrigger.Interact;
+    [Range(0, 30), Tooltip("For 'Proximity': how many cells away (diamond shape) triggers it.")]
+    public int Radius { get; set; } = 2;
+    [Tooltip("For 'Proximity' / 'Step on': run again every time the player re-enters (off = only the first time each visit).")]
+    public bool Repeat { get; set; } = true;
     [Tooltip("First rule whose conditions pass runs.")]
     public List<RuleDef> Rules { get; set; } = new();
     public string FallbackMessage { get; set; } = "";

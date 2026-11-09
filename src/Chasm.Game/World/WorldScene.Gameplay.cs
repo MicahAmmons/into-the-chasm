@@ -288,7 +288,8 @@ public partial class WorldScene
         if (!string.IsNullOrWhiteSpace(a.OnMessage)) ShowMessage(new[] { a.OnMessage }, null);
         Rules.RunFirst(a.OnActivate, Context());
         // Hidden spots that react to an active aspect re-check when it's switched on.
-        foreach (var p in ActivePlacements.OfType<InteractablePlacement>().Where(p => p.Trigger == InteractTrigger.StepOn && p.Cell == Player.Cell).ToList())
+        foreach (var p in ActivePlacements.OfType<InteractablePlacement>()
+                     .Where(p => p.Trigger == InteractTrigger.StepOn ? p.Cell == Player.Cell : p.Trigger == InteractTrigger.Proximity && p.Cell.ManhattanTo(Player.Cell) <= p.Radius).ToList())
             Interact(p);
     }
 

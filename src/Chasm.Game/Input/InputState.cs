@@ -43,6 +43,11 @@ public sealed class InputState
     public Vector2 MouseCanvas { get; private set; }
     public Point MouseWindow => _mouse.Position;
     public int ScrollDelta => MouseCapturedByUi ? 0 : _mouse.ScrollWheelValue - _prevMouse.ScrollWheelValue;
+    /// <summary>Sideways scrolling (trackpads, tilt wheels).</summary>
+    public int HorizontalScrollDelta => MouseCapturedByUi ? 0 : _mouse.HorizontalScrollWheelValue - _prevMouse.HorizontalScrollWheelValue;
+    public bool MiddleHeld => !MouseCapturedByUi && _mouse.MiddleButton == ButtonState.Pressed;
+    public Point MouseDelta => _mouse.Position - _prevMouse.Position;
+    public bool RightReleased => _mouse.RightButton == ButtonState.Released && _prevMouse.RightButton == ButtonState.Pressed;
 
     public void Update(Canvas canvas, bool windowActive)
     {

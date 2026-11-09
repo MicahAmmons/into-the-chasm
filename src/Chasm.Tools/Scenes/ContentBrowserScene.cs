@@ -1,3 +1,4 @@
+using Chasm.Tools.MapEditor;
 using Chasm.Core.Content;
 using Chasm.Core.Serialization;
 using Chasm.Game.Scenes;
