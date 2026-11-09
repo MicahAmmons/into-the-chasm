@@ -51,6 +51,40 @@ public sealed class ChasmGame : Microsoft.Xna.Framework.Game
         foreach (var asm in options.ContentAssemblies) ChasmJson.RegisterAssembly(asm);
     }
 
+    protected override void Initialize()
+    {
+        base.Initialize();
+        FitWindowToScreen();
+    }
+
+    /// <summary>
+    /// Opens at the requested size (1920x1080) centred on the screen. If the screen can't fit that
+    /// plus the title bar and taskbar, the window is maximized instead so nothing hangs off-screen.
+    /// </summary>
+    private void FitWindowToScreen()
+    {
+        if (_options.ExitAfterFrames is not null) return; // automated runs: leave as-is
+        var display = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode;
+        bool tooBig = _options.WindowWidth > display.Width - 40 || _options.WindowHeight > display.Height - 100;
+        if (tooBig && _options.MaximizeIfTooBig)
+        {
+            try { SDL_MaximizeWindow(Window.Handle); return; }
+            catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
+            {
+                // Fallback: fill the screen minus room for the title bar and taskbar.
+                _graphics.PreferredBackBufferWidth = display.Width;
+                _graphics.PreferredBackBufferHeight = display.Height - 100;
+                _graphics.ApplyChanges();
+                Window.Position = new Point(0, 30);
+                return;
+            }
+        }
+        Window.Position = new Point(Math.Max(0, (display.Width - _options.WindowWidth) / 2), Math.Max(0, (display.Height - _options.WindowHeight) / 2));
+    }
+
+    [System.Runtime.InteropServices.DllImport("SDL2", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private static extern void SDL_MaximizeWindow(IntPtr window);
+
     protected override void LoadContent()
     {
         _batch = new SpriteBatch(GraphicsDevice);

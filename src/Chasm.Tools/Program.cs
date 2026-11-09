@@ -21,7 +21,7 @@ if (args.Contains("--resave"))
     return;
 }
 
-var options = GameOptions.FromArgs(args, new GameOptions { WindowTitle = $"{GameInfo.Title} - Tools", WindowWidth = 1800, WindowHeight = 1000 });
+var options = GameOptions.FromArgs(args, new GameOptions { WindowTitle = $"{GameInfo.Title} - Tools" });
 using var game = new ChasmGame(options, s =>
 {
     WorldSandboxScene.SandboxDefs = s.Defs;
