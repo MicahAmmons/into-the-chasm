@@ -5,6 +5,7 @@ using Chasm.Core.World;
 using Chasm.Game.Rendering;
 using Chasm.Game.Scenes;
 using Chasm.Tools.Scenes;
+using Chasm.Tools.ImGuiHost;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -29,7 +30,7 @@ public sealed partial class MapEditorScene : Scene
     private enum Tool { Select, Walkable, PlayerStarts, EnemySpawns, PaintTexture, PlaceProp, Interaction }
     private enum Panel { Selection, FloorProperties, LowerClouds, UpperClouds, Reference, TileSettings }
 
-    private const int LeftW = 310, RightW = 480, MenuH = 24;
+    private const int LeftW = 310, RightW = 480, MenuH = 24, StatusH = 28;
 
     private readonly RenderQueue _queue = new();
     private readonly string? _openOnStart;
@@ -41,6 +42,7 @@ public sealed partial class MapEditorScene : Scene
     private Panel _panel = Panel.Selection;
     private string? _status;
     private float _statusTime;
+    private EditorPrefs _prefs = new();
     private bool _showGrid = true, _showArt = true, _showLabels = true, _showNeighbours, _showMarkers = true, _showCloudLines;
     private CellCoord? _hoverCell;
     private Num.Vector2 _hoverPx;
@@ -54,10 +56,12 @@ public sealed partial class MapEditorScene : Scene
     public override void OnEnter()
     {
         ToolContext.EnsureInitialized(Services);
+        _prefs = EditorPrefs.Load();
+        _showGrid = _prefs.ShowGrid;
         Services.Canvas.Region = () =>
         {
             var pp = Services.Graphics.PresentationParameters;
-            return new Rectangle(LeftW, MenuH, Math.Max(100, pp.BackBufferWidth - LeftW - RightW), Math.Max(100, pp.BackBufferHeight - MenuH));
+            return new Rectangle(LeftW, MenuH, Math.Max(100, pp.BackBufferWidth - LeftW - RightW), Math.Max(100, pp.BackBufferHeight - MenuH - StatusH));
         };
         Services.Canvas.ResetView();
         ToolContext.Wizards.Inspector.CellPicker = cb => { _cellPick = cb; Status("Click a cell on the map (Esc cancels)."); };
@@ -78,6 +82,7 @@ public sealed partial class MapEditorScene : Scene
         Services.Canvas.Region = null;
         Services.Canvas.ResetView();
         ToolContext.Wizards.Inspector.CellPicker = null;
+        if (_tile is not null && _history.Count > 0) WriteRecovery();
         DisposeNeighbours();
     }
 
@@ -218,6 +223,53 @@ public sealed partial class MapEditorScene : Scene
         _history.Add(json);
         if (_history.Count > 300) _history.RemoveAt(0);
         _historyIndex = _history.Count - 1;
+        _recoveryDue = true;
+    }
+
+    // ------------------------------------------------------------------ recovery (crash / close safety net)
+
+    private bool _recoveryDue;
+    private float _recoveryTimer;
+
+    private string RecoveryKey => _isNewTile ? "new_" + (string.IsNullOrWhiteSpace(_tile!.Name) ? "tile" : _tile.Name) : _tile!.Id;
+
+    private void UpdateRecovery(float dt)
+    {
+        _recoveryTimer -= dt;
+        if (!_recoveryDue || _recoveryTimer > 0 || _tile is null) return;
+        WriteRecovery();
+    }
+
+    private void WriteRecovery()
+    {
+        if (_tile is null || _history.Count == 0) return;
+        _recoveryDue = false;
+        _recoveryTimer = 2f;
+        string title = $"{(string.IsNullOrWhiteSpace(_tile.Name) ? "Untitled" : _tile.Name)}  [{(_isNewTile ? "new" : _tile.Id)}]";
+        EditorRecovery.Write(RecoveryKey, title, _history[_historyIndex]);
+    }
+
+    private void Recover(EditorRecovery.Entry entry)
+    {
+        var json = EditorRecovery.Read(entry);
+        var snap = json is null ? null : ChasmJson.Deserialize<Snapshot>(json);
+        if (snap is null) { Status("That recovery file couldn't be read."); return; }
+        _tile = snap.Tile;
+        _tile.InvalidateCaches();
+        _floor = snap.Floor;
+        _isNewTile = snap.New || !Services.Defs.Exists(typeof(TileDef), _tile.Id);
+        ResetHistory();
+        // Compare against what's saved on disk, so unsaved recovered work shows as unsaved.
+        _savedTileJson = !_isNewTile && Services.Defs.TryGet<TileDef>(_tile.Id, out var saved) ? ChasmJson.Serialize(saved) : "";
+        var savedFloor = _floor is null ? null : Services.Defs.All<FloorDef>().FirstOrDefault(f => f.Number == _floor.Number);
+        _savedFloorJson = savedFloor is null ? "" : ChasmJson.Serialize(savedFloor);
+        if (_isNewTile) _history.Insert(0, _history[0]); // counts as unsaved
+        _historyIndex = _history.Count - 1;
+        _tool = Tool.Select;
+        _panel = Panel.Selection;
+        ClearSelections();
+        Services.TileVisuals.Invalidate(_tile);
+        Status($"Recovered work from {EditorRecovery.Ago(entry.SavedLocal)}. Save (Ctrl+S) to keep it.");
     }
 
     private void Undo() => Restore(_historyIndex - 1);
@@ -251,6 +303,7 @@ public sealed partial class MapEditorScene : Scene
 
         LeftToolbar();
         RightPanelGui();
+        StatusBar();
         ToolContext.Wizards.Draw();
         Popups();
 
@@ -266,6 +319,7 @@ public sealed partial class MapEditorScene : Scene
         else if (!_panning) UpdateTool(input);
 
         MaybeCommitSnapshot();
+        UpdateRecovery(dt);
     }
 
     private void UpdateHover(Game.Input.InputState input)
@@ -311,21 +365,65 @@ public sealed partial class MapEditorScene : Scene
 
     private string _openSearch = "";
 
+    private List<EditorRecovery.Entry>? _recoveries;
+
     private void StartDialog()
     {
         var io = ImGui.GetIO();
+        _recoveries ??= EditorRecovery.List();
         ImGui.SetNextWindowPos(io.DisplaySize / 2, ImGuiCond.Always, new Num.Vector2(0.5f, 0.5f));
-        ImGui.SetNextWindowSize(new Num.Vector2(560, 600));
-        ImGui.Begin("Map Editor##start", ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoCollapse);
-        if (ImGui.Button("New tile", new Num.Vector2(-1, 50))) NewTile();
-        ImGui.Spacing();
-        ImGui.SeparatorText("Or open an existing tile");
+        ImGui.SetNextWindowSize(Ui.FitSize(620, 720));
+        ImGui.Begin("##start", ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoTitleBar);
+        Ui.Title("Map Editor");
+        Ui.Hint("Build tiles cell by cell: walkable ground, textures, art, interactions.");
+        ImGui.Dummy(new Num.Vector2(0, 6));
+        if (Ui.AccentButton("+  New tile", new Num.Vector2(-1, 46))) NewTile();
+
+        if (_recoveries.Count > 0)
+        {
+            Ui.Section("Recover recent work");
+            Ui.Hint("Saved automatically while you edit, even if you didn't press Save or the program closed.");
+            foreach (var r in _recoveries.Take(5))
+            {
+                ImGui.PushID(r.Path);
+                if (ImGui.Button("Recover", new Num.Vector2(80, 0))) Recover(r);
+                ImGui.SameLine();
+                ImGui.Text(r.Title);
+                ImGui.SameLine();
+                ImGui.TextColored(Ui.Muted, EditorRecovery.Ago(r.SavedLocal));
+                ImGui.PopID();
+            }
+        }
+
+        Ui.Section("Open a tile");
         ImGui.SetNextItemWidth(-1);
-        ImGui.InputTextWithHint("##search", "search...", ref _openSearch, 80);
-        ImGui.BeginChild("list");
+        ImGui.InputTextWithHint("##search", "search by name or id...", ref _openSearch, 80);
+        ImGui.BeginChild("list", new Num.Vector2(0, 0), ImGuiChildFlags.Borders);
         TileList(t => Open(t), _openSearch);
         ImGui.EndChild();
         ImGui.End();
+    }
+
+    private void StatusBar()
+    {
+        var io = ImGui.GetIO();
+        ImGui.SetNextWindowPos(new Num.Vector2(0, io.DisplaySize.Y - StatusH));
+        ImGui.SetNextWindowSize(new Num.Vector2(io.DisplaySize.X, StatusH));
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Num.Vector2(12, 5));
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 0);
+        ImGui.PushStyleColor(ImGuiCol.WindowBg, new Num.Vector4(0.06f, 0.065f, 0.09f, 1));
+        ImGui.Begin("##status", ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoSavedSettings);
+        var tool = ToolList.First(x => x.tool == _tool).label;
+        Ui.Colored(Ui.Accent, tool);
+        ImGui.SameLine(0, 18);
+        Ui.Colored(Ui.Muted, _hoverCell is { } h ? $"cell {h.Q},{h.R}   px {_hoverPx.X:0},{_hoverPx.Y:0}" : "cell -");
+        ImGui.SameLine(0, 18);
+        Ui.Colored(Ui.Muted, $"zoom {Services.Canvas.Zoom * 100:0}%");
+        if (_tool == Tool.PaintTexture) { ImGui.SameLine(0, 18); Ui.Colored(Ui.Muted, $"{_selection.Count} cells selected"); }
+        if (_statusTime > 0 && _status is not null) { ImGui.SameLine(0, 24); ImGui.TextUnformatted(_status); }
+        ImGui.End();
+        ImGui.PopStyleColor();
+        ImGui.PopStyleVar(2);
     }
 
     /// <summary>All tiles grouped by floor (sketches last).</summary>
@@ -366,6 +464,7 @@ public sealed partial class MapEditorScene : Scene
 
     private void Popups()
     {
+        NewFloorPopup();
         if (_askUnsaved) { ImGui.OpenPopup("Unsaved changes"); _askUnsaved = false; }
         if (!ImGui.BeginPopupModal("Unsaved changes", ImGuiWindowFlags.AlwaysAutoResize)) return;
         ImGui.Text("This tile (or its floor) has unsaved changes.");

@@ -196,7 +196,7 @@ public sealed class FloorDef : Def
     [Group("Clouds"), Tooltip("Clouds below: cliffs fade down into these.")]
     public CloudLayerDef LowerClouds { get; set; } = new() { Line = 0.7f };
     [Group("Clouds"), Tooltip("Clouds above: walls fade up into these.")]
-    public CloudLayerDef UpperClouds { get; set; } = new() { Line = 0.12f, Enabled = false };
+    public CloudLayerDef UpperClouds { get; set; } = new() { Line = 0.12f, Enabled = false, Coverage = CloudCoverage.Band };
 
     [Group("Look"), Range(0, 64), Tooltip("Default soft edge (pixels) for painted regions.")]
     public int DefaultFeather { get; set; } = 6;

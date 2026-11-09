@@ -1,3 +1,4 @@
+using Chasm.Tools.ImGuiHost;
 using Chasm.Tools.MapEditor;
 using Chasm.Core.Content;
 using Chasm.Core.Serialization;
@@ -55,7 +56,7 @@ public sealed class ContentBrowserScene : Scene
         ImGui.SetNextItemWidth(300);
         ImGui.InputTextWithHint("##search", "search...", ref _search, 100);
         ImGui.SameLine();
-        ImGui.TextDisabled($"content/defs/{folder.Folder}/");
+        Ui.Colored(Ui.Muted, $"content/defs/{folder.Folder}/");
         ImGui.Separator();
 
         if (ImGui.BeginTable("defs", 4, ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.ScrollY))
@@ -102,7 +103,7 @@ public sealed class ContentBrowserScene : Scene
                 if (ImGui.SmallButton("Delete")) { _confirmDelete = def.Id; ImGui.OpenPopup("Delete?"); }
                 if (ImGui.BeginPopupModal("Delete?", ImGuiWindowFlags.AlwaysAutoResize))
                 {
-                    ImGui.Text($"Delete '{_confirmDelete}'? Its JSON file is removed. Anything pointing to it will show as missing.");
+                    ImGui.TextUnformatted($"Delete '{_confirmDelete}'? Its JSON file is removed. Anything pointing to it will show as missing.");
                     if (ImGui.Button("Delete", new Num.Vector2(120, 0))) { Services.Defs.Delete(_type, _confirmDelete!); ImGui.CloseCurrentPopup(); }
                     ImGui.SameLine();
                     if (ImGui.Button("Cancel", new Num.Vector2(120, 0))) ImGui.CloseCurrentPopup();

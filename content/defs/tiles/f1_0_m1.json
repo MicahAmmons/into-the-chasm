@@ -104,6 +104,8 @@
       "Invisible": false,
       "SpriteYOffset": 0,
       "Trigger": "Interact",
+      "Radius": 2,
+      "Repeat": true,
       "Rules": [
         {
           "Label": "Feed it the berry",

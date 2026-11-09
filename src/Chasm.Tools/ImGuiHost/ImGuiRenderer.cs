@@ -27,6 +27,7 @@ public sealed class ImGuiRenderer : IDisposable
     private int _nextTextureId = 1;
     private IntPtr? _fontTextureId;
     private int _scrollWheel;
+    private readonly IntPtr _iniPath; // must stay alive for ImGui's lifetime
     private readonly List<int> _keys = new();
 
     public ImGuiRenderer(Microsoft.Xna.Framework.Game game)
@@ -34,6 +35,12 @@ public sealed class ImGuiRenderer : IDisposable
         _game = game;
         _device = game.GraphicsDevice;
         ImGui.SetCurrentContext(ImGui.CreateContext());
+        // ImGui remembers window sizes/positions in an .ini file. Keep it in AppData (per computer),
+        // never in the repo folder, so it can't block git pulls.
+        var iniDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "IntoTheChasm");
+        Directory.CreateDirectory(iniDir);
+        _iniPath = Marshal.StringToHGlobalAnsi(Path.Combine(iniDir, "imgui.ini"));
+        unsafe { ImGui.GetIO().NativePtr->IniFilename = (byte*)_iniPath; }
         _effect = new BasicEffect(_device) { TextureEnabled = true, VertexColorEnabled = true };
         _raster = new RasterizerState { CullMode = CullMode.None, DepthBias = 0, FillMode = FillMode.Solid, MultiSampleAntiAlias = false, ScissorTestEnable = true };
         game.Window.TextInput += (_, a) => { if (a.Character != '\t') ImGui.GetIO().AddInputCharacter(a.Character); };
@@ -41,6 +48,9 @@ public sealed class ImGuiRenderer : IDisposable
         io.ConfigFlags |= ImGuiConfigFlags.NavEnableKeyboard;
         io.ConfigFlags |= ImGuiConfigFlags.DockingEnable;
     }
+
+    /// <summary>Adds a font without rebuilding (call <see cref="RebuildFontAtlas"/> after adding all fonts).</summary>
+    public ImFontPtr AddFont(string ttfPath, float size) => ImGui.GetIO().Fonts.AddFontFromFileTTF(ttfPath, size);
 
     public void LoadFont(string ttfPath, float size)
     {

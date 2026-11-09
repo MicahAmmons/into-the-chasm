@@ -33,6 +33,20 @@ public sealed class SceneStack
         DoPush(scene);
     });
 
+    /// <summary>
+    /// The app is closing: give every scene its OnExit (top first) so they can save / write
+    /// recovery files. Errors are logged, never thrown, so closing always works.
+    /// </summary>
+    public void ExitAll()
+    {
+        for (int i = _scenes.Count - 1; i >= 0; i--)
+        {
+            try { _scenes[i].OnExit(); }
+            catch (Exception e) { Console.WriteLine($"[scenes] {_scenes[i].GetType().Name}.OnExit failed: {e.Message}"); }
+        }
+        _scenes.Clear();
+    }
+
     /// <summary>Applies queued changes. Called by the host once per frame before Update.</summary>
     public void ApplyPending()
     {

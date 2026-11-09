@@ -1,3 +1,4 @@
+using Chasm.Tools.ImGuiHost;
 using System.Reflection;
 using Chasm.Core.Content;
 using Chasm.Core.Serialization;
@@ -80,7 +81,7 @@ public sealed class DefEditorWindow
         var folder = DefRegistry.FolderOf(DefType);
         string kind = folder.DisplayName.TrimEnd('s');
         string title = IsNew ? $"New {kind}" : $"Edit {kind}: {_def.DisplayName}";
-        ImGui.SetNextWindowSize(new Num.Vector2(620, 640), ImGuiCond.FirstUseEver);
+        ImGui.SetNextWindowSize(Ui.FitSize(620, 680), ImGuiCond.FirstUseEver);
         ImGui.SetNextWindowPos(ImGui.GetIO().DisplaySize / 2, ImGuiCond.FirstUseEver, new Num.Vector2(0.5f, 0.5f));
         if (!ImGui.Begin($"{title}{(_dirty ? " *" : "")}###wiz{_windowId}", ref _open, ImGuiWindowFlags.NoCollapse))
         {
@@ -88,6 +89,7 @@ public sealed class DefEditorWindow
             return _open;
         }
 
+        Ui.KeepOnScreen();
         if (DefType.GetCustomAttribute<TooltipAttribute>() is { } tip) ImGui.TextDisabled(tip.Text);
         ImGui.Separator();
 
@@ -107,7 +109,7 @@ public sealed class DefEditorWindow
         {
             if (ImGui.InputText("##id", ref id, 120)) { _def.Id = id.Trim(); _idEdited = true; _dirty = true; }
         }
-        else ImGui.TextDisabled($"{id}   (ids can't change once saved: other content points to them)");
+        else Ui.Colored(Ui.Muted, $"{id}   (ids can't change once saved: other content points to them)");
 
         var inspector = _stack.Inspector;
         static bool IsHeader(PropertyInfo p) => p.Name is nameof(Def.Id) or nameof(Def.Name) or nameof(Def.Notes);

@@ -57,7 +57,7 @@ public sealed partial class MapEditorScene
                 d.DiamondFill(b, p, 118, 59, (t.Walkable[c] ? WalkGreen : BlockRed) * 0.38f);
             else if (cellMode && t.Walkable[c])
                 d.DiamondFill(b, p, 118, 59, WalkGreen * 0.15f);
-            if (_showGrid) d.DiamondOutline(b, p, IsoGrid.CellWidth, IsoGrid.CellHeight, (_showArt ? Color.White : Color.Gray) * 0.22f);
+            if (_showGrid) d.DiamondOutline(b, p, IsoGrid.CellWidth, IsoGrid.CellHeight, EditorPrefs.ToColor(_prefs.GridColor));
             var edges = IsoGrid.EdgesOf(c);
             if (edges != Edge.None && t.Walkable[c] && _showMarkers && TileLinks.ExitsFor(Services.Defs, t).Any(e => (edges & e.Edge) != 0))
                 d.DiamondOutline(b, p, 100, 50, new Color(120, 200, 255), 2);
@@ -96,6 +96,12 @@ public sealed partial class MapEditorScene
             CloudLine(b, _floor.UpperClouds, "upper cloud line", false);
         }
 
+        if (_prefs.ShowCenterLines)
+        {
+            var cl = EditorPrefs.ToColor(_prefs.CenterLineColor);
+            d.Line(b, new Vector2(960, 0), new Vector2(960, 1080), cl, 2);
+            d.Line(b, new Vector2(0, 540), new Vector2(1920, 540), cl, 2);
+        }
         if (_selectedCell is { } sc) d.DiamondOutline(b, IsoGrid.CellCenter(sc), IsoGrid.CellWidth, IsoGrid.CellHeight, Color.White, 2);
         if (_hoverCell is { } hc)
             d.DiamondOutline(b, IsoGrid.CellCenter(hc), IsoGrid.CellWidth, IsoGrid.CellHeight, _cellPick is not null ? Color.Cyan : Color.White * 0.9f, 2);

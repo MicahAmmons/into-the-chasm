@@ -19,8 +19,9 @@ public sealed partial class MapEditorScene
     {
         var io = ImGui.GetIO();
         ImGui.SetNextWindowPos(new Num.Vector2(io.DisplaySize.X - RightW, MenuH));
-        ImGui.SetNextWindowSize(new Num.Vector2(RightW, io.DisplaySize.Y - MenuH));
+        ImGui.SetNextWindowSize(new Num.Vector2(RightW, io.DisplaySize.Y - MenuH - StatusH));
         ImGui.Begin("##right", ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove);
+        PageHeader();
         switch (_panel)
         {
             case Panel.FloorProperties: FloorPanel(); break;
@@ -42,6 +43,37 @@ public sealed partial class MapEditorScene
         ImportDialog.Draw(Services, key => { _propTexture = key; _archiveKeys = null; });
     }
 
+    /// <summary>Title of the right panel's current page, with a close button for pages opened from the toolbar.</summary>
+    private void PageHeader()
+    {
+        string title = _panel switch
+        {
+            Panel.FloorProperties => $"Floor {_floor?.Number} properties",
+            Panel.LowerClouds => "Lower clouds",
+            Panel.UpperClouds => "Upper clouds",
+            Panel.Reference => "Reference tile",
+            Panel.TileSettings => "Tile settings",
+            _ => _tool switch
+            {
+                Tool.PaintTexture => "Paint texture",
+                Tool.PlaceProp => "Place art",
+                Tool.Walkable => "Walkable cells",
+                Tool.PlayerStarts => "Player start cells",
+                Tool.EnemySpawns => "Enemy spawn cells",
+                Tool.Interaction => "Interaction",
+                _ => "Selection",
+            },
+        };
+        Ui.Title(title);
+        if (_panel != Panel.Selection)
+        {
+            ImGui.SameLine(ImGui.GetWindowWidth() - 26 - ImGui.GetStyle().WindowPadding.X);
+            if (ImGui.Button("x", new Num.Vector2(26, 26))) _panel = Panel.Selection;
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Close this page");
+        }
+        ImGui.Separator();
+    }
+
     private bool Edit(object obj, Func<PropertyInfo, bool>? filter = null)
     {
         bool changed = ToolContext.Wizards.Inspector.Edit(obj, filter);
@@ -55,20 +87,19 @@ public sealed partial class MapEditorScene
     {
         var t = _tile!;
         int walk = IsoGrid.AllCells.Count(c => t.Walkable[c]);
-        ImGui.SeparatorText(_tool switch { Tool.Walkable => "Walkable cells", Tool.PlayerStarts => "Player start cells", _ => "Enemy spawn cells" });
         ImGui.TextWrapped(_tool switch
         {
             Tool.Walkable => "Green = walkable, red = blocked. Click or drag; the first cell you press decides. Right-drag always blocks.",
             Tool.PlayerStarts => "Blue cells: where the player may choose to start a fight. Must be walkable.",
             _ => "Orange cells: where enemies are placed at random when a fight starts. Must be walkable.",
         });
-        ImGui.Text($"Walkable: {walk}   Player starts: {t.PlayerCombatStarts.Count}   Enemy spawns: {t.EnemyCombatStarts.Count}");
+        ImGui.TextUnformatted($"Walkable: {walk}   Player starts: {t.PlayerCombatStarts.Count}   Enemy spawns: {t.EnemyCombatStarts.Count}");
         if (_tool == Tool.Walkable)
         {
             if (ImGui.Button("Make every cell walkable")) { foreach (var c in IsoGrid.AllCells) t.Walkable[c] = true; Edited(); }
             if (ImGui.Button("Block every cell")) { foreach (var c in IsoGrid.AllCells) t.Walkable[c] = false; t.PlayerCombatStarts.Clear(); t.EnemyCombatStarts.Clear(); Edited(); }
             if (ImGui.Button("Pick spawn point...")) ToolContext.Wizards.Inspector.CellPicker?.Invoke(c => { t.Spawn = c; });
-            ImGui.TextDisabled($"Spawn point (where teleports land): {t.Spawn}");
+            Ui.Colored(Ui.Muted, $"Spawn point (where teleports land): {t.Spawn}");
         }
         else
         {
@@ -84,7 +115,7 @@ public sealed partial class MapEditorScene
     private void PaintPanel()
     {
         var t = _tile!;
-        ImGui.SeparatorText($"Selected cells: {_selection.Count}");
+        Ui.Section($"Selected cells: {_selection.Count}");
         if (ImGui.Button("Clear")) _selection.Clear();
         ImGui.SameLine();
         if (ImGui.Button("All walkable")) foreach (var c in IsoGrid.AllCells.Where(c => t.Walkable[c])) _selection.Add(c);
@@ -93,7 +124,7 @@ public sealed partial class MapEditorScene
         ImGui.SameLine();
         if (ImGui.Button("Invert")) { var all = IsoGrid.AllCells.Where(c => !_selection.Contains(c)).ToList(); _selection.Clear(); foreach (var c in all) _selection.Add(c); }
 
-        ImGui.SeparatorText("Paint the selection with...");
+        Ui.Section("Paint the selection with...");
         var mats = AllMaterials().ToList();
         if (mats.Count == 0) ImGui.TextColored(Warn, "No materials yet. Add one to the floor library (Floor properties) or as a local material below.");
         foreach (var (reference, mat, scope) in mats)
@@ -103,6 +134,8 @@ public sealed partial class MapEditorScene
             if (ImGui.Button("Paint")) PaintSelection(reference);
             ImGui.EndDisabled();
             ImGui.SameLine();
+            Thumb(mat.Texture, 24);
+            ImGui.SameLine();
             if (ImGui.Selectable($"{mat.Name}  ({scope})", _selectedMaterialRef == reference)) _selectedMaterialRef = reference;
             if (ImGui.IsItemHovered()) MaterialTooltip(mat);
             ImGui.PopID();
@@ -110,7 +143,7 @@ public sealed partial class MapEditorScene
         if (ImGui.Button("+ Local material (this tile only)")) AddMaterial(t.LocalMaterials, "local");
         if (_floor is not null) { ImGui.SameLine(); if (ImGui.Button("Edit floor library")) _panel = Panel.FloorProperties; }
 
-        ImGui.SeparatorText("Regions (drawn top to bottom: lower = on top)");
+        Ui.Section("Regions  (lower in the list = drawn on top)");
         int moveUp = -1, moveDown = -1;
         for (int i = 0; i < t.PaintRegions.Count; i++)
         {
@@ -130,7 +163,7 @@ public sealed partial class MapEditorScene
 
         if (_selectedRegion is { } sel && t.PaintRegions.Contains(sel))
         {
-            ImGui.SeparatorText($"Region {sel.Id}");
+            Ui.Section($"Region {sel.Id}");
             string preview = t.FindMaterial(sel.Material, _floor)?.Name ?? sel.Material;
             ImGui.Text("Material"); ImGui.SameLine(170); ImGui.SetNextItemWidth(-1);
             if (ImGui.BeginCombo("##mat", preview))
@@ -154,7 +187,7 @@ public sealed partial class MapEditorScene
 
         if (t.LocalMaterials.Count > 0 || _selectedMaterialRef?.StartsWith("local:") == true)
         {
-            ImGui.SeparatorText("Local materials");
+            Ui.Section("Local materials");
             MaterialsEditor(t.LocalMaterials, isFloor: false);
         }
     }
@@ -184,7 +217,7 @@ public sealed partial class MapEditorScene
         float scale = Math.Min(1f, 220f / Math.Max(tex.Width, tex.Height));
         ImGui.BeginTooltip();
         ImGui.Image(id, new Num.Vector2(tex.Width * scale, tex.Height * scale));
-        ImGui.Text($"{m.Texture}\nrotation {m.Rotation:0}  tint {m.Tint}  flip {(m.FlipX ? "X" : "")}{(m.FlipY ? "Y" : "")}  {m.Fade}");
+        ImGui.TextUnformatted($"{m.Texture}\nrotation {m.Rotation:0}  tint {m.Tint}  flip {(m.FlipX ? "X" : "")}{(m.FlipY ? "Y" : "")}  {m.Fade}");
         ImGui.EndTooltip();
     }
 
@@ -210,14 +243,16 @@ public sealed partial class MapEditorScene
             var m = list[i];
             ImGui.PushID(m.Id);
             bool open = _editingMaterial == (isFloor ? "" : "local:") + m.Id;
-            if (ImGui.Selectable($"{m.Name}  [{m.Id}]", open)) _editingMaterial = open ? null : (isFloor ? "" : "local:") + m.Id;
+            Thumb(m.Texture, 28);
+            ImGui.SameLine();
+            if (ImGui.Selectable($"{m.Name}  [{m.Id}]", open, ImGuiSelectableFlags.None, new Num.Vector2(0, 28))) _editingMaterial = open ? null : (isFloor ? "" : "local:") + m.Id;
             if (ImGui.IsItemHovered()) MaterialTooltip(m);
             if (open)
             {
                 ImGui.Indent();
                 Edit(m, p => p.Name != nameof(MaterialDef.Id));
                 int uses = _tile!.PaintRegions.Count(r => r.Material == (isFloor ? m.Id : "local:" + m.Id));
-                ImGui.TextDisabled($"Used by {uses} region(s) on this tile{(isFloor ? " (other tiles on the floor may use it too)" : "")}.");
+                Ui.Colored(Ui.Muted, $"Used by {uses} region(s) on this tile{(isFloor ? " (other tiles on the floor may use it too)" : "")}.");
                 if (ImGui.Button("Duplicate (e.g. Left -> Right)"))
                 {
                     var copy = ChasmJson.Clone(m);
@@ -257,7 +292,8 @@ public sealed partial class MapEditorScene
 
     private void NewMaterialPopup()
     {
-        if (!ImGui.BeginPopup("newmat")) return;
+        CenterNextWindow();
+        if (!ImGui.BeginPopupModal("newmat", ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoTitleBar)) return;
         ImGui.Text("New material name (e.g. 'Cliff Left'):");
         ImGui.SetNextItemWidth(260);
         bool enter = ImGui.InputText("##n", ref _newMaterialName, 80, ImGuiInputTextFlags.EnterReturnsTrue);
@@ -269,6 +305,8 @@ public sealed partial class MapEditorScene
             Edited();
             ImGui.CloseCurrentPopup();
         }
+        ImGui.SameLine();
+        if (ImGui.Button("Cancel")) ImGui.CloseCurrentPopup();
         ImGui.EndPopup();
     }
 
@@ -286,8 +324,8 @@ public sealed partial class MapEditorScene
     private void FloorPanel()
     {
         if (_floor is null) { ImGui.TextDisabled("This tile has no floor."); return; }
-        ImGui.TextColored(Warn, "Floor-wide settings: changes affect EVERY tile on this floor.");
-        ImGui.TextDisabled($"Saved with the tile (Ctrl+S). File: content/defs/floors/{_floor.Id}.json");
+        ImGui.TextColored(Warn, "Changes here affect EVERY tile on this floor.");
+        Ui.Colored(Ui.Muted, $"Saved with the tile (Ctrl+S). File: content/defs/floors/{_floor.Id}.json");
         string name = _floor.Name;
         ImGui.Text("Name"); ImGui.SameLine(170); ImGui.SetNextItemWidth(-1);
         if (ImGui.InputText("##fname", ref name, 100)) { _floor.Name = name; Edited(); }
@@ -303,7 +341,7 @@ public sealed partial class MapEditorScene
     {
         if (_floor is null) return;
         var cloud = lower ? _floor.LowerClouds : _floor.UpperClouds;
-        ImGui.SeparatorText(lower ? "Lower clouds (cliffs fade down into these)" : "Upper clouds (walls fade up into these)");
+        Ui.Section(lower ? "Lower clouds (cliffs fade down into these)" : "Upper clouds (walls fade up into these)");
         ImGui.TextColored(Warn, "Floor-wide: affects every tile on this floor.");
         ImGui.TextWrapped(lower
             ? "Line: where the cloud starts (0 = top of screen, 1 = bottom). Materials set to 'fade into the lower clouds' are fully visible above the line and gone 'Fade Length' below it."
@@ -321,7 +359,7 @@ public sealed partial class MapEditorScene
     private void PropsPanel()
     {
         var t = _tile!;
-        ImGui.SeparatorText("Art archive");
+        Ui.Section("Art archive");
         _archiveKeys ??= Services.Textures.AllKeys().ToList();
         var categories = _archiveKeys.Select(k => k.Contains('/') ? k[..k.IndexOf('/')] : "(root)").Distinct().OrderBy(c => c).ToList();
         ImGui.SetNextItemWidth(150);
@@ -346,7 +384,7 @@ public sealed partial class MapEditorScene
         ImGui.EndChild();
         if (_propTexture.Length > 0)
         {
-            ImGui.Text($"Placing: {_propTexture}");
+            ImGui.TextUnformatted($"Placing: {_propTexture}");
             ImageInline(_propTexture, 120);
         }
         ImGui.Checkbox("Snap to cell centres", ref _snapProps);
@@ -356,7 +394,7 @@ public sealed partial class MapEditorScene
 
     private void PropEditor(PropDef p)
     {
-        ImGui.SeparatorText($"Prop {p.Id}");
+        Ui.Section($"Prop {p.Id}");
         Edit(p, x => x.Name != nameof(PropDef.Interaction));
         if (p.Interaction is null)
         {
@@ -384,6 +422,17 @@ public sealed partial class MapEditorScene
         if (ImGui.Button("Delete prop")) DeleteSelected();
     }
 
+    /// <summary>A small square thumbnail of a texture (a tinted box when the art is missing).</summary>
+    private void Thumb(string key, float size)
+    {
+        var tex = Services.Textures.Get(key);
+        var id = ImGuiExtension.Instance!.Renderer.BindTexture(tex);
+        float scale = size / Math.Max(tex.Width, tex.Height);
+        var p = ImGui.GetCursorScreenPos();
+        ImGui.GetWindowDrawList().AddRectFilled(p, p + new Num.Vector2(size, size), ImGui.GetColorU32(ImGuiCol.FrameBg), 4);
+        ImGui.Image(id, new Num.Vector2(tex.Width * scale, tex.Height * scale));
+    }
+
     private void ImageTooltip(string key)
     {
         ImGui.BeginTooltip();
@@ -397,7 +446,7 @@ public sealed partial class MapEditorScene
         var id = ImGuiExtension.Instance!.Renderer.BindTexture(tex);
         float scale = Math.Min(1f, max / Math.Max(tex.Width, tex.Height));
         ImGui.Image(id, new Num.Vector2(tex.Width * scale, tex.Height * scale));
-        ImGui.TextDisabled($"{tex.Width} x {tex.Height}");
+        Ui.Colored(Ui.Muted, $"{tex.Width} x {tex.Height}");
     }
 
     // ------------------------------------------------------------------ selection + tile settings
@@ -408,7 +457,7 @@ public sealed partial class MapEditorScene
         if (_selectedProp is { } prop && t.Props.Contains(prop)) { PropEditor(prop); return; }
         if (_selectedPlacement is { } pl && t.Placements.Contains(pl))
         {
-            ImGui.SeparatorText($"{pl.Id}: {pl.Describe(Services.Defs)}");
+            Ui.Section($"{pl.Id}: {pl.Describe(Services.Defs)}");
             if (ImGui.Button("Delete")) { DeleteSelected(); return; }
             ImGui.SameLine();
             if (ImGui.Button("Duplicate"))
@@ -427,13 +476,13 @@ public sealed partial class MapEditorScene
             ImGui.TextWrapped("Select tool: click a cell, prop or object on the map.\n\nUse the tools on the left to paint cells, textures, place art and add interactions.");
             return;
         }
-        ImGui.SeparatorText($"Cell {cell}");
+        Ui.Section($"Cell {cell}");
         bool walk = t.Walkable[cell];
         if (ImGui.Checkbox("Walkable", ref walk)) { t.Walkable[cell] = walk; Edited(); }
-        ImGui.Text($"Player start: {(t.PlayerCombatStarts.Contains(cell) ? "yes" : "no")}   Enemy spawn: {(t.EnemyCombatStarts.Contains(cell) ? "yes" : "no")}");
+        ImGui.TextUnformatted($"Player start: {(t.PlayerCombatStarts.Contains(cell) ? "yes" : "no")}   Enemy spawn: {(t.EnemyCombatStarts.Contains(cell) ? "yes" : "no")}");
         var regions = t.PaintRegions.Where(r => r.Cells.Contains(cell)).ToList();
-        ImGui.Text($"Paint regions here: {(regions.Count == 0 ? "none" : string.Join(", ", regions.Select(r => r.Id)))}");
-        ImGui.SeparatorText("Add to this cell");
+        ImGui.TextUnformatted($"Paint regions here: {(regions.Count == 0 ? "none" : string.Join(", ", regions.Select(r => r.Id)))}");
+        Ui.Section("Add to this cell");
         foreach (var type in PolymorphicTypes.ConcreteSubtypes(typeof(Placement)))
         {
             if (ImGui.Button(Editing.Inspector.LabelFor(type)))
@@ -449,7 +498,7 @@ public sealed partial class MapEditorScene
         var here = t.Placements.Where(p => p.Cell == cell).ToList();
         if (here.Count > 0)
         {
-            ImGui.SeparatorText("On this cell");
+            Ui.Section("On this cell");
             foreach (var p in here) if (ImGui.Selectable($"{p.Id}: {p.Describe(Services.Defs)}")) _selectedPlacement = p;
         }
     }
@@ -457,7 +506,7 @@ public sealed partial class MapEditorScene
     private void TileSettingsPanel()
     {
         var t = _tile!;
-        ImGui.SeparatorText("Tile settings");
+        Ui.Section("Tile settings");
         ImGui.TextDisabled("Full-screen art layers (hand-painted tiles), extra exits, local materials, notes.");
         ImGui.BeginChild("ts");
         Edit(t, p => p.Name is not ("Id" or "Name" or nameof(TileDef.Floor) or nameof(TileDef.X) or nameof(TileDef.Y) or nameof(TileDef.LocalMaterials)));

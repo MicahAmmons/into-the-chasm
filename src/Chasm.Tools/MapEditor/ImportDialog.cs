@@ -1,3 +1,4 @@
+using Chasm.Tools.ImGuiHost;
 using Chasm.Game.Hosting;
 using ImGuiNET;
 using Num = System.Numerics;
@@ -22,7 +23,8 @@ public static class ImportDialog
     {
         if (_requestOpen) { ImGui.OpenPopup("Import PNG"); _requestOpen = false; _open = true; }
         if (!_open) return;
-        ImGui.SetNextWindowSize(new Num.Vector2(720, 560), ImGuiCond.Appearing);
+        ImGui.SetNextWindowSize(Ui.FitSize(720, 560), ImGuiCond.Appearing);
+        ImGui.SetNextWindowPos(ImGui.GetIO().DisplaySize / 2, ImGuiCond.Appearing, new Num.Vector2(0.5f, 0.5f));
         if (!ImGui.BeginPopupModal("Import PNG", ref _open)) return;
 
         // Drives / quick places

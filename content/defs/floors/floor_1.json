@@ -6,6 +6,8 @@
   "Theme": "",
   "LowerClouds": {
     "Enabled": true,
+    "Coverage": "FullScreen",
+    "RowsOnScreen": 2,
     "Line": 0.7,
     "FadeLength": 0.15,
     "Texture": "backgrounds/clouds/Cloud1.png",
@@ -15,6 +17,8 @@
   },
   "UpperClouds": {
     "Enabled": false,
+    "Coverage": "Band",
+    "RowsOnScreen": 2,
     "Line": 0.12,
     "FadeLength": 0.15,
     "Texture": "backgrounds/clouds/Cloud1.png",

@@ -6,8 +6,11 @@ namespace Chasm.Game.Hosting;
 public sealed record GameOptions
 {
     public string WindowTitle { get; init; } = Chasm.Core.GameInfo.Title;
-    public int WindowWidth { get; init; } = 1600;
-    public int WindowHeight { get; init; } = 900;
+    public int WindowWidth { get; init; } = 1920;
+    public int WindowHeight { get; init; } = 1080;
+
+    /// <summary>Open maximized when the screen is too small for the requested size (e.g. a 1920x1080 laptop).</summary>
+    public bool MaximizeIfTooBig { get; init; } = true;
 
     /// <summary>Exit on its own after this many frames (automated smoke tests).</summary>
     public int? ExitAfterFrames { get; init; }

@@ -21,7 +21,18 @@ if (args.Contains("--resave"))
     return;
 }
 
-var options = GameOptions.FromArgs(args, new GameOptions { WindowTitle = $"{GameInfo.Title} - Tools", WindowWidth = 1800, WindowHeight = 1000 });
+// --generate-art: (re)build the placeholder art pack in content/art/placeholder.
+if (args.Contains("--generate-art"))
+{
+    var artPaths = Chasm.Game.Assets.ContentPaths.Resolve();
+    var sw = System.Diagnostics.Stopwatch.StartNew();
+    foreach (var f in Chasm.Tools.Art.PlaceholderArt.Generate(artPaths.Art))
+        Console.WriteLine($"  {Path.GetRelativePath(artPaths.Root, f)}  ({new FileInfo(f).Length / 1024} KB)");
+    Console.WriteLine($"Placeholder art generated in {sw.Elapsed.TotalSeconds:0.0}s.");
+    return;
+}
+
+var options = GameOptions.FromArgs(args, new GameOptions { WindowTitle = $"{GameInfo.Title} - Tools" });
 using var game = new ChasmGame(options, s =>
 {
     WorldSandboxScene.SandboxDefs = s.Defs;

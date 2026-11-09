@@ -49,6 +49,14 @@ Tools can jump straight to a tool: `--mode map|world|combat|content [--arg <tile
 - **Reference tile**: overlay another tile (opacity slider), browse it read-only, copy its materials/regions/props/objects.
 - **View**: grid, markers, cloud lines, *neighbouring tiles* (zoom out to see them around the edges).
 - Undo / redo: Ctrl+Z / Ctrl+Y. Trackpad: two-finger scroll pans, Ctrl+scroll (pinch) zooms, Space+drag pans, F = fit.
+- Tools have number keys 1-8. Panel buttons close their page when clicked again.
+- **Recovery**: while you edit, your work is copied to `AppData/IntoTheChasm/editor-recovery/` every couple of
+  seconds and on close (saved or not). The start screen lists it under *Recover recent work*.
+- Personal preferences (grid / centre-line colours) live in `AppData/IntoTheChasm/editor-prefs.json`.
+
+Placeholder art: `ChasmTools --generate-art` (re)builds `content/art/placeholder/`: seamless 1024x1024 textures
+(rock strata, grass, dirt, moss, stone wall) and transparent props (rocks, bushes, crystals). Floor 2's library has
+ready-made materials using them (`Placeholder cliff`, `... wall (up)`, `... grass`, etc.).
 
 Screen textures: paint them as **2208x2208** squares; they're centred on the screen and cover it at any rotation
 (smaller textures repeat).

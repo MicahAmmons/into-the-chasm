@@ -215,7 +215,7 @@ public sealed class Inspector
             ImGui.Unindent();
             return value;
         }
-        ImGui.TextDisabled($"({type.Name} not editable)");
+        Ui.Colored(Ui.Muted, $"({type.Name} not editable)");
         return value;
     }
 
@@ -442,7 +442,7 @@ public sealed class Inspector
         float scale = Math.Min(1f, 256f / Math.Max(tex.Width, tex.Height));
         ImGui.BeginTooltip();
         ImGui.Image(id, new Num.Vector2(tex.Width * scale, tex.Height * scale));
-        ImGui.TextDisabled($"{tex.Width} x {tex.Height}");
+        Ui.Colored(Ui.Muted, $"{tex.Width} x {tex.Height}");
         ImGui.EndTooltip();
     }
 
