@@ -6,7 +6,7 @@
       "State": "WalkUp",
       "Layers": [
         {
-          "Texture": "monsters/frost_ooze/FrostOozeWalkUp.png",
+          "Texture": "Original Art/monsters/frost_ooze/FrostOozeWalkUp.png",
           "Row": 1,
           "FrameCount": 16,
           "FrameWidth": 192,
@@ -29,7 +29,7 @@
       "State": "WalkDown",
       "Layers": [
         {
-          "Texture": "monsters/frost_ooze/FrostOozeWalkDown.png",
+          "Texture": "Original Art/monsters/frost_ooze/FrostOozeWalkDown.png",
           "Row": 1,
           "FrameCount": 15,
           "FrameWidth": 172,
@@ -52,7 +52,7 @@
       "State": "AttackUp",
       "Layers": [
         {
-          "Texture": "monsters/frost_ooze/FrostOozeIcicleStabUp.png",
+          "Texture": "Original Art/monsters/frost_ooze/FrostOozeIcicleStabUp.png",
           "Row": 1,
           "FrameCount": 34,
           "FrameWidth": 136,
@@ -75,7 +75,7 @@
       "State": "AttackDown",
       "Layers": [
         {
-          "Texture": "monsters/frost_ooze/FrostOozeIcicleStabDown.png",
+          "Texture": "Original Art/monsters/frost_ooze/FrostOozeIcicleStabDown.png",
           "Row": 1,
           "FrameCount": 29,
           "FrameWidth": 136,
@@ -98,7 +98,7 @@
       "State": "Idle",
       "Layers": [
         {
-          "Texture": "monsters/frost_ooze/FrostOozeIdle.png",
+          "Texture": "Original Art/monsters/frost_ooze/FrostOozeIdle.png",
           "Row": 1,
           "FrameCount": 2,
           "FrameWidth": 84,
@@ -116,7 +116,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/frost_ooze/FrostOozeIdle.png",
+          "Texture": "Original Art/monsters/frost_ooze/FrostOozeIdle.png",
           "Row": 2,
           "FrameCount": 30,
           "FrameWidth": 84,
@@ -134,7 +134,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/frost_ooze/FrostOozeIdle.png",
+          "Texture": "Original Art/monsters/frost_ooze/FrostOozeIdle.png",
           "Row": 3,
           "FrameCount": 30,
           "FrameWidth": 84,
@@ -152,7 +152,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/frost_ooze/FrostOozeIdle.png",
+          "Texture": "Original Art/monsters/frost_ooze/FrostOozeIdle.png",
           "Row": 4,
           "FrameCount": 30,
           "FrameWidth": 84,
@@ -170,7 +170,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/frost_ooze/FrostOozeIdle.png",
+          "Texture": "Original Art/monsters/frost_ooze/FrostOozeIdle.png",
           "Row": 5,
           "FrameCount": 30,
           "FrameWidth": 84,

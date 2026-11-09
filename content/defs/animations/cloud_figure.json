@@ -6,7 +6,7 @@
       "State": "Idle",
       "Layers": [
         {
-          "Texture": "monsters/cloud_figure/TestCase.png",
+          "Texture": "Original Art/monsters/cloud_figure/TestCase.png",
           "Row": 1,
           "FrameCount": 3,
           "FrameWidth": 109,

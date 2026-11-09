@@ -3,7 +3,7 @@
   "Name": "Earth Ooze",
   "Description": "Roots enemies from range and keeps its distance; flees when hurt. (Original \u0022always run away first\u0022 made fights endless.)",
   "Animation": "earth_ooze",
-  "Icon": "icons/monsters/EarthOoze.png",
+  "Icon": "Original Art/icons/monsters/EarthOoze.png",
   "Element": "earth",
   "Health": 2,
   "AP": 2,

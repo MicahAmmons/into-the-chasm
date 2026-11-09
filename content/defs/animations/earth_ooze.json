@@ -6,7 +6,7 @@
       "State": "WalkUp",
       "Layers": [
         {
-          "Texture": "monsters/earth_ooze/EarthOozeWalkUp.png",
+          "Texture": "Original Art/monsters/earth_ooze/EarthOozeWalkUp.png",
           "Row": 1,
           "FrameCount": 18,
           "FrameWidth": 192,
@@ -29,7 +29,7 @@
       "State": "WalkDown",
       "Layers": [
         {
-          "Texture": "monsters/earth_ooze/EarthOozeWalkDown.png",
+          "Texture": "Original Art/monsters/earth_ooze/EarthOozeWalkDown.png",
           "Row": 1,
           "FrameCount": 18,
           "FrameWidth": 192,
@@ -52,7 +52,7 @@
       "State": "AttackUp",
       "Layers": [
         {
-          "Texture": "monsters/earth_ooze/EarthOozeGraspingRoot.png",
+          "Texture": "Original Art/monsters/earth_ooze/EarthOozeGraspingRoot.png",
           "Row": 1,
           "FrameCount": 31,
           "FrameWidth": 192,
@@ -75,7 +75,7 @@
       "State": "AttackDown",
       "Layers": [
         {
-          "Texture": "monsters/earth_ooze/EarthOozeGraspingRoot.png",
+          "Texture": "Original Art/monsters/earth_ooze/EarthOozeGraspingRoot.png",
           "Row": 1,
           "FrameCount": 31,
           "FrameWidth": 192,
@@ -98,7 +98,7 @@
       "State": "Idle",
       "Layers": [
         {
-          "Texture": "monsters/earth_ooze/EarthOozeIdle.png",
+          "Texture": "Original Art/monsters/earth_ooze/EarthOozeIdle.png",
           "Row": 1,
           "FrameCount": 19,
           "FrameWidth": 64,

@@ -10,7 +10,7 @@
     "RowsOnScreen": 2,
     "Line": 0.55,
     "FadeLength": 0.2,
-    "Texture": "backgrounds/clouds/Cloud1.png",
+    "Texture": "Original Art/backgrounds/clouds/Cloud1.png",
     "Tint": "#e8d0ff",
     "Speed": 20,
     "Opacity": 1
@@ -21,7 +21,7 @@
     "RowsOnScreen": 2,
     "Line": 0.12,
     "FadeLength": 0.15,
-    "Texture": "backgrounds/clouds/Cloud1.png",
+    "Texture": "Original Art/backgrounds/clouds/Cloud1.png",
     "Tint": "#ffffff",
     "Speed": 20,
     "Opacity": 1
@@ -36,7 +36,7 @@
     {
       "Id": "cliff_test",
       "Name": "Cliff test",
-      "Texture": "tiles/floor1/0_0_0/LowerRocks_0_0_0.png",
+      "Texture": "Original Art/tiles/floor1/0_0_0/LowerRocks_0_0_0.png",
       "Rotation": 30,
       "Tint": "#9fe0b0",
       "FlipX": false,
@@ -46,7 +46,7 @@
     {
       "Id": "grass_test",
       "Name": "Grass test",
-      "Texture": "tiles/floor1/0_0_0/0_0_0.png",
+      "Texture": "Original Art/tiles/floor1/0_0_0/0_0_0.png",
       "Rotation": 0,
       "Tint": "#ffffff",
       "FlipX": false,

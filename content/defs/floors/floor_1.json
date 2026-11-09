@@ -10,7 +10,7 @@
     "RowsOnScreen": 2,
     "Line": 0.7,
     "FadeLength": 0.15,
-    "Texture": "backgrounds/clouds/Cloud1.png",
+    "Texture": "Original Art/backgrounds/clouds/Cloud1.png",
     "Tint": "#ffffff",
     "Speed": 20,
     "Opacity": 1
@@ -21,7 +21,7 @@
     "RowsOnScreen": 2,
     "Line": 0.12,
     "FadeLength": 0.15,
-    "Texture": "backgrounds/clouds/Cloud1.png",
+    "Texture": "Original Art/backgrounds/clouds/Cloud1.png",
     "Tint": "#ffffff",
     "Speed": 20,
     "Opacity": 1

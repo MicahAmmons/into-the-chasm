@@ -6,7 +6,7 @@
       "State": "WalkUp",
       "Layers": [
         {
-          "Texture": "monsters/fire_ooze/FireOozeWalkUp.png",
+          "Texture": "Original Art/monsters/fire_ooze/FireOozeWalkUp.png",
           "Row": 1,
           "FrameCount": 51,
           "FrameWidth": 164,
@@ -29,7 +29,7 @@
       "State": "WalkDown",
       "Layers": [
         {
-          "Texture": "monsters/fire_ooze/FireOozeWalkDown.png",
+          "Texture": "Original Art/monsters/fire_ooze/FireOozeWalkDown.png",
           "Row": 1,
           "FrameCount": 48,
           "FrameWidth": 206,
@@ -52,7 +52,7 @@
       "State": "AttackUp",
       "Layers": [
         {
-          "Texture": "monsters/fire_ooze/FireOozeLavaBall.png",
+          "Texture": "Original Art/monsters/fire_ooze/FireOozeLavaBall.png",
           "Row": 1,
           "FrameCount": 39,
           "FrameWidth": 32,
@@ -75,7 +75,7 @@
       "State": "AttackDown",
       "Layers": [
         {
-          "Texture": "monsters/fire_ooze/FireOozeLavaBall.png",
+          "Texture": "Original Art/monsters/fire_ooze/FireOozeLavaBall.png",
           "Row": 1,
           "FrameCount": 39,
           "FrameWidth": 32,
@@ -98,7 +98,7 @@
       "State": "Idle",
       "Layers": [
         {
-          "Texture": "monsters/fire_ooze/FireOozeIdle.png",
+          "Texture": "Original Art/monsters/fire_ooze/FireOozeIdle.png",
           "Row": 1,
           "FrameCount": 17,
           "FrameWidth": 32,
@@ -116,7 +116,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/fire_ooze/FireOozeIdle.png",
+          "Texture": "Original Art/monsters/fire_ooze/FireOozeIdle.png",
           "Row": 2,
           "FrameCount": 16,
           "FrameWidth": 32,
@@ -134,7 +134,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/fire_ooze/FireOozeIdle.png",
+          "Texture": "Original Art/monsters/fire_ooze/FireOozeIdle.png",
           "Row": 3,
           "FrameCount": 14,
           "FrameWidth": 32,
@@ -152,7 +152,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/fire_ooze/FireOozeIdle.png",
+          "Texture": "Original Art/monsters/fire_ooze/FireOozeIdle.png",
           "Row": 4,
           "FrameCount": 14,
           "FrameWidth": 32,
@@ -170,7 +170,7 @@
           "Scale": 1
         },
         {
-          "Texture": "monsters/fire_ooze/FireOozeIdle.png",
+          "Texture": "Original Art/monsters/fire_ooze/FireOozeIdle.png",
           "Row": 5,
           "FrameCount": 15,
           "FrameWidth": 32,

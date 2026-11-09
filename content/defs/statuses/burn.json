@@ -2,7 +2,7 @@
   "Id": "burn",
   "Name": "Burn",
   "Description": "Takes fire damage at the start of each turn.",
-  "Icon": "icons/aspects/acidIcon.png",
+  "Icon": "Original Art/icons/aspects/acidIcon.png",
   "IsBuff": false,
   "DefaultDuration": 3,
   "Stacks": true,

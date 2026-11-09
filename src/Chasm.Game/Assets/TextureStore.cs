@@ -4,7 +4,7 @@ using Microsoft.Xna.Framework.Graphics;
 namespace Chasm.Game.Assets;
 
 /// <summary>
-/// Loads PNGs from content/art at runtime by path key (e.g. "tiles/floor0/0_0_0.png").
+/// Loads PNGs from content/art at runtime by path key (e.g. "Original Art/tiles/floor1/0_0_0/0_0_0.png").
 ///
 /// Missing art never crashes: you get a placeholder (a coloured box) instead, and
 /// <see cref="IsPlaceholder"/> lets drawing code label it with what it stands for. That's how
