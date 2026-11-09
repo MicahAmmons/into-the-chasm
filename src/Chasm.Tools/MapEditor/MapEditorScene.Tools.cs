@@ -1,6 +1,7 @@
 using Chasm.Core.Grid;
 using Chasm.Core.World;
 using Chasm.Game.Input;
+using Chasm.Tools.ImGuiHost;
 using ImGuiNET;
 using Microsoft.Xna.Framework.Input;
 using Num = System.Numerics;
@@ -53,6 +54,13 @@ public sealed partial class MapEditorScene
             return;
         }
         if (input.KeyPressed(Keys.Delete) && !input.KeyboardCapturedByUi) DeleteSelected();
+        // Number keys pick tools (when not typing in a box).
+        if (!input.KeyboardCapturedByUi && !input.KeyHeld(Keys.LeftControl))
+        {
+            for (int i = 0; i < ToolList.Length; i++)
+                if (input.KeyPressed(Keys.D1 + i)) { SetTool(ToolList[i].tool); return; }
+            if (input.KeyPressed(Keys.D8)) ToggleReference();
+        }
         if (input.LeftReleased || input.RightReleased) { _dragMode = null; _draggingProp = false; _draggingPlacement = false; }
 
         switch (_tool)
@@ -219,7 +227,7 @@ public sealed partial class MapEditorScene
         CenterNextWindow();
         if (ImGui.BeginPopup("trigger?"))
         {
-            ImGui.TextDisabled($"Interaction at {_triggerCell}. What triggers it?");
+            Ui.Colored(Ui.Muted, $"Interaction at {_triggerCell}. What triggers it?");
             if (ImGui.Selectable("Player presses Interact / clicks it")) CreateInteraction(_triggerCell!.Value, InteractTrigger.Interact, 0);
             if (ImGui.Selectable("Player steps onto the cell")) CreateInteraction(_triggerCell!.Value, InteractTrigger.StepOn, 0);
             if (ImGui.Selectable("Player comes within a radius...")) { _radiusCenter = _triggerCell; _radius = 2; }

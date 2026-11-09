@@ -1,3 +1,4 @@
+using Chasm.Tools.ImGuiHost;
 using Chasm.Core.Combat;
 using Chasm.Core.Stats;
 using Chasm.Core.World;
@@ -52,6 +53,7 @@ public sealed class CombatSandboxScene : Scene
         ImGui.SetNextWindowPos(new Num.Vector2(20, 40), ImGuiCond.FirstUseEver);
         ImGui.SetNextWindowSize(new Num.Vector2(560, 880), ImGuiCond.FirstUseEver);
         ImGui.Begin("Combat setup");
+        Ui.KeepOnScreen();
 
         ImGui.SeparatorText("Battlefield");
         ImGui.Text("Tile"); ImGui.SameLine(120); ImGui.SetNextItemWidth(-1);
@@ -88,7 +90,7 @@ public sealed class CombatSandboxScene : Scene
             ImGui.PushID(g.Key);
             if (ImGui.SmallButton("-")) removeItem = g.Last().i;
             ImGui.SameLine();
-            ImGui.Text($"{g.Count()}x {name}{(it is not null && string.IsNullOrEmpty(it.CombatAbility) ? "  (no combat use)" : "")}");
+            ImGui.TextUnformatted($"{g.Count()}x {name}{(it is not null && string.IsNullOrEmpty(it.CombatAbility) ? "  (no combat use)" : "")}");
             ImGui.PopID();
         }
         if (removeItem >= 0) _items.RemoveAt(removeItem);
@@ -120,7 +122,7 @@ public sealed class CombatSandboxScene : Scene
                 ImGui.EndChild();
             }
             if (ImGui.CollapsingHeader("Stats from sandbox fights"))
-                foreach (var (k, v) in _stats.Values) ImGui.Text($"{k}: {v:0.##}");
+                foreach (var (k, v) in _stats.Values) ImGui.TextUnformatted($"{k}: {v:0.##}");
         }
         ImGui.End();
         ToolContext.Wizards.Draw();
@@ -138,7 +140,7 @@ public sealed class CombatSandboxScene : Scene
             ImGui.SameLine();
             if (ImGui.SmallButton("+")) { list.Add(group.Key); ImGui.PopID(); break; }
             ImGui.SameLine();
-            ImGui.Text($"{group.Count()}x {name}");
+            ImGui.TextUnformatted($"{group.Count()}x {name}");
             if (m is not null) { ImGui.SameLine(); if (ImGui.SmallButton("edit")) ToolContext.Wizards.OpenEdit(m); }
             ImGui.PopID();
         }
@@ -181,6 +183,7 @@ public sealed class CombatSandboxScene : Scene
     {
         ImGui.SetNextWindowPos(new Num.Vector2(ImGui.GetIO().DisplaySize.X - 300, 120), ImGuiCond.FirstUseEver);
         ImGui.Begin("Fight controls", ImGuiWindowFlags.AlwaysAutoResize);
+        Ui.KeepOnScreen();
         float sp = scene.Speed;
         ImGui.SetNextItemWidth(160);
         if (ImGui.SliderFloat("Speed", ref sp, 0.25f, 8f, "%.2fx")) scene.Speed = sp;
@@ -188,7 +191,7 @@ public sealed class CombatSandboxScene : Scene
         if (ImGui.Checkbox("AI plays my side", ref auto)) scene.AutoPlayPlayerSide = auto;
         if (scene.Engine is { } e)
         {
-            ImGui.Text($"Round {e.Round}");
+            ImGui.TextUnformatted($"Round {e.Round}");
             if (ImGui.Button("Give everyone on my side full HP"))
                 foreach (var u in e.Alive.Where(u => u.Team == Team.Player)) u.Hp = u.MaxHp;
         }

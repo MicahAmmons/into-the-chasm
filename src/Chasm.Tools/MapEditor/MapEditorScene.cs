@@ -5,6 +5,7 @@ using Chasm.Core.World;
 using Chasm.Game.Rendering;
 using Chasm.Game.Scenes;
 using Chasm.Tools.Scenes;
+using Chasm.Tools.ImGuiHost;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -29,7 +30,7 @@ public sealed partial class MapEditorScene : Scene
     private enum Tool { Select, Walkable, PlayerStarts, EnemySpawns, PaintTexture, PlaceProp, Interaction }
     private enum Panel { Selection, FloorProperties, LowerClouds, UpperClouds, Reference, TileSettings }
 
-    private const int LeftW = 310, RightW = 480, MenuH = 24;
+    private const int LeftW = 310, RightW = 480, MenuH = 24, StatusH = 28;
 
     private readonly RenderQueue _queue = new();
     private readonly string? _openOnStart;
@@ -60,7 +61,7 @@ public sealed partial class MapEditorScene : Scene
         Services.Canvas.Region = () =>
         {
             var pp = Services.Graphics.PresentationParameters;
-            return new Rectangle(LeftW, MenuH, Math.Max(100, pp.BackBufferWidth - LeftW - RightW), Math.Max(100, pp.BackBufferHeight - MenuH));
+            return new Rectangle(LeftW, MenuH, Math.Max(100, pp.BackBufferWidth - LeftW - RightW), Math.Max(100, pp.BackBufferHeight - MenuH - StatusH));
         };
         Services.Canvas.ResetView();
         ToolContext.Wizards.Inspector.CellPicker = cb => { _cellPick = cb; Status("Click a cell on the map (Esc cancels)."); };
@@ -302,6 +303,7 @@ public sealed partial class MapEditorScene : Scene
 
         LeftToolbar();
         RightPanelGui();
+        StatusBar();
         ToolContext.Wizards.Draw();
         Popups();
 
@@ -363,21 +365,65 @@ public sealed partial class MapEditorScene : Scene
 
     private string _openSearch = "";
 
+    private List<EditorRecovery.Entry>? _recoveries;
+
     private void StartDialog()
     {
         var io = ImGui.GetIO();
+        _recoveries ??= EditorRecovery.List();
         ImGui.SetNextWindowPos(io.DisplaySize / 2, ImGuiCond.Always, new Num.Vector2(0.5f, 0.5f));
-        ImGui.SetNextWindowSize(new Num.Vector2(560, 600));
-        ImGui.Begin("Map Editor##start", ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoCollapse);
-        if (ImGui.Button("New tile", new Num.Vector2(-1, 50))) NewTile();
-        ImGui.Spacing();
-        ImGui.SeparatorText("Or open an existing tile");
+        ImGui.SetNextWindowSize(Ui.FitSize(620, 720));
+        ImGui.Begin("##start", ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoTitleBar);
+        Ui.Title("Map Editor");
+        Ui.Hint("Build tiles cell by cell: walkable ground, textures, art, interactions.");
+        ImGui.Dummy(new Num.Vector2(0, 6));
+        if (Ui.AccentButton("+  New tile", new Num.Vector2(-1, 46))) NewTile();
+
+        if (_recoveries.Count > 0)
+        {
+            Ui.Section("Recover recent work");
+            Ui.Hint("Saved automatically while you edit, even if you didn't press Save or the program closed.");
+            foreach (var r in _recoveries.Take(5))
+            {
+                ImGui.PushID(r.Path);
+                if (ImGui.Button("Recover", new Num.Vector2(80, 0))) Recover(r);
+                ImGui.SameLine();
+                ImGui.Text(r.Title);
+                ImGui.SameLine();
+                ImGui.TextColored(Ui.Muted, EditorRecovery.Ago(r.SavedLocal));
+                ImGui.PopID();
+            }
+        }
+
+        Ui.Section("Open a tile");
         ImGui.SetNextItemWidth(-1);
-        ImGui.InputTextWithHint("##search", "search...", ref _openSearch, 80);
-        ImGui.BeginChild("list");
+        ImGui.InputTextWithHint("##search", "search by name or id...", ref _openSearch, 80);
+        ImGui.BeginChild("list", new Num.Vector2(0, 0), ImGuiChildFlags.Borders);
         TileList(t => Open(t), _openSearch);
         ImGui.EndChild();
         ImGui.End();
+    }
+
+    private void StatusBar()
+    {
+        var io = ImGui.GetIO();
+        ImGui.SetNextWindowPos(new Num.Vector2(0, io.DisplaySize.Y - StatusH));
+        ImGui.SetNextWindowSize(new Num.Vector2(io.DisplaySize.X, StatusH));
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Num.Vector2(12, 5));
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 0);
+        ImGui.PushStyleColor(ImGuiCol.WindowBg, new Num.Vector4(0.06f, 0.065f, 0.09f, 1));
+        ImGui.Begin("##status", ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoSavedSettings);
+        var tool = ToolList.First(x => x.tool == _tool).label;
+        Ui.Colored(Ui.Accent, tool);
+        ImGui.SameLine(0, 18);
+        Ui.Colored(Ui.Muted, _hoverCell is { } h ? $"cell {h.Q},{h.R}   px {_hoverPx.X:0},{_hoverPx.Y:0}" : "cell -");
+        ImGui.SameLine(0, 18);
+        Ui.Colored(Ui.Muted, $"zoom {Services.Canvas.Zoom * 100:0}%");
+        if (_tool == Tool.PaintTexture) { ImGui.SameLine(0, 18); Ui.Colored(Ui.Muted, $"{_selection.Count} cells selected"); }
+        if (_statusTime > 0 && _status is not null) { ImGui.SameLine(0, 24); ImGui.TextUnformatted(_status); }
+        ImGui.End();
+        ImGui.PopStyleColor();
+        ImGui.PopStyleVar(2);
     }
 
     /// <summary>All tiles grouped by floor (sketches last).</summary>

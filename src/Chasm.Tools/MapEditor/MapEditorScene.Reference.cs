@@ -1,6 +1,7 @@
 using Chasm.Core.Serialization;
 using Chasm.Tools.Scenes;
 using Chasm.Core.World;
+using Chasm.Tools.ImGuiHost;
 using ImGuiNET;
 using Num = System.Numerics;
 
@@ -36,8 +37,8 @@ public sealed partial class MapEditorScene
         var refFloor = TileLinks.FloorOf(Services.Defs, r);
         ImGui.SameLine();
         if (ImGui.Button("Close")) { _reference = null; _panel = Panel.Selection; return; }
-        ImGui.SeparatorText($"{r.DisplayName}  [{r.Id}]  (read-only)");
-        ImGui.Text($"Floor {(r.Floor?.ToString() ?? "-")}   X {(r.X?.ToString() ?? "-")}   Y {(r.Y?.ToString() ?? "-")}");
+        Ui.Section($"{r.DisplayName}  [{r.Id}]  (read-only)");
+        ImGui.TextUnformatted($"Floor {(r.Floor?.ToString() ?? "-")}   X {(r.X?.ToString() ?? "-")}   Y {(r.Y?.ToString() ?? "-")}");
         ImGui.Checkbox("Show on top of my tile", ref _referenceOverlay);
         ImGui.SetNextItemWidth(-1);
         ImGui.SliderFloat("##op", ref _referenceOpacity, 0f, 1f, "Opacity %.2f");
@@ -52,7 +53,7 @@ public sealed partial class MapEditorScene
                 if (ImGui.SmallButton("Copy as local")) { CopyMaterialLocal(m.m); }
                 if (_floor is not null) { ImGui.SameLine(); if (ImGui.SmallButton("Copy to my floor")) CopyMaterialToFloor(m.m); }
                 ImGui.SameLine();
-                ImGui.Text($"{m.m.Name} ({m.Item2})  {m.m.Texture}");
+                ImGui.TextUnformatted($"{m.m.Name} ({m.Item2})  {m.m.Texture}");
                 if (ImGui.IsItemHovered()) MaterialTooltip(m.m);
                 ImGui.PopID();
             }
@@ -64,7 +65,7 @@ public sealed partial class MapEditorScene
                 ImGui.PushID(reg.Id);
                 if (ImGui.SmallButton("Copy")) CopyRegion(reg, r, refFloor);
                 ImGui.SameLine();
-                ImGui.Text($"{reg.Id}: {r.FindMaterial(reg.Material, refFloor)?.Name ?? reg.Material}  {reg.Cells.Count} cells");
+                ImGui.TextUnformatted($"{reg.Id}: {r.FindMaterial(reg.Material, refFloor)?.Name ?? reg.Material}  {reg.Cells.Count} cells");
                 ImGui.PopID();
             }
         }
@@ -75,7 +76,7 @@ public sealed partial class MapEditorScene
                 ImGui.PushID(p.Id);
                 if (ImGui.SmallButton("Copy")) { var c = ChasmJson.Clone(p); c.Id = NextId("prop", t.Props.Select(x => x.Id)); t.Props.Add(c); Edited(); }
                 ImGui.SameLine();
-                ImGui.Text($"{p.Id}: {p.Texture}  ({p.X:0},{p.Y:0})");
+                ImGui.TextUnformatted($"{p.Id}: {p.Texture}  ({p.X:0},{p.Y:0})");
                 if (ImGui.IsItemHovered()) ImageTooltip(p.Texture);
                 ImGui.PopID();
             }
@@ -87,7 +88,7 @@ public sealed partial class MapEditorScene
                 ImGui.PushID(p.Id);
                 if (ImGui.SmallButton("Copy")) { var c = ChasmJson.Clone(p); c.Id = NextId(p.Id.Split('_')[0], t.Placements.Select(x => x.Id)); t.Placements.Add(c); Edited(); }
                 ImGui.SameLine();
-                ImGui.Text($"{p.Id} {p.Cell}: {p.Describe(Services.Defs)}");
+                ImGui.TextUnformatted($"{p.Id} {p.Cell}: {p.Describe(Services.Defs)}");
                 ImGui.PopID();
             }
         }

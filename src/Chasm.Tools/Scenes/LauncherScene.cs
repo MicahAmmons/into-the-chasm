@@ -1,3 +1,4 @@
+using Chasm.Tools.ImGuiHost;
 using Chasm.Tools.MapEditor;
 using Chasm.Core;
 using Chasm.Core.Content;
@@ -38,7 +39,7 @@ public sealed class LauncherScene : Scene
         ImGui.Separator();
         var errors = Services.Defs.LoadErrors;
         var problems = ContentValidator.ValidateAll(Services.Defs);
-        ImGui.TextDisabled($"Content: {Services.Paths.Root}");
+        Ui.Colored(Ui.Muted, $"Content: {Services.Paths.Root}");
         if (errors.Count + problems.Count == 0) ImGui.TextColored(new Num.Vector4(0.5f, 1, 0.6f, 1), "All content valid.");
         else if (ImGui.CollapsingHeader($"{errors.Count + problems.Count} content problem(s)"))
             foreach (var p in errors.Concat(problems)) ImGui.TextWrapped(p);

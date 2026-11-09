@@ -1,3 +1,4 @@
+using Chasm.Tools.ImGuiHost;
 using Chasm.Tools.MapEditor;
 using Chasm.Core.Content;
 using Chasm.Core.Grid;
@@ -78,11 +79,12 @@ public sealed class WorldSandboxScene : WorldScene
         ImGui.SetNextWindowPos(new Num.Vector2(10, 34), ImGuiCond.FirstUseEver);
         ImGui.SetNextWindowSize(new Num.Vector2(440, 640), ImGuiCond.FirstUseEver);
         ImGui.Begin("Sandbox", ref _panelOpen);
+        Ui.KeepOnScreen();
         var insp = ToolContext.Wizards.Inspector;
 
         if (ImGui.CollapsingHeader("Where", ImGuiTreeNodeFlags.DefaultOpen))
         {
-            ImGui.Text($"Tile {Tile.Id} (floor {Tile.Floor})  cell {Player.Cell}");
+            ImGui.TextUnformatted($"Tile {Tile.Id} (floor {Tile.Floor})  cell {Player.Cell}");
             ImGui.SetNextItemWidth(250);
             insp.RefPicker(typeof(TileDef), ref _teleportTile);
             ImGui.SameLine();
@@ -95,7 +97,7 @@ public sealed class WorldSandboxScene : WorldScene
         if (ImGui.CollapsingHeader("Clock", ImGuiTreeNodeFlags.DefaultOpen))
         {
             var clock = Session.Clock;
-            ImGui.Text($"Day {clock.Day}, {(clock.IsNight ? "night" : "day")}  ({clock.Time:P0} through the day)");
+            ImGui.TextUnformatted($"Day {clock.Day}, {(clock.IsNight ? "night" : "day")}  ({clock.Time:P0} through the day)");
             bool run = ClockRunning; if (ImGui.Checkbox("Time passes", ref run)) ClockRunning = run;
             ImGui.SameLine();
             if (ImGui.Button("Rest")) Rest();
@@ -122,7 +124,7 @@ public sealed class WorldSandboxScene : WorldScene
                 if (ImGui.SmallButton("-")) Session.Inventory.Remove(id);
                 ImGui.SameLine();
                 string name = Session.Defs.TryGet<ItemDef>(id, out var def) ? def.DisplayName : id;
-                ImGui.Text($"{name} x{count}");
+                ImGui.TextUnformatted($"{name} x{count}");
                 ImGui.PopID();
             }
         }
@@ -145,7 +147,7 @@ public sealed class WorldSandboxScene : WorldScene
         }
 
         if (ImGui.CollapsingHeader("Stats"))
-            foreach (var (k, v) in Session.Stats.Values) ImGui.Text($"{k}: {v:0.##}");
+            foreach (var (k, v) in Session.Stats.Values) ImGui.TextUnformatted($"{k}: {v:0.##}");
 
         if (ImGui.CollapsingHeader("Objects on this tile"))
             foreach (var p in Tile.Placements)

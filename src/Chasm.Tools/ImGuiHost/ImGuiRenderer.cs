@@ -42,6 +42,9 @@ public sealed class ImGuiRenderer : IDisposable
         io.ConfigFlags |= ImGuiConfigFlags.DockingEnable;
     }
 
+    /// <summary>Adds a font without rebuilding (call <see cref="RebuildFontAtlas"/> after adding all fonts).</summary>
+    public ImFontPtr AddFont(string ttfPath, float size) => ImGui.GetIO().Fonts.AddFontFromFileTTF(ttfPath, size);
+
     public void LoadFont(string ttfPath, float size)
     {
         var io = ImGui.GetIO();
