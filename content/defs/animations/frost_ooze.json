@@ -1,0 +1,194 @@
+{
+  "Id": "frost_ooze",
+  "Name": "Frost Ooze",
+  "States": [
+    {
+      "State": "WalkUp",
+      "Layers": [
+        {
+          "Texture": "monsters/frost_ooze/FrostOozeWalkUp.png",
+          "Row": 1,
+          "FrameCount": 16,
+          "FrameWidth": 192,
+          "FrameHeight": 192,
+          "FrameDurationMs": 100,
+          "Loop": false,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 0,
+          "StartPauseFrames": 0,
+          "ArtFaces": "Left",
+          "YOffset": 0,
+          "Crossfade": false,
+          "Shader": "None",
+          "Scale": 1.0
+        }
+      ]
+    },
+    {
+      "State": "WalkDown",
+      "Layers": [
+        {
+          "Texture": "monsters/frost_ooze/FrostOozeWalkDown.png",
+          "Row": 1,
+          "FrameCount": 15,
+          "FrameWidth": 172,
+          "FrameHeight": 172,
+          "FrameDurationMs": 100,
+          "Loop": false,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 0,
+          "StartPauseFrames": 0,
+          "ArtFaces": "Left",
+          "YOffset": 0,
+          "Crossfade": false,
+          "Shader": "None",
+          "Scale": 1.0
+        }
+      ]
+    },
+    {
+      "State": "AttackUp",
+      "Layers": [
+        {
+          "Texture": "monsters/frost_ooze/FrostOozeIcicleStabUp.png",
+          "Row": 1,
+          "FrameCount": 34,
+          "FrameWidth": 136,
+          "FrameHeight": 136,
+          "FrameDurationMs": 40,
+          "Loop": false,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 0,
+          "StartPauseFrames": 0,
+          "ArtFaces": "Left",
+          "YOffset": 0,
+          "Crossfade": false,
+          "Shader": "None",
+          "Scale": 1.0
+        }
+      ]
+    },
+    {
+      "State": "AttackDown",
+      "Layers": [
+        {
+          "Texture": "monsters/frost_ooze/FrostOozeIcicleStabDown.png",
+          "Row": 1,
+          "FrameCount": 29,
+          "FrameWidth": 136,
+          "FrameHeight": 136,
+          "FrameDurationMs": 40,
+          "Loop": false,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 0,
+          "StartPauseFrames": 0,
+          "ArtFaces": "Left",
+          "YOffset": 0,
+          "Crossfade": false,
+          "Shader": "None",
+          "Scale": 1.0
+        }
+      ]
+    },
+    {
+      "State": "Idle",
+      "Layers": [
+        {
+          "Texture": "monsters/frost_ooze/FrostOozeIdle.png",
+          "Row": 1,
+          "FrameCount": 2,
+          "FrameWidth": 84,
+          "FrameHeight": 84,
+          "FrameDurationMs": 10000,
+          "Loop": true,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 0,
+          "StartPauseFrames": 0,
+          "ArtFaces": "Left",
+          "YOffset": 0,
+          "Crossfade": false,
+          "Shader": "None",
+          "Scale": 1.0
+        },
+        {
+          "Texture": "monsters/frost_ooze/FrostOozeIdle.png",
+          "Row": 2,
+          "FrameCount": 30,
+          "FrameWidth": 84,
+          "FrameHeight": 84,
+          "FrameDurationMs": 85,
+          "Loop": true,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 16,
+          "StartPauseFrames": 2,
+          "ArtFaces": "Left",
+          "YOffset": 0,
+          "Crossfade": false,
+          "Shader": "None",
+          "Scale": 1.0
+        },
+        {
+          "Texture": "monsters/frost_ooze/FrostOozeIdle.png",
+          "Row": 3,
+          "FrameCount": 30,
+          "FrameWidth": 84,
+          "FrameHeight": 84,
+          "FrameDurationMs": 85,
+          "Loop": true,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 16,
+          "StartPauseFrames": 16,
+          "ArtFaces": "Left",
+          "YOffset": 0,
+          "Crossfade": false,
+          "Shader": "None",
+          "Scale": 1.0
+        },
+        {
+          "Texture": "monsters/frost_ooze/FrostOozeIdle.png",
+          "Row": 4,
+          "FrameCount": 30,
+          "FrameWidth": 84,
+          "FrameHeight": 84,
+          "FrameDurationMs": 85,
+          "Loop": true,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 16,
+          "StartPauseFrames": 30,
+          "ArtFaces": "Left",
+          "YOffset": 0,
+          "Crossfade": false,
+          "Shader": "None",
+          "Scale": 1.0
+        },
+        {
+          "Texture": "monsters/frost_ooze/FrostOozeIdle.png",
+          "Row": 5,
+          "FrameCount": 30,
+          "FrameWidth": 84,
+          "FrameHeight": 84,
+          "FrameDurationMs": 85,
+          "Loop": true,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 16,
+          "StartPauseFrames": 43,
+          "ArtFaces": "Left",
+          "YOffset": 0,
+          "Crossfade": false,
+          "Shader": "None",
+          "Scale": 1.0
+        }
+      ]
+    }
+  ],
+  "Notes": "Ported from JustPlaying AnimationData.json \"FrostOoze\"."
+}

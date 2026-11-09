@@ -1,0 +1,122 @@
+{
+  "Id": "earth_ooze",
+  "Name": "Earth Ooze",
+  "States": [
+    {
+      "State": "WalkUp",
+      "Layers": [
+        {
+          "Texture": "monsters/earth_ooze/EarthOozeWalkUp.png",
+          "Row": 1,
+          "FrameCount": 18,
+          "FrameWidth": 192,
+          "FrameHeight": 192,
+          "FrameDurationMs": 75,
+          "Loop": false,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 0,
+          "StartPauseFrames": 0,
+          "ArtFaces": "Right",
+          "YOffset": 0,
+          "Crossfade": false,
+          "Shader": "None",
+          "Scale": 1.0
+        }
+      ]
+    },
+    {
+      "State": "WalkDown",
+      "Layers": [
+        {
+          "Texture": "monsters/earth_ooze/EarthOozeWalkDown.png",
+          "Row": 1,
+          "FrameCount": 18,
+          "FrameWidth": 192,
+          "FrameHeight": 192,
+          "FrameDurationMs": 75,
+          "Loop": false,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 0,
+          "StartPauseFrames": 0,
+          "ArtFaces": "Right",
+          "YOffset": 0,
+          "Crossfade": false,
+          "Shader": "None",
+          "Scale": 1.0
+        }
+      ]
+    },
+    {
+      "State": "AttackUp",
+      "Layers": [
+        {
+          "Texture": "monsters/earth_ooze/EarthOozeGraspingRoot.png",
+          "Row": 1,
+          "FrameCount": 31,
+          "FrameWidth": 192,
+          "FrameHeight": 192,
+          "FrameDurationMs": 70,
+          "Loop": false,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 22,
+          "StartPauseFrames": 0,
+          "ArtFaces": "Right",
+          "YOffset": 0,
+          "Crossfade": false,
+          "Shader": "None",
+          "Scale": 1.0
+        }
+      ]
+    },
+    {
+      "State": "AttackDown",
+      "Layers": [
+        {
+          "Texture": "monsters/earth_ooze/EarthOozeGraspingRoot.png",
+          "Row": 1,
+          "FrameCount": 31,
+          "FrameWidth": 192,
+          "FrameHeight": 192,
+          "FrameDurationMs": 70,
+          "Loop": false,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 22,
+          "StartPauseFrames": 0,
+          "ArtFaces": "Left",
+          "YOffset": 0,
+          "Crossfade": false,
+          "Shader": "None",
+          "Scale": 1.0
+        }
+      ]
+    },
+    {
+      "State": "Idle",
+      "Layers": [
+        {
+          "Texture": "monsters/earth_ooze/EarthOozeIdle.png",
+          "Row": 1,
+          "FrameCount": 19,
+          "FrameWidth": 64,
+          "FrameHeight": 64,
+          "FrameDurationMs": 100,
+          "Loop": true,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 0,
+          "StartPauseFrames": 0,
+          "ArtFaces": "Left",
+          "YOffset": 0,
+          "Crossfade": true,
+          "Shader": "None",
+          "Scale": 1.0
+        }
+      ]
+    }
+  ],
+  "Notes": "Ported from JustPlaying AnimationData.json \"EarthOoze\"."
+}

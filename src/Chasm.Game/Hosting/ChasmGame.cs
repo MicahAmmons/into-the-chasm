@@ -25,6 +25,7 @@ public sealed class ChasmGame : Microsoft.Xna.Framework.Game
     private readonly GraphicsDeviceManager _graphics;
     private SpriteBatch _batch = null!;
     private int _frameCount;
+    private bool _screenshotTaken;
 
     public GameServices Svc { get; private set; } = null!;
     public GameOptions Options => _options;
@@ -92,7 +93,7 @@ public sealed class ChasmGame : Microsoft.Xna.Framework.Game
         Svc.Scenes.Update(dt);
 
         _frameCount++;
-        if (_options.ExitAfterFrames is int limit && _frameCount >= limit)
+        if (_options.ExitAfterFrames is int limit && _frameCount >= limit && (_options.ScreenshotPath is null || _screenshotTaken))
         {
             Console.WriteLine($"[smoke-test] Ran {_frameCount} frames, exiting cleanly.");
             Exit();
@@ -108,8 +109,11 @@ public sealed class ChasmGame : Microsoft.Xna.Framework.Game
         Svc.Canvas.Present(_batch);
         Svc.Scenes.Top?.DrawOverlayUi();
         _extension?.EndFrame();
-        if (_options.ScreenshotPath is { } shot && _frameCount == (_options.ExitAfterFrames ?? 0) - 1)
+        if (_options.ScreenshotPath is { } shot && !_screenshotTaken && _frameCount >= (_options.ExitAfterFrames ?? 0) - 5)
+        {
+            _screenshotTaken = true;
             SaveScreenshot(shot);
+        }
         base.Draw(gameTime);
     }
 

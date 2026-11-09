@@ -1,0 +1,194 @@
+{
+  "Id": "fire_ooze",
+  "Name": "Fire Ooze",
+  "States": [
+    {
+      "State": "WalkUp",
+      "Layers": [
+        {
+          "Texture": "monsters/fire_ooze/FireOozeWalkUp.png",
+          "Row": 1,
+          "FrameCount": 51,
+          "FrameWidth": 164,
+          "FrameHeight": 164,
+          "FrameDurationMs": 50,
+          "Loop": false,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 0,
+          "StartPauseFrames": 0,
+          "ArtFaces": "Left",
+          "YOffset": 0,
+          "Crossfade": false,
+          "Shader": "None",
+          "Scale": 1.0
+        }
+      ]
+    },
+    {
+      "State": "WalkDown",
+      "Layers": [
+        {
+          "Texture": "monsters/fire_ooze/FireOozeWalkDown.png",
+          "Row": 1,
+          "FrameCount": 48,
+          "FrameWidth": 206,
+          "FrameHeight": 128,
+          "FrameDurationMs": 50,
+          "Loop": false,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 0,
+          "StartPauseFrames": 0,
+          "ArtFaces": "Left",
+          "YOffset": 0,
+          "Crossfade": false,
+          "Shader": "None",
+          "Scale": 1.0
+        }
+      ]
+    },
+    {
+      "State": "AttackUp",
+      "Layers": [
+        {
+          "Texture": "monsters/fire_ooze/FireOozeLavaBall.png",
+          "Row": 1,
+          "FrameCount": 39,
+          "FrameWidth": 32,
+          "FrameHeight": 64,
+          "FrameDurationMs": 50,
+          "Loop": false,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 0,
+          "StartPauseFrames": 0,
+          "ArtFaces": "Left",
+          "YOffset": 0,
+          "Crossfade": false,
+          "Shader": "None",
+          "Scale": 1.0
+        }
+      ]
+    },
+    {
+      "State": "AttackDown",
+      "Layers": [
+        {
+          "Texture": "monsters/fire_ooze/FireOozeLavaBall.png",
+          "Row": 1,
+          "FrameCount": 39,
+          "FrameWidth": 32,
+          "FrameHeight": 64,
+          "FrameDurationMs": 50,
+          "Loop": false,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 0,
+          "StartPauseFrames": 0,
+          "ArtFaces": "Left",
+          "YOffset": 0,
+          "Crossfade": false,
+          "Shader": "None",
+          "Scale": 1.0
+        }
+      ]
+    },
+    {
+      "State": "Idle",
+      "Layers": [
+        {
+          "Texture": "monsters/fire_ooze/FireOozeIdle.png",
+          "Row": 1,
+          "FrameCount": 17,
+          "FrameWidth": 32,
+          "FrameHeight": 32,
+          "FrameDurationMs": 100,
+          "Loop": true,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 0,
+          "StartPauseFrames": 0,
+          "ArtFaces": "Left",
+          "YOffset": 16,
+          "Crossfade": false,
+          "Shader": "None",
+          "Scale": 1.0
+        },
+        {
+          "Texture": "monsters/fire_ooze/FireOozeIdle.png",
+          "Row": 2,
+          "FrameCount": 16,
+          "FrameWidth": 32,
+          "FrameHeight": 32,
+          "FrameDurationMs": 100,
+          "Loop": true,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 0,
+          "StartPauseFrames": 0,
+          "ArtFaces": "Left",
+          "YOffset": 16,
+          "Crossfade": false,
+          "Shader": "None",
+          "Scale": 1.0
+        },
+        {
+          "Texture": "monsters/fire_ooze/FireOozeIdle.png",
+          "Row": 3,
+          "FrameCount": 14,
+          "FrameWidth": 32,
+          "FrameHeight": 32,
+          "FrameDurationMs": 100,
+          "Loop": true,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 0,
+          "StartPauseFrames": 0,
+          "ArtFaces": "Left",
+          "YOffset": 16,
+          "Crossfade": false,
+          "Shader": "None",
+          "Scale": 1.0
+        },
+        {
+          "Texture": "monsters/fire_ooze/FireOozeIdle.png",
+          "Row": 4,
+          "FrameCount": 14,
+          "FrameWidth": 32,
+          "FrameHeight": 32,
+          "FrameDurationMs": 100,
+          "Loop": true,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 3,
+          "StartPauseFrames": 0,
+          "ArtFaces": "Left",
+          "YOffset": 16,
+          "Crossfade": false,
+          "Shader": "None",
+          "Scale": 1.0
+        },
+        {
+          "Texture": "monsters/fire_ooze/FireOozeIdle.png",
+          "Row": 5,
+          "FrameCount": 15,
+          "FrameWidth": 32,
+          "FrameHeight": 32,
+          "FrameDurationMs": 100,
+          "Loop": true,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 0,
+          "StartPauseFrames": 0,
+          "ArtFaces": "Left",
+          "YOffset": 16,
+          "Crossfade": false,
+          "Shader": "None",
+          "Scale": 1.0
+        }
+      ]
+    }
+  ],
+  "Notes": "Ported from JustPlaying AnimationData.json \"FireOoze\"."
+}

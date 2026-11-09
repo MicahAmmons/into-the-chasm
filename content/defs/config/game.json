@@ -1,0 +1,11 @@
+{
+  "Id": "game",
+  "Name": "Game",
+  "StartTile": "f1_0_0",
+  "PlayerAnimation": "",
+  "PlayerWalkSpeed": 220,
+  "DayLengthMinutes": 10,
+  "NightStartsAt": 0.65,
+  "InteractRange": 1,
+  "Notes": "PlayerAnimation is empty until player art exists (the player draws as a placeholder)."
+}

@@ -1,0 +1,9 @@
+{
+  "Id": "floor_2",
+  "Name": "Floor 2",
+  "Number": 2,
+  "EntryTile": "f2_0_0",
+  "CloudColor": "#c8d2e6",
+  "Theme": "",
+  "Notes": "Ported from JustPlaying."
+}

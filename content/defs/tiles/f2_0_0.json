@@ -1,0 +1,110 @@
+{
+  "Id": "f2_0_0",
+  "Name": "Floor 2 (0,0)",
+  "Floor": 2,
+  "Layers": [
+    {
+      "Texture": "tiles/floor2/0_0_1/0_0_1.png",
+      "Kind": "Background",
+      "Opacity": 1.0
+    }
+  ],
+  "BackgroundColor": "#1a1d2e",
+  "Exits": [
+    {
+      "Edge": "East",
+      "TargetTile": "f2_1_0",
+      "Conditions": [],
+      "BlockedMessage": "",
+      "Prompt": "Continue to the next area?"
+    }
+  ],
+  "Spawn": {
+    "Q": 17,
+    "R": -1
+  },
+  "PlayerCombatStarts": [
+    {
+      "Q": 21,
+      "R": -2
+    }
+  ],
+  "EnemyCombatStarts": [
+    {
+      "Q": 20,
+      "R": -1
+    }
+  ],
+  "WalkMap": [
+    "# # # # # # # # # # # # # # # #",
+    " # # # # # # # # # # # # # # #",
+    "# # # # # # # # # # # # # # # #",
+    " # # # # # # # # # # # # # # #",
+    "# # # # # # # # # # # # # # # #",
+    " # # # # # # # # # # # # # # #",
+    "# # # # # # # # # # # # # # # #",
+    " # # # # # # # # # # # # # # #",
+    "# # # # # # # # # # # # # # # #",
+    " # # # # # # # # # # # # # # #",
+    "# # # # # # # # # # # # # # # #",
+    " # # # # # # # # # # # # # # #",
+    "# # # # # # # # # # # # # # # #",
+    " # # # # # # # # # # # # # # #",
+    "# # # # # # # # # . . # # # # #",
+    " # # # # # # # # # . . # # # #",
+    "# # # # # # # # # . . . # # # #",
+    " # # # # # # # # # . . . # # #",
+    "# # # # # # # # # . . . . # # #",
+    " # # # # # # # # # . . . . # #",
+    "# # # # # # # # # . . . . . # #",
+    " # # # # # # # # # . . . . . #",
+    "# # # # # # # # # # . . . . . #",
+    " # # # # # # # # # # . . . . .",
+    "# # # # # # # # # # # . . . . .",
+    " # # # # # # # # # # # . . . .",
+    "# # # # # # # # # # # # . . . .",
+    " # # # # # # # # # # # # . . .",
+    "# # # # # # # # # # # # # . # .",
+    " # # # # # # # # # # # # # # #",
+    "# # # # # # # # # # # # # # # #",
+    " # # # # # # # # # # # # # # #",
+    "# # # # # # # # # # # # # # # #",
+    " # # # # # # # # # # # # # # #"
+  ],
+  "Placements": [
+    {
+      "$type": "Interactable",
+      "Id": "wind_edge",
+      "Cell": {
+        "Q": 16,
+        "R": -2
+      },
+      "VisibleWhen": [],
+      "BlocksMovement": false,
+      "Label": "Windy ledge",
+      "Sprite": "",
+      "Invisible": true,
+      "SpriteYOffset": 0,
+      "Trigger": "StepOn",
+      "Rules": [
+        {
+          "Label": "Explain the wind",
+          "Conditions": [],
+          "Outcomes": [
+            {
+              "$type": "Message",
+              "Speaker": "",
+              "Pages": [
+                "The wind surges strongly up the bluffs...",
+                "If you stepped off, you'd be sent flying...",
+                "Perhaps you could make yourself heavier..."
+              ]
+            }
+          ]
+        }
+      ],
+      "FallbackMessage": ""
+    }
+  ],
+  "Notes": "Ported from JustPlaying MapTile_0_0_1.json. Old monsters: ['EarthOoze']. Had trigger PathToLevel2 (wind/turtle aspect message) - see placements."
+}

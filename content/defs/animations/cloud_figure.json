@@ -1,0 +1,30 @@
+{
+  "Id": "cloud_figure",
+  "Name": "Cloud Figure",
+  "States": [
+    {
+      "State": "Idle",
+      "Layers": [
+        {
+          "Texture": "monsters/cloud_figure/TestCase.png",
+          "Row": 1,
+          "FrameCount": 3,
+          "FrameWidth": 109,
+          "FrameHeight": 109,
+          "FrameDurationMs": 550,
+          "Loop": true,
+          "PingPong": false,
+          "Reverse": false,
+          "EndPauseFrames": 0,
+          "StartPauseFrames": 0,
+          "ArtFaces": "Right",
+          "YOffset": 0,
+          "Crossfade": false,
+          "Shader": "CloudMovement",
+          "Scale": 1.0
+        }
+      ]
+    }
+  ],
+  "Notes": "Ported from JustPlaying AnimationData.json \"TestCase\"."
+}
