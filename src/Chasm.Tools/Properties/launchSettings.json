@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "Launcher": { "commandName": "Project" },
+    "Map Editor": { "commandName": "Project", "commandLineArgs": "--mode map" },
+    "World Sandbox": { "commandName": "Project", "commandLineArgs": "--mode world" },
+    "Combat Sandbox": { "commandName": "Project", "commandLineArgs": "--mode combat" },
+    "Content Browser": { "commandName": "Project", "commandLineArgs": "--mode content" }
+  }
+}
