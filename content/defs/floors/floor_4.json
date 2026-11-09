@@ -1,0 +1,33 @@
+{
+  "Id": "floor_4",
+  "Name": "Floor 4",
+  "Number": 4,
+  "EntryTile": "",
+  "Theme": "",
+  "LowerClouds": {
+    "Enabled": true,
+    "Line": 0.7,
+    "FadeLength": 0.15,
+    "Texture": "backgrounds/clouds/Cloud1.png",
+    "Tint": "#ffffff",
+    "Speed": 20,
+    "Opacity": 1
+  },
+  "UpperClouds": {
+    "Enabled": false,
+    "Line": 0.12,
+    "FadeLength": 0.15,
+    "Texture": "backgrounds/clouds/Cloud1.png",
+    "Tint": "#ffffff",
+    "Speed": 20,
+    "Opacity": 1
+  },
+  "DefaultFeather": 6,
+  "BackgroundColor": "#1a1d2e",
+  "AmbientTint": "#ffffff",
+  "FogColor": "#000000",
+  "Music": "",
+  "DefaultEncounters": [],
+  "Materials": [],
+  "Notes": ""
+}
