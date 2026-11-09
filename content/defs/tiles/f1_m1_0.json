@@ -1,6 +1,6 @@
 {
   "Id": "f1_m1_0",
-  "Name": "Floor 1 (-1,0)",
+  "Name": "Thick Grass",
   "Floor": 1,
   "Layers": [
     {
@@ -224,6 +224,53 @@
     "# . . . # # # # # # # # # # # #",
     " . . . # # # # # # # # # # # #"
   ],
-  "Placements": [],
+  "Placements": [
+    {
+      "$type": "ItemPickup",
+      "Id": "item_berry",
+      "Cell": {
+        "Q": 14,
+        "R": 3
+      },
+      "VisibleWhen": [
+        {
+          "$type": "Flag",
+          "Flag": "figure_quest_given",
+          "Compare": "NotEqual",
+          "Value": 0
+        }
+      ],
+      "BlocksMovement": false,
+      "Item": "glow_berry",
+      "Count": 1,
+      "OneTime": true,
+      "AlsoOnPickup": []
+    },
+    {
+      "$type": "MonsterGroup",
+      "Id": "monsters_1",
+      "Cell": {
+        "Q": 17,
+        "R": -3
+      },
+      "VisibleWhen": [],
+      "BlocksMovement": false,
+      "Encounter": "fire_oozes",
+      "Patrol": "BackAndForth",
+      "PatrolPoints": [
+        {
+          "Q": 16,
+          "R": -7
+        },
+        {
+          "Q": 18,
+          "R": 2
+        }
+      ],
+      "WalkSpeed": 60,
+      "PauseSeconds": 2.5,
+      "Aggressive": false
+    }
+  ],
   "Notes": "Ported from JustPlaying MapTile_-1_0_0.json. Old monsters: ['FireOoze']."
 }

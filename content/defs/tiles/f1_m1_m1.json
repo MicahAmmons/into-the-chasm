@@ -1,6 +1,6 @@
 {
   "Id": "f1_m1_m1",
-  "Name": "Floor 1 (-1,-1)",
+  "Name": "Windy Bluffs",
   "Floor": 1,
   "Layers": [
     {
@@ -168,6 +168,97 @@
     "# # # # # # # # # # # # # # # #",
     " # # # # # # # # # # # # # # #"
   ],
-  "Placements": [],
+  "Placements": [
+    {
+      "$type": "Interactable",
+      "Id": "windy_ledge",
+      "Cell": {
+        "Q": 22,
+        "R": 5
+      },
+      "VisibleWhen": [],
+      "BlocksMovement": false,
+      "Label": "Windy ledge",
+      "Sprite": "",
+      "Animation": "",
+      "Invisible": true,
+      "SpriteYOffset": 0,
+      "Trigger": "StepOn",
+      "Rules": [
+        {
+          "Label": "Heavy enough to fall",
+          "Conditions": [
+            {
+              "$type": "AspectActive",
+              "Aspect": "aspect_of_the_turtle"
+            }
+          ],
+          "Outcomes": [
+            {
+              "$type": "Ask",
+              "Question": "The wind still roars, but it can no longer lift you. Jump?",
+              "IfYes": [
+                {
+                  "$type": "Flag",
+                  "Flag": "reached_floor_2",
+                  "Operation": "Set",
+                  "Value": 1
+                },
+                {
+                  "$type": "Message",
+                  "Speaker": "",
+                  "Pages": [
+                    "You fall through the clouds..."
+                  ]
+                },
+                {
+                  "$type": "ChangeTile",
+                  "Tile": "f2_0_0",
+                  "UseArrivalCell": false,
+                  "ArrivalCell": {
+                    "Q": 0,
+                    "R": 0
+                  }
+                }
+              ],
+              "IfNo": []
+            }
+          ]
+        },
+        {
+          "Label": "The wind",
+          "Conditions": [],
+          "Outcomes": [
+            {
+              "$type": "Message",
+              "Speaker": "",
+              "Pages": [
+                "The wind surges strongly up the bluffs...",
+                "If you stepped off, you'd be sent flying...",
+                "Perhaps you could make yourself heavier..."
+              ]
+            }
+          ]
+        }
+      ],
+      "FallbackMessage": ""
+    },
+    {
+      "$type": "MonsterGroup",
+      "Id": "monsters_1",
+      "Cell": {
+        "Q": 15,
+        "R": 1
+      },
+      "VisibleWhen": [],
+      "BlocksMovement": false,
+      "Encounter": "ooze_trio",
+      "Patrol": "Stay",
+      "PatrolPoints": [],
+      "WalkSpeed": 70,
+      "PauseSeconds": 2,
+      "Aggressive": true
+    }
+  ],
   "Notes": "Ported from JustPlaying MapTile_-1_-1_0.json. Old monsters: ['FireOoze']."
 }

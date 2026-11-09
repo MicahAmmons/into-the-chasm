@@ -37,5 +37,34 @@
     }
   ],
   "SummonApCost": 3,
-  "SummonRange": 2
+  "SummonRange": 2,
+  "Summon": {
+    "BaseDailyUses": 2,
+    "BaseOnField": 1,
+    "XpPerSummon": 10,
+    "AffinityLevels": [
+      {
+        "XpRequired": 20,
+        "ExtraDailyUses": 1,
+        "ExtraOnField": 0,
+        "BonusHp": 3,
+        "BonusAp": 0,
+        "BonusMp": 0,
+        "GrantAbility": "",
+        "GrantAspect": "",
+        "Message": "The turtle trusts you more. (+1 use per rest, +3 HP)"
+      },
+      {
+        "XpRequired": 40,
+        "ExtraDailyUses": 0,
+        "ExtraOnField": 0,
+        "BonusHp": 0,
+        "BonusAp": 0,
+        "BonusMp": 0,
+        "GrantAbility": "",
+        "GrantAspect": "aspect_of_the_turtle",
+        "Message": "The turtle's patience becomes yours."
+      }
+    ]
+  }
 }

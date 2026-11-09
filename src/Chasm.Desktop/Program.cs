@@ -1,8 +1,7 @@
-using Chasm.Core.Session;
 using Chasm.Game.Hosting;
-using Chasm.Game.World;
+using Chasm.Game.Ui;
 
-// Entry point for the shipped game. (Title screen + save slots come later; this starts a fresh session.)
+// Entry point for the shipped game: the title screen with save slots.
 var options = GameOptions.FromArgs(args, new GameOptions());
-using var game = new ChasmGame(options, s => new WorldScene(new GameSession(s.Defs)));
+using var game = new ChasmGame(options, _ => new TitleScene());
 game.Run();

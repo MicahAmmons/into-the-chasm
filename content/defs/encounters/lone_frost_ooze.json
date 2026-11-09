@@ -1,0 +1,15 @@
+{
+  "Id": "lone_frost_ooze",
+  "Name": "Lone Frost Ooze",
+  "Monsters": [
+    {
+      "Monster": "frost_ooze",
+      "Count": 1
+    }
+  ],
+  "CanFlee": true,
+  "Respawn": "Respawns",
+  "OnVictory": [],
+  "OnDefeat": [],
+  "Notes": "A gentle first fight."
+}

@@ -73,37 +73,24 @@
   ],
   "Placements": [
     {
-      "$type": "Interactable",
-      "Id": "wind_edge",
+      "$type": "Figure",
+      "Id": "figure_2",
       "Cell": {
-        "Q": 16,
+        "Q": 18,
         "R": -2
       },
       "VisibleWhen": [],
-      "BlocksMovement": false,
-      "Label": "Windy ledge",
-      "Sprite": "",
-      "Invisible": true,
-      "SpriteYOffset": 0,
-      "Trigger": "StepOn",
-      "Rules": [
-        {
-          "Label": "Explain the wind",
-          "Conditions": [],
-          "Outcomes": [
-            {
-              "$type": "Message",
-              "Speaker": "",
-              "Pages": [
-                "The wind surges strongly up the bluffs...",
-                "If you stepped off, you'd be sent flying...",
-                "Perhaps you could make yourself heavier..."
-              ]
-            }
-          ]
-        }
+      "BlocksMovement": true,
+      "Name": "Figure",
+      "Animation": "cloud_figure",
+      "Greeting": [
+        "You fell well.",
+        "Below the clouds, the chasm keeps going. It always does."
       ],
-      "FallbackMessage": ""
+      "TalkRules": [],
+      "OffersRest": true,
+      "OffersFastTravel": true,
+      "EncounterRange": 3
     }
   ],
   "Notes": "Ported from JustPlaying MapTile_0_0_1.json. Old monsters: ['EarthOoze']. Had trigger PathToLevel2 (wind/turtle aspect message) - see placements."

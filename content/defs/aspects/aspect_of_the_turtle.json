@@ -1,0 +1,12 @@
+{
+  "Id": "aspect_of_the_turtle",
+  "Name": "Aspect of the Turtle",
+  "Description": "In combat: shield an ally (30% less damage). Out of combat: become heavy as stone.",
+  "Icon": "",
+  "CombatAbility": "turtle_shell",
+  "Toggleable": true,
+  "OnMessage": "You feel heavy as stone.",
+  "OffMessage": "The weight lifts.",
+  "OnActivate": [],
+  "Notes": ""
+}

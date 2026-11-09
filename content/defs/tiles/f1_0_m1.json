@@ -1,6 +1,6 @@
 {
   "Id": "f1_0_m1",
-  "Name": "Floor 1 (0,-1)",
+  "Name": "Turtle Rise",
   "Floor": 1,
   "Layers": [
     {
@@ -187,6 +187,118 @@
     "# # # # # . # # # # # # # # # #",
     " # # # # # # # # # # # # # # #"
   ],
-  "Placements": [],
+  "Placements": [
+    {
+      "$type": "Interactable",
+      "Id": "turtle_beast",
+      "Cell": {
+        "Q": 16,
+        "R": -2
+      },
+      "VisibleWhen": [],
+      "BlocksMovement": true,
+      "Label": "Turtle Beast",
+      "Sprite": "",
+      "Animation": "turtle",
+      "Invisible": false,
+      "SpriteYOffset": 0,
+      "Trigger": "Interact",
+      "Rules": [
+        {
+          "Label": "Feed it the berry",
+          "Conditions": [
+            {
+              "$type": "HasItem",
+              "Item": "glow_berry",
+              "Count": 1
+            },
+            {
+              "$type": "Flag",
+              "Flag": "turtle_fed",
+              "Compare": "Equal",
+              "Value": 0
+            }
+          ],
+          "Outcomes": [
+            {
+              "$type": "TakeItem",
+              "Item": "glow_berry",
+              "Count": 1
+            },
+            {
+              "$type": "Message",
+              "Speaker": "",
+              "Pages": [
+                "The turtle crunches the berry slowly...",
+                "It breathes out a ribbon of shimmering cloud."
+              ]
+            },
+            {
+              "$type": "GiveItem",
+              "Item": "turtle_flow",
+              "Count": 1,
+              "Announce": true
+            },
+            {
+              "$type": "Flag",
+              "Flag": "turtle_fed",
+              "Operation": "Set",
+              "Value": 1
+            }
+          ]
+        },
+        {
+          "Label": "Already fed",
+          "Conditions": [
+            {
+              "$type": "Flag",
+              "Flag": "turtle_fed",
+              "Compare": "NotEqual",
+              "Value": 0
+            }
+          ],
+          "Outcomes": [
+            {
+              "$type": "Message",
+              "Speaker": "",
+              "Pages": [
+                "The turtle dozes, content."
+              ]
+            }
+          ]
+        }
+      ],
+      "FallbackMessage": "An enormous, ancient turtle. It looks hungry."
+    },
+    {
+      "$type": "MonsterGroup",
+      "Id": "monsters_1",
+      "Cell": {
+        "Q": 15,
+        "R": 6
+      },
+      "VisibleWhen": [],
+      "BlocksMovement": false,
+      "Encounter": "lone_frost_ooze",
+      "Patrol": "Loop",
+      "PatrolPoints": [
+        {
+          "Q": 19,
+          "R": 5
+        },
+        {
+          "Q": 15,
+          "R": 2
+        },
+        {
+          "Q": 13,
+          "R": 5
+        }
+      ],
+      "WalkSpeed": 50,
+      "PauseSeconds": 3,
+      "Aggressive": false
+    }
+  ],
   "Notes": "Ported from JustPlaying MapTile_0_-1_0.json. Old monsters: ['FireOoze']."
 }

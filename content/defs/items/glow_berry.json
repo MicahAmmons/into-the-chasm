@@ -1,0 +1,13 @@
+{
+  "Id": "glow_berry",
+  "Name": "Glow Berry",
+  "Description": "A berry that glows faintly, like the sky.",
+  "Category": "Quest",
+  "Icon": "",
+  "WorldSprite": "props/GlowMound.png",
+  "Stackable": true,
+  "ShowInQuickBar": true,
+  "UseRules": [],
+  "NoUseMessage": "It smells sweet. Something bigger than you would love this.",
+  "Notes": "Milestone 1: fed to the Turtle Beast."
+}

@@ -50,6 +50,35 @@ public partial class WorldScene : Scene, IRuleHost
 
     public WorldScene(GameSession session) => Session = session;
 
+    // ------------------------------------------------------------------ autosave
+
+    /// <summary>Where this session autosaves. Null (sandboxes) = never saves.</summary>
+    public (Saving.SaveStore Store, int Slot)? SaveTarget { get; init; }
+    private bool _saveDirty;
+    private float _saveCooldown;
+
+    /// <summary>Marks that something worth keeping changed; written within a couple of seconds.</summary>
+    public void MarkSaveDirty() => _saveDirty = true;
+
+    /// <summary>Writes the save right now (commit point).</summary>
+    public void SaveNow(string? fightInProgress = null)
+    {
+        if (SaveTarget is not { } t) return;
+        Session.PlayerPosition = Player.Position;
+        var data = Session.ToSave();
+        data.FightInProgress = fightInProgress;
+        t.Store.Write(t.Slot, data);
+        _saveDirty = false;
+        _saveCooldown = 2;
+    }
+
+    private void UpdateAutosave(float dt)
+    {
+        Session.PlaySeconds += dt;
+        _saveCooldown -= dt;
+        if (_saveDirty && _saveCooldown <= 0 && !Player.IsMoving) SaveNow();
+    }
+
     public override void OnEnter()
     {
         var cfg = Session.Config;
@@ -69,10 +98,25 @@ public partial class WorldScene : Scene, IRuleHost
             foreach (var o in cfg.NewGameOutcomes) o.Execute(ctx);
         }
         Session.Defs.Changed += OnDefChanged;
-        _defSub = new Unsub(() => Session.Defs.Changed -= OnDefChanged);
+        Session.World.FlagChanged += OnStateChanged;
+        Session.Inventory.Changed += OnInventoryChanged;
+        _defSub = new Unsub(() =>
+        {
+            Session.Defs.Changed -= OnDefChanged;
+            Session.World.FlagChanged -= OnStateChanged;
+            Session.Inventory.Changed -= OnInventoryChanged;
+        });
+        SaveNow();
     }
 
-    public override void OnExit() => _defSub?.Dispose();
+    public override void OnExit()
+    {
+        SaveNow();
+        _defSub?.Dispose();
+    }
+
+    private void OnStateChanged(string flag, int value) => MarkSaveDirty();
+    private void OnInventoryChanged() => MarkSaveDirty();
 
     private sealed class Unsub(Action a) : IDisposable { public void Dispose() => a(); }
 
@@ -104,6 +148,7 @@ public partial class WorldScene : Scene, IRuleHost
         _suppressedEdges = IsoGrid.EdgesOf(_lastCell); // don't instantly re-prompt on arrival
         _pendingInteract = null;
         ResetGroups();
+        if (Services is not null) MarkSaveDirty();
     }
 
     private Vector2 SnapToWalkable(Vector2 pos)
@@ -224,10 +269,19 @@ public partial class WorldScene : Scene, IRuleHost
         if (_fadeDir != 0) { Player.Animation.Update(dt); return; }
 
         var input = Services.Input;
+        UpdateAutosave(dt);
         if (ClockRunning) Session.Clock.Advance(dt);
         if (input.Pressed(InputAction.DebugOverlay)) _statsOverlay.Visible = !_statsOverlay.Visible;
         if (input.Pressed(InputAction.DebugCells)) ShowGrid = !ShowGrid;
         if (input.Pressed(InputAction.Rest)) AskRest();
+        if (input.Pressed(InputAction.Cancel) && IsTop && SaveTarget is not null)
+            Services.Scenes.Push(new ChoiceScene("Paused (your progress is saved automatically)", new List<(string, Action)>
+            {
+                ("Resume", () => { }),
+                ("Rest", AskRest),
+                ("Quit to title", () => Services.Scenes.Pop()),
+                ("Quit game", () => { SaveNow(); Services.Game.Exit(); }),
+            }));
         UpdateQuickBarKeys();
         UpdateGroups(dt);
 
@@ -356,6 +410,7 @@ public partial class WorldScene : Scene, IRuleHost
     public void Rest()
     {
         Session.Rest();
+        SaveNow();
         ShowMessage(new[] { $"You rest for half a day. Your summons recover. It is now day {Session.Clock.Day}, {(Session.Clock.IsNight ? "night" : "daytime")}." }, null);
     }
 
@@ -374,7 +429,7 @@ public partial class WorldScene : Scene, IRuleHost
         DrawGroupsAndFigures();
         foreach (var p in ActivePlacements)
         {
-            if (p is MonsterGroupPlacement or FigurePlacement) continue;
+            if (p is MonsterGroupPlacement or FigurePlacement || p is InteractablePlacement { Invisible: false } ia && !string.IsNullOrEmpty(ia.Animation)) continue;
             if (IsHidden(p))
             {
                 if (ShowGrid) TileRenderer.QueueCell(_queue, s, p.Cell, new XColor(200, 120, 255) * 0.5f);

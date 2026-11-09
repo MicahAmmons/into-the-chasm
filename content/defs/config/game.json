@@ -7,5 +7,20 @@
   "DayLengthMinutes": 10,
   "NightStartsAt": 0.65,
   "InteractRange": 1,
-  "Notes": "PlayerAnimation is empty until player art exists (the player draws as a placeholder)."
+  "Notes": "PlayerAnimation is empty until player art exists (the player draws as a placeholder).",
+  "NewGameOutcomes": [
+    {
+      "$type": "Message",
+      "Speaker": "",
+      "Pages": [
+        "You wake on soft grass.",
+        "Above you, a bright sky. Around you, as far as you can see... clouds.",
+        "You remember nothing."
+      ]
+    }
+  ],
+  "PlayerBaseHp": 20,
+  "PlayerBaseAp": 6,
+  "PlayerBaseMp": 3,
+  "PlayerInitiative": 10
 }

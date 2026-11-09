@@ -135,6 +135,7 @@ public partial class WorldScene
         var cfg = Session.Config;
         var prog = Session.Progress;
         var policy = new ProgressSummonPolicy(prog, Session.Defs);
+        SaveNow(fightInProgress: encounterId); // quitting mid-fight counts as a loss on next load
         Services.Scenes.Push(new CombatScene(new CombatRequest
         {
             Tile = Tile,
@@ -182,6 +183,18 @@ public partial class WorldScene
                 break;
         }
         if (msgs.Count > 0) ShowMessage(msgs, null);
+        SaveNow();
+    }
+
+    /// <summary>Called on load when the save says a fight was in progress: it's a loss.</summary>
+    public void ResolveAbandonedFight()
+    {
+        Session.Stats.Add(Chasm.Core.Stats.StatKeys.CombatsLost);
+        Session.Rest();
+        var prog = Session.Progress;
+        var msgs = new List<string> { "You left in the middle of a fight...", "Everything went dark." };
+        if (!string.IsNullOrEmpty(prog.RespawnTile)) { msgs.Add("You wake beside the Figure."); BeginChangeTo(prog.RespawnTile, prog.RespawnCell); }
+        ShowMessage(msgs, null);
     }
 
     private void BeginChangeTo(string tile, CellCoord cell) => ChangeTile(tile, cell);
@@ -367,6 +380,18 @@ public partial class WorldScene
                         var pos = rt.Pos;
                         string label = "Fight: " + GroupLabel(g);
                         _queue.Add(RenderLayer.WorldUi, 1, b => s.Draw.TextCentered(b, label, new XVec(pos.X, pos.Y - 110), new XColor(255, 170, 160), 22, bold: true));
+                    }
+                    break;
+                case InteractablePlacement { Invisible: false } ip when !string.IsNullOrEmpty(ip.Animation):
+                    s.Defs.TryGet<AnimationDef>(ip.Animation, out var ia);
+                    if (!_figureAnims.TryGetValue(ip.Id, out var ipl) || ipl.Def != ia)
+                        _figureAnims[ip.Id] = ipl = new AnimationPlayer(ia) { PlaceholderSize = new(90, 80) };
+                    ipl.Update(1 / 60f);
+                    ipl.Draw(_queue, s.Textures, s.Draw, IsoGrid.CellCenter(ip.Cell), Facing.Left, p == Hovered ? new XColor(255, 255, 220) : XColor.White, ip.Label);
+                    if (p == Hovered)
+                    {
+                        var pos = IsoGrid.CellCenter(ip.Cell);
+                        _queue.Add(RenderLayer.WorldUi, 1, b => s.Draw.TextCentered(b, ip.Label, new XVec(pos.X, pos.Y - 100), XColor.White, 22, bold: true));
                     }
                     break;
                 case FigurePlacement f:

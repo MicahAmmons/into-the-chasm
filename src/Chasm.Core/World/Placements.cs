@@ -59,6 +59,8 @@ public sealed class InteractablePlacement : Placement
     public string Label { get; set; } = "";
     [Texture, Tooltip("Art. Empty = labelled placeholder box. Leave empty AND tick Invisible for hidden spots.")]
     public string Sprite { get; set; } = "";
+    [Ref(typeof(Animation.AnimationDef)), Tooltip("Animated look (plays Idle). Overrides Sprite.")]
+    public string Animation { get; set; } = "";
     [Tooltip("Not drawn and no hover name: for secret spots.")]
     public bool Invisible { get; set; }
     public int SpriteYOffset { get; set; }

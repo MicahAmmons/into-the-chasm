@@ -24,6 +24,7 @@ public sealed class GameSession
     public Progression.PlayerProgress Progress { get; private set; } = new();
 
     public string CurrentTile { get; set; } = "";
+    public double PlaySeconds { get; set; }
     public Vector2 PlayerPosition { get; set; }
 
     public GameConfigDef Config =>
@@ -59,6 +60,7 @@ public sealed class GameSession
     public SaveData ToSave() => new()
     {
         Progress = Progress,
+        PlaySeconds = PlaySeconds,
         Tile = CurrentTile, PlayerX = PlayerPosition.X, PlayerY = PlayerPosition.Y,
         Flags = World.Snapshot(), Items = Inventory.Snapshot(), Gold = Inventory.Gold,
         Stats = Stats.Snapshot(), Day = Clock.Day, TimeOfDay = Clock.Time,
@@ -73,6 +75,7 @@ public sealed class GameSession
         Stats.Load(s.Stats);
         Clock.Load(s.Day, s.TimeOfDay);
         Progress = s.Progress ?? new();
+        PlaySeconds = s.PlaySeconds;
     }
 }
 
@@ -90,4 +93,9 @@ public sealed class SaveData
     public int Day { get; set; } = 1;
     public float TimeOfDay { get; set; }
     public Progression.PlayerProgress? Progress { get; set; }
+
+    /// <summary>Set while a fight is in progress. Loading a save with this set counts the fight as lost (no save-scumming).</summary>
+    public string? FightInProgress { get; set; }
+    public DateTime SavedAtUtc { get; set; }
+    public double PlaySeconds { get; set; }
 }

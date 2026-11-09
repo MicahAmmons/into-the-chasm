@@ -1,6 +1,6 @@
 {
   "Id": "f1_0_0",
-  "Name": "Floor 1 (0,0)",
+  "Name": "Waking Meadow",
   "Floor": 1,
   "Layers": [
     {
@@ -172,6 +172,150 @@
     "# # # # # # # # . . # # # # # #",
     " # # # # # # # . . # # # # # #"
   ],
-  "Placements": [],
+  "Placements": [
+    {
+      "$type": "Figure",
+      "Id": "figure_1",
+      "Cell": {
+        "Q": 16,
+        "R": -2
+      },
+      "VisibleWhen": [],
+      "BlocksMovement": true,
+      "Name": "Figure",
+      "Animation": "cloud_figure",
+      "Greeting": [
+        "..."
+      ],
+      "TalkRules": [
+        {
+          "Label": "Hint: the windy ledge",
+          "Conditions": [
+            {
+              "$type": "AspectKnown",
+              "Aspect": "aspect_of_the_turtle"
+            },
+            {
+              "$type": "Flag",
+              "Flag": "reached_floor_2",
+              "Compare": "Equal",
+              "Value": 0
+            }
+          ],
+          "Outcomes": [
+            {
+              "$type": "Message",
+              "Speaker": "Figure",
+              "Pages": [
+                "The wind howls up the cliffs to the north-west.",
+                "Something heavy might fall through it."
+              ]
+            }
+          ]
+        },
+        {
+          "Label": "Hint: bond with the turtle",
+          "Conditions": [
+            {
+              "$type": "SummonUnlocked",
+              "Monster": "turtle"
+            }
+          ],
+          "Outcomes": [
+            {
+              "$type": "Message",
+              "Speaker": "Figure",
+              "Pages": [
+                "Call on the turtle when you fight. The more you rely on it, the more of it becomes yours."
+              ]
+            }
+          ]
+        },
+        {
+          "Label": "Hint: consume the flow",
+          "Conditions": [
+            {
+              "$type": "HasItem",
+              "Item": "turtle_flow",
+              "Count": 1
+            }
+          ],
+          "Outcomes": [
+            {
+              "$type": "Message",
+              "Speaker": "Figure",
+              "Pages": [
+                "Breathe it in. Use it."
+              ]
+            }
+          ]
+        },
+        {
+          "Label": "Hint: feed the turtle",
+          "Conditions": [
+            {
+              "$type": "HasItem",
+              "Item": "glow_berry",
+              "Count": 1
+            }
+          ],
+          "Outcomes": [
+            {
+              "$type": "Message",
+              "Speaker": "Figure",
+              "Pages": [
+                "North. The old one waits."
+              ]
+            }
+          ]
+        },
+        {
+          "Label": "Hint: find the berry",
+          "Conditions": [
+            {
+              "$type": "Flag",
+              "Flag": "figure_quest_given",
+              "Compare": "NotEqual",
+              "Value": 0
+            }
+          ],
+          "Outcomes": [
+            {
+              "$type": "Message",
+              "Speaker": "Figure",
+              "Pages": [
+                "West, where the grass grows thick, something glows."
+              ]
+            }
+          ]
+        },
+        {
+          "Label": "First meeting: the berry quest",
+          "Conditions": [],
+          "Outcomes": [
+            {
+              "$type": "Message",
+              "Speaker": "Figure",
+              "Pages": [
+                "You are awake. Good.",
+                "You will not remember how you came here. No one does.",
+                "There is an old turtle to the north. It is hungry.",
+                "West of here a berry glows. Bring it to the turtle."
+              ]
+            },
+            {
+              "$type": "Flag",
+              "Flag": "figure_quest_given",
+              "Operation": "Set",
+              "Value": 1
+            }
+          ]
+        }
+      ],
+      "OffersRest": true,
+      "OffersFastTravel": true,
+      "EncounterRange": 3
+    }
+  ],
   "Notes": "Ported from JustPlaying MapTile_0_0_0.json. Old monsters: ['FireOoze']."
 }

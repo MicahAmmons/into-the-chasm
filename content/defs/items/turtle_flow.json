@@ -1,0 +1,37 @@
+{
+  "Id": "turtle_flow",
+  "Name": "Turtle's Flow",
+  "Description": "A shimmering breath of cloud. Consume it to bond with the turtle.",
+  "Category": "Consumable",
+  "Icon": "",
+  "WorldSprite": "",
+  "Stackable": false,
+  "ShowInQuickBar": true,
+  "UseRules": [
+    {
+      "Label": "Consume the flow",
+      "Conditions": [],
+      "Outcomes": [
+        {
+          "$type": "TakeItem",
+          "Item": "turtle_flow",
+          "Count": 1
+        },
+        {
+          "$type": "Message",
+          "Speaker": "",
+          "Pages": [
+            "You breathe in the flow. Something slow and patient settles in your chest."
+          ]
+        },
+        {
+          "$type": "GrantSummon",
+          "Monster": "turtle",
+          "Announce": true
+        }
+      ]
+    }
+  ],
+  "NoUseMessage": "",
+  "Notes": "Milestone 1: using it unlocks the Turtle summon."
+}
