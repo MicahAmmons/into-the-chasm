@@ -52,6 +52,66 @@
       "FlipX": false,
       "FlipY": false,
       "Fade": "None"
+    },
+    {
+      "Id": "ph_cliff",
+      "Name": "Placeholder cliff (strata)",
+      "Texture": "placeholder/textures/rock_strata.png",
+      "Rotation": 28,
+      "Tint": "#ffffff",
+      "FlipX": false,
+      "FlipY": false,
+      "Fade": "IntoLowerClouds"
+    },
+    {
+      "Id": "ph_cliff_right",
+      "Name": "Placeholder cliff right",
+      "Texture": "placeholder/textures/rock_strata.png",
+      "Rotation": 332,
+      "Tint": "#ffffff",
+      "FlipX": true,
+      "FlipY": false,
+      "Fade": "IntoLowerClouds"
+    },
+    {
+      "Id": "ph_wall",
+      "Name": "Placeholder wall (up)",
+      "Texture": "placeholder/textures/stone_wall.png",
+      "Rotation": 0,
+      "Tint": "#ffffff",
+      "FlipX": false,
+      "FlipY": false,
+      "Fade": "IntoUpperClouds"
+    },
+    {
+      "Id": "ph_grass",
+      "Name": "Placeholder grass",
+      "Texture": "placeholder/textures/grass.png",
+      "Rotation": 0,
+      "Tint": "#ffffff",
+      "FlipX": false,
+      "FlipY": false,
+      "Fade": "None"
+    },
+    {
+      "Id": "ph_dirt",
+      "Name": "Placeholder dirt",
+      "Texture": "placeholder/textures/dirt.png",
+      "Rotation": 0,
+      "Tint": "#ffffff",
+      "FlipX": false,
+      "FlipY": false,
+      "Fade": "None"
+    },
+    {
+      "Id": "ph_moss",
+      "Name": "Placeholder moss",
+      "Texture": "placeholder/textures/moss.png",
+      "Rotation": 0,
+      "Tint": "#ffffff",
+      "FlipX": false,
+      "FlipY": false,
+      "Fade": "None"
     }
   ],
   "Notes": "Ported from JustPlaying."

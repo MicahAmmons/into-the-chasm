@@ -24,7 +24,78 @@
     }
   ],
   "LocalMaterials": [],
-  "Props": [],
+  "Props": [
+    {
+      "Id": "prop_1",
+      "Texture": "placeholder/props/rock_large.png",
+      "X": 640,
+      "Y": 330,
+      "Rotation": 0,
+      "Scale": 1,
+      "Tint": "#ffffff",
+      "FlipX": false,
+      "FlipY": false,
+      "Opacity": 1,
+      "Layer": "SortWithCharacters",
+      "Interaction": null
+    },
+    {
+      "Id": "prop_2",
+      "Texture": "placeholder/props/bush.png",
+      "X": 1010,
+      "Y": 300,
+      "Rotation": 0,
+      "Scale": 1,
+      "Tint": "#ffffff",
+      "FlipX": false,
+      "FlipY": false,
+      "Opacity": 1,
+      "Layer": "SortWithCharacters",
+      "Interaction": null
+    },
+    {
+      "Id": "prop_3",
+      "Texture": "placeholder/props/crystal_cluster.png",
+      "X": 820,
+      "Y": 250,
+      "Rotation": 0,
+      "Scale": 1,
+      "Tint": "#ffffff",
+      "FlipX": false,
+      "FlipY": false,
+      "Opacity": 1,
+      "Layer": "SortWithCharacters",
+      "Interaction": null
+    },
+    {
+      "Id": "prop_4",
+      "Texture": "placeholder/props/rock_small.png",
+      "X": 1180,
+      "Y": 370,
+      "Rotation": 0,
+      "Scale": 1,
+      "Tint": "#ffffff",
+      "FlipX": false,
+      "FlipY": false,
+      "Opacity": 1,
+      "Layer": "SortWithCharacters",
+      "Interaction": null
+    },
+    {
+      "Id": "prop_5",
+      "Texture": "placeholder/props/bush_small.png",
+      "X": 520,
+      "Y": 260,
+      "Rotation": 0,
+      "Scale": 1,
+      "Tint": "#ffffff",
+      "FlipX": false,
+      "FlipY": false,
+      "Opacity": 1,
+      "Layer": "SortWithCharacters",
+      "Interaction": null
+    }
+  ],
   "BackgroundColor": "#2a2f45",
   "Exits": [
     {
