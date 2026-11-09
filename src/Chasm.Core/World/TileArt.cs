@@ -83,10 +83,20 @@ public sealed class PropDef
     public override string ToString() => $"{Id}: {Texture}";
 }
 
-/// <summary>A scrolling cloud band (the visual floor separators).</summary>
+public enum CloudCoverage
+{
+    [Label("Whole screen (texture repeats to fill it)")] FullScreen,
+    [Label("Band at the cloud line")] Band,
+}
+
+/// <summary>A scrolling cloud layer (the visual floor separators).</summary>
 public sealed class CloudLayerDef
 {
     public bool Enabled { get; set; } = true;
+    [Tooltip("Whole screen: the cloud texture fills everything behind the tile. Band: only near the cloud line.")]
+    public CloudCoverage Coverage { get; set; } = CloudCoverage.FullScreen;
+    [Range(1, 6), Tooltip("Whole screen: how many copies of the texture stack top to bottom.")]
+    public int RowsOnScreen { get; set; } = 2;
     [Range(0, 1), Tooltip("Where the cloud line sits on screen: 0 = top, 1 = bottom.")]
     public float Line { get; set; } = 0.65f;
     [Range(0, 1), Tooltip("How far (fraction of screen height) textures take to fade out past the line.")]

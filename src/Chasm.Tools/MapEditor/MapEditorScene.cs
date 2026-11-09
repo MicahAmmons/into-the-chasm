@@ -81,6 +81,7 @@ public sealed partial class MapEditorScene : Scene
         Services.Canvas.Region = null;
         Services.Canvas.ResetView();
         ToolContext.Wizards.Inspector.CellPicker = null;
+        if (_tile is not null && _history.Count > 0) WriteRecovery();
         DisposeNeighbours();
     }
 
@@ -221,6 +222,53 @@ public sealed partial class MapEditorScene : Scene
         _history.Add(json);
         if (_history.Count > 300) _history.RemoveAt(0);
         _historyIndex = _history.Count - 1;
+        _recoveryDue = true;
+    }
+
+    // ------------------------------------------------------------------ recovery (crash / close safety net)
+
+    private bool _recoveryDue;
+    private float _recoveryTimer;
+
+    private string RecoveryKey => _isNewTile ? "new_" + (string.IsNullOrWhiteSpace(_tile!.Name) ? "tile" : _tile.Name) : _tile!.Id;
+
+    private void UpdateRecovery(float dt)
+    {
+        _recoveryTimer -= dt;
+        if (!_recoveryDue || _recoveryTimer > 0 || _tile is null) return;
+        WriteRecovery();
+    }
+
+    private void WriteRecovery()
+    {
+        if (_tile is null || _history.Count == 0) return;
+        _recoveryDue = false;
+        _recoveryTimer = 2f;
+        string title = $"{(string.IsNullOrWhiteSpace(_tile.Name) ? "Untitled" : _tile.Name)}  [{(_isNewTile ? "new" : _tile.Id)}]";
+        EditorRecovery.Write(RecoveryKey, title, _history[_historyIndex]);
+    }
+
+    private void Recover(EditorRecovery.Entry entry)
+    {
+        var json = EditorRecovery.Read(entry);
+        var snap = json is null ? null : ChasmJson.Deserialize<Snapshot>(json);
+        if (snap is null) { Status("That recovery file couldn't be read."); return; }
+        _tile = snap.Tile;
+        _tile.InvalidateCaches();
+        _floor = snap.Floor;
+        _isNewTile = snap.New || !Services.Defs.Exists(typeof(TileDef), _tile.Id);
+        ResetHistory();
+        // Compare against what's saved on disk, so unsaved recovered work shows as unsaved.
+        _savedTileJson = !_isNewTile && Services.Defs.TryGet<TileDef>(_tile.Id, out var saved) ? ChasmJson.Serialize(saved) : "";
+        var savedFloor = _floor is null ? null : Services.Defs.All<FloorDef>().FirstOrDefault(f => f.Number == _floor.Number);
+        _savedFloorJson = savedFloor is null ? "" : ChasmJson.Serialize(savedFloor);
+        if (_isNewTile) _history.Insert(0, _history[0]); // counts as unsaved
+        _historyIndex = _history.Count - 1;
+        _tool = Tool.Select;
+        _panel = Panel.Selection;
+        ClearSelections();
+        Services.TileVisuals.Invalidate(_tile);
+        Status($"Recovered work from {EditorRecovery.Ago(entry.SavedLocal)}. Save (Ctrl+S) to keep it.");
     }
 
     private void Undo() => Restore(_historyIndex - 1);
@@ -269,6 +317,7 @@ public sealed partial class MapEditorScene : Scene
         else if (!_panning) UpdateTool(input);
 
         MaybeCommitSnapshot();
+        UpdateRecovery(dt);
     }
 
     private void UpdateHover(Game.Input.InputState input)

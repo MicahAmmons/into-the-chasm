@@ -89,6 +89,8 @@
       "Invisible": true,
       "SpriteYOffset": 0,
       "Trigger": "StepOn",
+      "Radius": 2,
+      "Repeat": true,
       "Rules": [
         {
           "Label": "Heavy enough to fall",

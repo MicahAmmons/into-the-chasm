@@ -55,6 +55,7 @@ public sealed class ChasmGame : Microsoft.Xna.Framework.Game
     {
         base.Initialize();
         Window.ClientSizeChanged += OnClientSizeChanged;
+        Exiting += (_, _) => Svc?.Scenes.ExitAll();
         Activated += (_, _) => { _resyncFrames = 3; Svc?.TileVisuals.InvalidateAll(); };
         GraphicsDevice.DeviceReset += (_, _) => Svc?.TileVisuals.InvalidateAll();
         FitWindowToScreen();

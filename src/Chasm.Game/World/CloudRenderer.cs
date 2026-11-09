@@ -20,6 +20,7 @@ public static class CloudRenderer
     {
         if (!cloud.Enabled || cloud.Opacity <= 0) return;
         var tex = s.Textures.Get(cloud.Texture);
+        if (cloud.Coverage == CloudCoverage.FullScreen) { DrawFullScreen(b, s, cloud, tex); return; }
         float lineY = cloud.Line * 1080, pad = Math.Max(40, cloud.FadeLength * 1080 * 0.5f);
         int top = lower ? (int)(lineY - pad) : 0;
         int bottom = lower ? 1080 : (int)(lineY + pad);
@@ -45,6 +46,33 @@ public static class CloudRenderer
                 int y0 = lower ? top + k * soft / EdgeStrips : bottom - (k + 1) * soft / EdgeStrips;
                 int y1 = lower ? top + (k + 1) * soft / EdgeStrips : bottom - k * soft / EdgeStrips;
                 DrawSlice(b, tex, x, w, top, h, y0, y1, color * a, fx);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Fills the whole screen: the texture is scaled so <see cref="CloudLayerDef.RowsOnScreen"/>
+    /// copies stack top to bottom, repeated across. Neighbouring copies are mirrored so seams
+    /// line up, and everything drifts right and wraps.
+    /// </summary>
+    private static void DrawFullScreen(SpriteBatch b, GameServices s, CloudLayerDef cloud, Texture2D tex)
+    {
+        int rows = Math.Max(1, cloud.RowsOnScreen);
+        int h = (int)MathF.Ceiling(1080f / rows);
+        int w = Math.Max(1, (int)(tex.Width * (h / (float)tex.Height)));
+        float offset = (float)(s.TotalTime * cloud.Speed % (2 * w));
+        var color = TileRenderer.ParseColor(cloud.Tint, Color.White) * cloud.Opacity;
+        // Skip the texture's outermost pixels (often a different shade), so no seams show where copies meet.
+        int trim = Math.Max(1, Math.Min(tex.Width, tex.Height) / 200);
+        var src = new Rectangle(trim, trim, tex.Width - trim * 2, tex.Height - trim * 2);
+        int start = (int)offset - 2 * w;
+        for (int row = 0; row < rows; row++)
+        {
+            int y0 = row * 1080 / rows, y1 = (row + 1) * 1080 / rows;
+            for (int i = 0, x = start; x < 1920; x += w, i++)
+            {
+                var fx = (i % 2 == 1 ? SpriteEffects.FlipHorizontally : 0) | (row % 2 == 1 ? SpriteEffects.FlipVertically : 0);
+                b.Draw(tex, new Rectangle(x, y0, w, y1 - y0), src, color, 0, Vector2.Zero, fx, 0);
             }
         }
     }
