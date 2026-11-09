@@ -73,6 +73,7 @@ public sealed class ChasmGame : Microsoft.Xna.Framework.Game
             Canvas = new Canvas(GraphicsDevice),
             Input = new InputState(),
             Events = new EventBus(),
+            TileVisuals = new World.TileVisuals(GraphicsDevice, textures, defs),
         };
         Svc.Scenes = new SceneStack(Svc);
         Console.WriteLine($"[content] root: {paths.Root} (dev checkout: {paths.IsDevelopmentCheckout})");
@@ -135,6 +136,7 @@ public sealed class ChasmGame : Microsoft.Xna.Framework.Game
     {
         _extension?.Dispose();
         Svc.DefReload.Dispose();
+        Svc.TileVisuals.Dispose();
         Svc.Textures.Dispose();
         Svc.Canvas.Dispose();
         base.UnloadContent();

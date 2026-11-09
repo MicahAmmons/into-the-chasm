@@ -26,6 +26,7 @@ public sealed class GameServices
     public required Canvas Canvas { get; init; }
     public required InputState Input { get; init; }
     public required EventBus Events { get; init; }
+    public required World.TileVisuals TileVisuals { get; init; }
     public SceneStack Scenes { get; internal set; } = null!;
 
     /// <summary>Total seconds since start, for shaders and animated UI.</summary>

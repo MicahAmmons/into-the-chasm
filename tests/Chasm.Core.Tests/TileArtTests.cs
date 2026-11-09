@@ -74,3 +74,35 @@ public class TileArtTests
         Assert.Contains(problems, p => p.Contains("already sits at floor 4 (0,0)"));
     }
 }
+
+public class RegionMaskTests
+{
+    private static float At(float[] m, float canvasX, float canvasY) =>
+        m[(int)(canvasY / 2) * RegionMask.Width + (int)(canvasX / 2)];
+
+    [Fact]
+    public void Inside_is_solid_outside_is_empty_and_feather_softens_the_edge()
+    {
+        var cell = new CellCoord(15, 0);
+        var c = IsoGrid.CellCenter(cell);
+        var hard = RegionMask.Build(new[] { cell }, 0, null, true);
+        Assert.Equal(1f, At(hard, c.X, c.Y));
+        Assert.Equal(0f, At(hard, c.X + 200, c.Y));
+        var soft = RegionMask.Build(new[] { cell }, 16, null, true);
+        float edge = At(soft, c.X + IsoGrid.HalfW - 2, c.Y);
+        Assert.InRange(edge, 0.05f, 0.95f);
+    }
+
+    [Fact]
+    public void Lower_cloud_fade_hides_cells_below_the_line()
+    {
+        var cells = IsoGrid.AllCells.ToList();
+        var cloud = new CloudLayerDef { Line = 0.5f, FadeLength = 0.1f };
+        var m = RegionMask.Build(cells, 0, cloud, lower: true);
+        Assert.Equal(1f, At(m, 960, 300));      // above the line
+        Assert.Equal(0f, At(m, 960, 800));      // well below line + fade
+        var up = RegionMask.Build(cells, 0, new CloudLayerDef { Line = 0.5f, FadeLength = 0.1f }, lower: false);
+        Assert.Equal(0f, At(up, 960, 300));     // walls fade going up
+        Assert.Equal(1f, At(up, 960, 800));
+    }
+}

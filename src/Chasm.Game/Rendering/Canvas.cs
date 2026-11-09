@@ -22,7 +22,7 @@ public sealed class Canvas : IDisposable
     {
         _device = device;
         Target = new RenderTarget2D(device, GameInfo.CanvasWidth, GameInfo.CanvasHeight, false,
-            SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.DiscardContents);
+            SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
         UpdateDestination();
     }
 
