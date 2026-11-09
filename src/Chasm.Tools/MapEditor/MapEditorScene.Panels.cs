@@ -40,7 +40,6 @@ public sealed partial class MapEditorScene
                 break;
         }
         ImGui.End();
-        ImportDialog.Draw(Services, key => { _propTexture = key; _archiveKeys = null; });
     }
 
     /// <summary>Title of the right panel's current page, with a close button for pages opened from the toolbar.</summary>
@@ -372,7 +371,9 @@ public sealed partial class MapEditorScene
         ImGui.SameLine(); ImGui.SetNextItemWidth(150);
         ImGui.InputTextWithHint("##s", "search...", ref _archiveSearch, 60);
         ImGui.SameLine();
-        if (ImGui.Button("Import PNG...")) ImportDialog.Open(Services);
+        if (ImGui.Button("+ Add new...")) Art.ArtBrowser.OpenPick(_propTexture, k => { _propTexture = k; _archiveKeys = null; }, addNew: true);
+        ImGui.SameLine();
+        if (ImGui.Button("Library...")) Art.ArtBrowser.OpenPick(_propTexture, k => { _propTexture = k; _archiveKeys = null; });
         ImGui.BeginChild("archive", new Num.Vector2(0, 220), ImGuiChildFlags.Borders);
         foreach (var k in _archiveKeys)
         {

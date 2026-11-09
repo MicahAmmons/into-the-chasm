@@ -40,6 +40,7 @@ public sealed class WizardStack
 
     public void Draw()
     {
+        Chasm.Tools.Art.ArtBrowser.Draw(_services);
         for (int i = 0; i < _open.Count; i++)
         {
             if (!_open[i].Draw()) { _open.RemoveAt(i); i--; }

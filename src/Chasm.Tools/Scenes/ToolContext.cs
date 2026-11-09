@@ -16,6 +16,16 @@ public static class ToolContext
         if (_initialized) return;
         Wizards.Initialize(s);
         _initialized = true;
+        // Dev convenience for automated checks: CHASM_ART=library | import | pick:<key> | move:<key>:<folder>
+        switch (Environment.GetEnvironmentVariable("CHASM_ART")?.Split(':'))
+        {
+            case ["library"]: Chasm.Tools.Art.ArtBrowser.OpenManage(); break;
+            case ["pick", var current]: Chasm.Tools.Art.ArtBrowser.OpenPick(current, _ => { }); break;
+            case ["import"]: Chasm.Tools.Art.ArtBrowser.OpenPick(null, _ => { }, addNew: true); break;
+            case ["move", var key, var folder]:
+                Console.WriteLine($"[art] moved to {Chasm.Tools.Art.ArtLibrary.MoveFile(s, key, folder)}");
+                break;
+        }
     }
 
     private static void OpenFolder(string path)
@@ -35,6 +45,8 @@ public static class ToolContext
             if (ImGui.MenuItem("Map Editor")) s.Scenes.ResetTo(new MapEditorScene());
             if (ImGui.MenuItem("World Sandbox")) s.Scenes.ResetTo(new WorldSandboxScene(null));
             if (ImGui.MenuItem("Combat Sandbox")) s.Scenes.ResetTo(new CombatSandboxScene(null));
+            ImGui.Separator();
+            if (ImGui.MenuItem("Art library...")) Chasm.Tools.Art.ArtBrowser.OpenManage();
             ImGui.Separator();
             if (ImGui.MenuItem("Reset display", "F9")) s.Game.ResetDisplay();
             if (ImGui.MenuItem("Open log file folder")) OpenFolder(Path.GetDirectoryName(Chasm.Game.Diagnostics.Log.FilePath)!);

@@ -411,9 +411,17 @@ public sealed class Inspector
 
     private string _texSearch = "";
 
+    private (uint field, string key)? _texPicked;
+
     public bool TexturePicker(ref string key)
     {
         bool changed = false;
+        uint fieldId = ImGui.GetID("##texfield");
+        if (_texPicked is { } done && done.field == fieldId) { key = done.key; _texPicked = null; changed = true; }
+        string currentKey = key;
+        void Library(bool addNew) => Chasm.Tools.Art.ArtBrowser.OpenPick(currentKey, k => _texPicked = (fieldId, k), addNew);
+        float buttons = 60;
+        ImGui.SetNextItemWidth(Math.Max(80, ImGui.CalcItemWidth() - buttons));
         string preview = string.IsNullOrEmpty(key) ? "(none)" : key;
         bool missing = !string.IsNullOrEmpty(key) && !_textures.Exists(key);
         if (missing) ImGui.PushStyleColor(ImGuiCol.Text, new Num.Vector4(1, 0.5f, 0.5f, 1));
@@ -421,6 +429,9 @@ public sealed class Inspector
         {
             if (ImGui.IsWindowAppearing()) { _texSearch = ""; ImGui.SetKeyboardFocusHere(); }
             ImGui.InputTextWithHint("##search", "search art...", ref _texSearch, 100);
+            if (ImGui.Selectable("+ Add new texture...")) Library(true);
+            if (ImGui.Selectable("Browse art library (folders)...")) Library(false);
+            ImGui.Separator();
             if (ImGui.Selectable("(none)", string.IsNullOrEmpty(key))) { key = ""; changed = true; }
             foreach (var k in _textures.AllKeys())
             {
@@ -432,6 +443,12 @@ public sealed class Inspector
         }
         if (missing) { ImGui.PopStyleColor(); if (ImGui.IsItemHovered()) ImGui.SetTooltip("File not found in content/art"); }
         else if (!string.IsNullOrEmpty(key) && ImGui.IsItemHovered()) PreviewTooltip(key);
+        ImGui.SameLine(0, 4);
+        if (ImGui.Button("...##lib", new Num.Vector2(26, 0))) Library(false);
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Art library (folders)");
+        ImGui.SameLine(0, 4);
+        if (ImGui.Button("+##addtex", new Num.Vector2(26, 0))) Library(true);
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Add new texture from your computer");
         return changed;
     }
 

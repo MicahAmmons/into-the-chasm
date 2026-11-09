@@ -65,6 +65,7 @@ public sealed partial class MapEditorScene : Scene
         };
         Services.Canvas.ResetView();
         ToolContext.Wizards.Inspector.CellPicker = cb => { _cellPick = cb; Status("Click a cell on the map (Esc cancels)."); };
+        Art.ArtLibrary.KeysMoved += OnArtMoved;
         if (_openOnStart is not null && Services.Defs.TryGet<TileDef>(_openOnStart, out var t)) Open(t);
         // Dev convenience for automated screenshots: CHASM_EDITOR=tool[:panel][:neighbours]
         if (_tile is not null && Environment.GetEnvironmentVariable("CHASM_EDITOR") is { } dev)
@@ -82,6 +83,7 @@ public sealed partial class MapEditorScene : Scene
         Services.Canvas.Region = null;
         Services.Canvas.ResetView();
         ToolContext.Wizards.Inspector.CellPicker = null;
+        Art.ArtLibrary.KeysMoved -= OnArtMoved;
         if (_tile is not null && _history.Count > 0) WriteRecovery();
         DisposeNeighbours();
     }
@@ -270,6 +272,25 @@ public sealed partial class MapEditorScene : Scene
         ClearSelections();
         Services.TileVisuals.Invalidate(_tile);
         Status($"Recovered work from {EditorRecovery.Ago(entry.SavedLocal)}. Save (Ctrl+S) to keep it.");
+    }
+
+    /// <summary>Art was moved/renamed in the library: point the open (possibly unsaved) work and its undo history at the new paths.</summary>
+    private void OnArtMoved(IReadOnlyDictionary<string, string> map)
+    {
+        _archiveKeys = null;
+        if (_tile is null || _history.Count == 0) return;
+        for (int i = 0; i < _history.Count; i++) _history[i] = Art.ArtLibrary.Rewrite(_history[i], map);
+        _savedTileJson = Art.ArtLibrary.Rewrite(_savedTileJson, map);
+        _savedFloorJson = Art.ArtLibrary.Rewrite(_savedFloorJson, map);
+        string current = Art.ArtLibrary.Rewrite(SnapshotJson(), map);
+        var snap = ChasmJson.Deserialize<Snapshot>(current)!;
+        _tile = snap.Tile;
+        _floor = snap.Floor;
+        _tile.InvalidateCaches();
+        _selectedRegion = _tile.PaintRegions.FirstOrDefault(r => r.Id == _selectedRegion?.Id);
+        _selectedProp = _tile.Props.FirstOrDefault(p => p.Id == _selectedProp?.Id);
+        _selectedPlacement = _tile.Placements.FirstOrDefault(p => p.Id == _selectedPlacement?.Id);
+        Services.TileVisuals.InvalidateAll();
     }
 
     private void Undo() => Restore(_historyIndex - 1);
