@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- MonoGame runtime: rendering, input, scenes. Shared by the shipped game and the tools launcher. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Chasm.Core\Chasm.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.6" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Runtime-loaded content (PNG/JSON) lives in /content at the repo root and is copied next to the exe. -->
+    <None Include="..\..\content\**\*" Link="content\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The shipped game. Thin entry point only; contains no tools. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>IntoTheChasm</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Chasm.Game\Chasm.Game.csproj" />
+  </ItemGroup>
+</Project>

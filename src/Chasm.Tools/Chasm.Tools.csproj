@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Developer launcher: sandboxes and editors. Console stays open for logs. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>ChasmTools</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Chasm.Game\Chasm.Game.csproj" />
+  </ItemGroup>
+</Project>
