@@ -69,7 +69,7 @@ public sealed class ChasmGame : Microsoft.Xna.Framework.Game
         Diagnostics.Log.Start(Window.Title);
         Window.ClientSizeChanged += OnClientSizeChanged;
         Exiting += (_, _) => Svc?.Scenes.ExitAll();
-        Activated += (_, _) => { Diagnostics.Log.Write($"Focus gained (IsActive={IsActive}, window {Window.ClientBounds.Size})"); Svc?.TileVisuals.InvalidateAll(); };
+        Activated += (_, _) => { Diagnostics.Log.Write($"Focus gained (IsActive={IsActive}, window {Window.ClientBounds})"); _checkOnScreen = 3; Svc?.TileVisuals.InvalidateAll(); };
         Deactivated += (_, _) => Diagnostics.Log.Write("Focus lost");
         GraphicsDevice.DeviceReset += (_, _) => { Diagnostics.Log.Write("Graphics device reset"); Svc?.TileVisuals.InvalidateAll(); };
         FitWindowToScreen();
@@ -108,6 +108,7 @@ public sealed class ChasmGame : Microsoft.Xna.Framework.Game
     {
         Diagnostics.Log.Write($"Display reset requested (window {Window.ClientBounds.Size}, backbuffer {GraphicsDevice.PresentationParameters.BackBufferWidth}x{GraphicsDevice.PresentationParameters.BackBufferHeight})");
         SyncBackBuffer(force: true);
+        EnsureOnScreen();
         Svc?.Canvas.Rebuild();
         Svc?.TileVisuals.InvalidateAll();
     }
@@ -125,6 +126,9 @@ public sealed class ChasmGame : Microsoft.Xna.Framework.Game
     private void SyncBackBuffer(bool force = false)
     {
         if (_resizing) return;
+        // While minimized Windows parks the window at -32000,-32000; resizing then makes MonoGame
+        // re-centre it relative to that spot, which threw the window far off-screen after alt-tab.
+        if (IsMinimized) return;
         var bounds = Window.ClientBounds;
         if (bounds.Width < 200 || bounds.Height < 150) return; // minimized / mid-transition: never shrink the surface to nothing
         var pp = GraphicsDevice.PresentationParameters;
@@ -135,6 +139,73 @@ public sealed class ChasmGame : Microsoft.Xna.Framework.Game
         _graphics.ApplyChanges();
         _resizing = false;
         Svc?.Canvas.UpdateDestination();
+        _checkOnScreen = 3;
+    }
+
+    // ---------------------------------------------------------------- keep the window on screen
+
+    private int _checkOnScreen;
+    private const uint SdlWindowMinimized = 0x40, SdlWindowHidden = 0x8, SdlWindowMaximized = 0x80;
+
+    private uint WindowFlags()
+    {
+        if (_sdlFlagsBroken) return 0;
+        try { return SDL_GetWindowFlags(Window.Handle); }
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException) { _sdlFlagsBroken = true; return 0; }
+    }
+
+    public bool IsMinimized => (WindowFlags() & (SdlWindowMinimized | SdlWindowHidden)) != 0;
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct SdlRect { public int X, Y, W, H; }
+
+    [System.Runtime.InteropServices.DllImport("SDL2", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private static extern int SDL_GetNumVideoDisplays();
+    [System.Runtime.InteropServices.DllImport("SDL2", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private static extern int SDL_GetDisplayUsableBounds(int displayIndex, out SdlRect rect);
+    [System.Runtime.InteropServices.DllImport("SDL2", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private static extern void SDL_GetWindowPosition(IntPtr window, out int x, out int y);
+    [System.Runtime.InteropServices.DllImport("SDL2", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private static extern void SDL_SetWindowPosition(IntPtr window, int x, int y);
+
+    /// <summary>
+    /// If the window's title bar isn't reachable on any monitor, bring the window back to the
+    /// middle of the main screen (shrinking it to fit if needed). Runs after focus/resize changes
+    /// and from F9 / Tools > Reset display.
+    /// </summary>
+    public void EnsureOnScreen()
+    {
+        if (_options.ExitAfterFrames is not null || IsMinimized) return;
+        try
+        {
+            if ((WindowFlags() & SdlWindowMaximized) != 0) return;
+            SDL_GetWindowPosition(Window.Handle, out int x, out int y);
+            var size = Window.ClientBounds.Size;
+            int displays = Math.Max(1, SDL_GetNumVideoDisplays());
+            for (int i = 0; i < displays; i++)
+            {
+                if (SDL_GetDisplayUsableBounds(i, out var r) != 0) continue;
+                // Title bar strip (window top, 200px of its width) must overlap the monitor.
+                int overlapX = Math.Min(x + Math.Min(size.X, 400), r.X + r.W) - Math.Max(x, r.X);
+                bool topVisible = y >= r.Y - 10 && y < r.Y + r.H - 40;
+                if (overlapX >= 100 && topVisible) return;
+            }
+            if (SDL_GetDisplayUsableBounds(0, out var main) != 0) return;
+            int w = Math.Min(size.X, main.W - 20), h = Math.Min(size.Y, main.H - 60);
+            if (w != size.X || h != size.Y)
+            {
+                _resizing = true;
+                _graphics.PreferredBackBufferWidth = w;
+                _graphics.PreferredBackBufferHeight = h;
+                _graphics.ApplyChanges();
+                _resizing = false;
+                Svc?.Canvas.UpdateDestination();
+            }
+            int nx = main.X + (main.W - w) / 2, ny = main.Y + Math.Max(30, (main.H - h) / 2);
+            SDL_SetWindowPosition(Window.Handle, nx, ny);
+            Diagnostics.Log.Write($"Window was off-screen at {x},{y}; moved back to {nx},{ny}");
+        }
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException) { }
     }
 
     /// <summary>
@@ -205,7 +276,8 @@ public sealed class ChasmGame : Microsoft.Xna.Framework.Game
         // event after alt-tab / minimize), fix it.
         var pp0 = GraphicsDevice.PresentationParameters;
         var cb = Window.ClientBounds;
-        if (cb.Width >= 200 && cb.Height >= 150 && (pp0.BackBufferWidth != cb.Width || pp0.BackBufferHeight != cb.Height))
+        if (_checkOnScreen > 0 && --_checkOnScreen == 0) EnsureOnScreen();
+        if (!IsMinimized && cb.Width >= 200 && cb.Height >= 150 && (pp0.BackBufferWidth != cb.Width || pp0.BackBufferHeight != cb.Height))
         {
             if (++_sizeMismatchFrames >= 5) { Diagnostics.Log.Write($"Back buffer {pp0.BackBufferWidth}x{pp0.BackBufferHeight} != window {cb.Size}; fixing"); SyncBackBuffer(); _sizeMismatchFrames = 0; }
         }

@@ -28,7 +28,7 @@ namespace Chasm.Tools.MapEditor;
 public sealed partial class MapEditorScene : Scene
 {
     private enum Tool { Select, Walkable, PlayerStarts, EnemySpawns, PaintTexture, PlaceProp, Interaction }
-    private enum Panel { Selection, FloorProperties, LowerClouds, UpperClouds, Reference, TileSettings }
+    private enum Panel { Selection, FloorProperties, FloorTextures, LowerClouds, UpperClouds, Reference, TileSettings }
 
     private const int LeftW = 310, RightW = 480, MenuH = 24, StatusH = 28;
 
@@ -67,13 +67,18 @@ public sealed partial class MapEditorScene : Scene
         ToolContext.Wizards.Inspector.CellPicker = cb => { _cellPick = cb; Status("Click a cell on the map (Esc cancels)."); };
         Art.ArtLibrary.KeysMoved += OnArtMoved;
         if (_openOnStart is not null && Services.Defs.TryGet<TileDef>(_openOnStart, out var t)) Open(t);
-        // Dev convenience for automated screenshots: CHASM_EDITOR=tool[:panel][:neighbours]
+        // Dev convenience for automated screenshots: CHASM_EDITOR=tool[:panel][:neighbours][:mat=<id>][:cut]
         if (_tile is not null && Environment.GetEnvironmentVariable("CHASM_EDITOR") is { } dev)
         {
             var parts = dev.Split(':');
             if (Enum.TryParse<Tool>(parts[0], true, out var tool)) SetTool(tool);
             if (parts.Length > 1 && Enum.TryParse<Panel>(parts[1], true, out var panel)) _panel = panel;
             if (parts.Contains("neighbours")) { _showNeighbours = true; Services.Canvas.Zoom = 0.45f; }
+            if (parts.FirstOrDefault(x => x.StartsWith("mat=")) is { } mat && _floor?.Materials.FirstOrDefault(m => m.Id == mat[4..]) is { } md)
+            {
+                _editingMaterial = md.Id;
+                if (parts.Contains("cut")) { md.UseForCutOut = true; _cutOutMaterial = md.Id; }
+            }
             if (parts.Contains("selectall")) foreach (var c in IsoGrid.AllCells.Where(c => _tile.Walkable[c])) _selection.Add(c);
         }
     }

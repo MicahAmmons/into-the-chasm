@@ -32,6 +32,8 @@ public sealed class MaterialDef
     public bool FlipX { get; set; }
     public bool FlipY { get; set; }
     public CloudFade Fade { get; set; } = CloudFade.None;
+    [Label("Use for cut out"), Tooltip("Pick cells on a tile and this texture shows through them (one region per tile).")]
+    public bool UseForCutOut { get; set; }
     public override string ToString() => string.IsNullOrEmpty(Name) ? Id : Name;
 }
 

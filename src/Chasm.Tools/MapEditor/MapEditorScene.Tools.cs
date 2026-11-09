@@ -46,6 +46,7 @@ public sealed partial class MapEditorScene
     private void UpdateTool(InputState input)
     {
         var t = _tile!;
+        if (UpdateCutOutPicking(input)) return;
         if (input.Pressed(InputAction.Cancel) && !input.KeyboardCapturedByUi)
         {
             if (_radiusCenter is not null) { _radiusCenter = null; Status("Cancelled."); }

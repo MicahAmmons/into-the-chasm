@@ -67,8 +67,10 @@ public sealed partial class MapEditorScene
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) ImGui.SetTooltip("Every tile on this floor by X / Y. Click one to open it.");
         FloorMapPopup();
         ImGui.SameLine();
-        PanelButton("Properties", Panel.FloorProperties, half,
-            "The floor's texture library and floor-wide settings.\n\nWARNING: changes here affect EVERY tile on this floor.");
+        PanelButton("Textures", Panel.FloorTextures, half,
+            "The floor's texture library: materials (texture + rotation, tint, flips, cloud fade) and cut-out cells.\n\nMaterials are shared by every tile on this floor.");
+        PanelButton("Properties", Panel.FloorProperties, full - 20,
+            "Floor-wide settings (name, look, numbers).\n\nWARNING: changes here affect EVERY tile on this floor.");
         PanelButton("Lower clouds", Panel.LowerClouds, half, "The cloud layer cliffs fade down into (floor-wide).");
         ImGui.SameLine();
         PanelButton("Upper clouds", Panel.UpperClouds, half, "The cloud layer walls fade up into (floor-wide).");

@@ -25,6 +25,7 @@ public sealed partial class MapEditorScene
         switch (_panel)
         {
             case Panel.FloorProperties: FloorPanel(); break;
+            case Panel.FloorTextures: FloorTexturesPanel(); break;
             case Panel.LowerClouds: CloudPanel(lower: true); break;
             case Panel.UpperClouds: CloudPanel(lower: false); break;
             case Panel.Reference: ReferencePanel(); break;
@@ -48,6 +49,7 @@ public sealed partial class MapEditorScene
         string title = _panel switch
         {
             Panel.FloorProperties => $"Floor {_floor?.Number} properties",
+            Panel.FloorTextures => $"Floor {_floor?.Number} textures",
             Panel.LowerClouds => "Lower clouds",
             Panel.UpperClouds => "Upper clouds",
             Panel.Reference => "Reference tile",
@@ -140,7 +142,7 @@ public sealed partial class MapEditorScene
             ImGui.PopID();
         }
         if (ImGui.Button("+ Local material (this tile only)")) AddMaterial(t.LocalMaterials, "local");
-        if (_floor is not null) { ImGui.SameLine(); if (ImGui.Button("Edit floor library")) _panel = Panel.FloorProperties; }
+        if (_floor is not null) { ImGui.SameLine(); if (ImGui.Button("Edit floor library")) _panel = Panel.FloorTextures; }
 
         Ui.Section("Regions  (lower in the list = drawn on top)");
         int moveUp = -1, moveDown = -1;
@@ -249,17 +251,20 @@ public sealed partial class MapEditorScene
             if (open)
             {
                 ImGui.Indent();
-                Edit(m, p => p.Name != nameof(MaterialDef.Id));
+                MaterialFields(m, isFloor);
                 int uses = _tile!.PaintRegions.Count(r => r.Material == (isFloor ? m.Id : "local:" + m.Id));
-                Ui.Colored(Ui.Muted, $"Used by {uses} region(s) on this tile{(isFloor ? " (other tiles on the floor may use it too)" : "")}.");
+                Ui.Hint($"Used by {uses} region(s) on this tile{(isFloor ? " (other tiles on the floor may use it too)" : "")}.");
                 if (ImGui.Button("Duplicate (e.g. Left -> Right)"))
                 {
                     var copy = ChasmJson.Clone(m);
                     copy.Name = m.Name + " copy";
                     copy.Id = UniqueMaterialId(list, copy.Name);
-                    list.Add(copy);
+                    list.Insert(i + 1, copy);
                     _editingMaterial = (isFloor ? "" : "local:") + copy.Id;
+                    _focusMaterialName = true;
+                    _cutOutMaterial = null;
                     Edited();
+                    Status($"Duplicated as '{copy.Name}'. Rename it, change what you need, then Save (Ctrl+S).");
                 }
                 ImGui.SameLine();
                 if (ImGui.Button("Delete")) remove = i;
@@ -299,6 +304,8 @@ public sealed partial class MapEditorScene
         if ((ImGui.Button("Create") || enter) && _newMaterialName.Trim().Length > 0 && _addingTo is not null)
         {
             var m = new MaterialDef { Name = _newMaterialName.Trim(), Id = UniqueMaterialId(_addingTo, _newMaterialName) };
+            var created = m;
+            Art.ArtBrowser.OpenPick(null, k => { created.Texture = k; Edited(); });
             _addingTo.Add(m);
             _editingMaterial = (_addingTo == _floor?.Materials ? "" : "local:") + m.Id;
             Edited();
@@ -329,10 +336,18 @@ public sealed partial class MapEditorScene
         ImGui.Text("Name"); ImGui.SameLine(170); ImGui.SetNextItemWidth(-1);
         if (ImGui.InputText("##fname", ref name, 100)) { _floor.Name = name; Edited(); }
         ImGui.BeginChild("floor");
-        if (ImGui.CollapsingHeader("Texture library", ImGuiTreeNodeFlags.DefaultOpen))
-            MaterialsEditor(_floor.Materials, isFloor: true);
-        if (ImGui.CollapsingHeader("Everything else"))
-            Edit(_floor, p => p.Name is not (nameof(FloorDef.Materials) or nameof(FloorDef.LowerClouds) or nameof(FloorDef.UpperClouds) or "Id" or "Name"));
+        Edit(_floor, p => p.Name is not (nameof(FloorDef.Materials) or nameof(FloorDef.LowerClouds) or nameof(FloorDef.UpperClouds) or "Id" or "Name"));
+        ImGui.Spacing();
+        Ui.Hint("Textures (the floor's material library) moved to the Textures button.");
+        ImGui.EndChild();
+    }
+
+    private void FloorTexturesPanel()
+    {
+        if (_floor is null) { ImGui.TextDisabled("This tile has no floor."); return; }
+        Ui.Hint("Materials here are shared by every tile on this floor. Cut-out cells are saved per tile.");
+        ImGui.BeginChild("floortex");
+        MaterialsEditor(_floor.Materials, isFloor: true);
         ImGui.EndChild();
     }
 
