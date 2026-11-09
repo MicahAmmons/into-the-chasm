@@ -41,6 +41,7 @@ public sealed partial class MapEditorScene : Scene
     private Panel _panel = Panel.Selection;
     private string? _status;
     private float _statusTime;
+    private EditorPrefs _prefs = new();
     private bool _showGrid = true, _showArt = true, _showLabels = true, _showNeighbours, _showMarkers = true, _showCloudLines;
     private CellCoord? _hoverCell;
     private Num.Vector2 _hoverPx;
@@ -54,6 +55,8 @@ public sealed partial class MapEditorScene : Scene
     public override void OnEnter()
     {
         ToolContext.EnsureInitialized(Services);
+        _prefs = EditorPrefs.Load();
+        _showGrid = _prefs.ShowGrid;
         Services.Canvas.Region = () =>
         {
             var pp = Services.Graphics.PresentationParameters;
@@ -366,6 +369,7 @@ public sealed partial class MapEditorScene : Scene
 
     private void Popups()
     {
+        NewFloorPopup();
         if (_askUnsaved) { ImGui.OpenPopup("Unsaved changes"); _askUnsaved = false; }
         if (!ImGui.BeginPopupModal("Unsaved changes", ImGuiWindowFlags.AlwaysAutoResize)) return;
         ImGui.Text("This tile (or its floor) has unsaved changes.");

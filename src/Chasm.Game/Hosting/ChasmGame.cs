@@ -54,7 +54,35 @@ public sealed class ChasmGame : Microsoft.Xna.Framework.Game
     protected override void Initialize()
     {
         base.Initialize();
+        Window.ClientSizeChanged += OnClientSizeChanged;
+        Activated += (_, _) => { _resyncFrames = 3; Svc?.TileVisuals.InvalidateAll(); };
+        GraphicsDevice.DeviceReset += (_, _) => Svc?.TileVisuals.InvalidateAll();
         FitWindowToScreen();
+        _resyncFrames = 3;
+    }
+
+    private bool _resizing;
+    private int _resyncFrames;
+
+    /// <summary>
+    /// Keeps the back buffer the same size as the window. Without this, maximizing, restoring or
+    /// alt-tabbing can leave the drawing surface at the old size and the picture looks scrambled.
+    /// </summary>
+    private void OnClientSizeChanged(object? sender, EventArgs e) => SyncBackBuffer();
+
+    private void SyncBackBuffer()
+    {
+        if (_resizing) return;
+        var bounds = Window.ClientBounds;
+        if (bounds.Width <= 0 || bounds.Height <= 0) return; // minimized
+        var pp = GraphicsDevice.PresentationParameters;
+        if (pp.BackBufferWidth == bounds.Width && pp.BackBufferHeight == bounds.Height) return;
+        _resizing = true;
+        _graphics.PreferredBackBufferWidth = bounds.Width;
+        _graphics.PreferredBackBufferHeight = bounds.Height;
+        _graphics.ApplyChanges();
+        _resizing = false;
+        Svc?.Canvas.UpdateDestination();
     }
 
     /// <summary>
@@ -118,6 +146,8 @@ public sealed class ChasmGame : Microsoft.Xna.Framework.Game
     protected override void Update(GameTime gameTime)
     {
         float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+        // A few frames after start / regaining focus, make sure the back buffer matches the window.
+        if (_resyncFrames > 0) { _resyncFrames--; SyncBackBuffer(); }
         Svc.TotalTime = gameTime.TotalGameTime.TotalSeconds;
         Svc.Textures.ProcessHotReload();
         Svc.DefReload.Process();

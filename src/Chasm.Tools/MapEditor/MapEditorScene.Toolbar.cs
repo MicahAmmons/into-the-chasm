@@ -32,7 +32,7 @@ public sealed partial class MapEditorScene
         if (ImGui.Button("Redo", new Num.Vector2(60, 0))) Redo();
         ImGui.SameLine();
         if (ImGui.Button("Open", new Num.Vector2(-1, 0))) Guard(() => _tile = null);
-        if (ImGui.Button("Tile settings (art layers, exits, notes)", new Num.Vector2(-1, 0))) _panel = Panel.TileSettings;
+        PanelButton("Tile settings (art layers, exits, notes)", Panel.TileSettings);
 
         // ---- floor
         ImGui.SeparatorText("Floor");
@@ -43,13 +43,12 @@ public sealed partial class MapEditorScene
         if (!hasFloor) ImGui.BeginDisabled();
         if (ImGui.Button("Tiles on this floor", new Num.Vector2(-1, 0))) ImGui.OpenPopup("floormap");
         FloorMapPopup();
-        if (PanelButton("Floor properties", Panel.FloorProperties))
-            _panel = Panel.FloorProperties;
+        PanelButton("Floor properties", Panel.FloorProperties);
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip("Settings and the texture library shared by the whole floor.\n\nWARNING: changes here affect EVERY tile on this floor.");
-        if (PanelButton("Lower clouds", Panel.LowerClouds, half: true)) _panel = Panel.LowerClouds;
+        PanelButton("Lower clouds", Panel.LowerClouds, half: true);
         ImGui.SameLine();
-        if (PanelButton("Upper clouds", Panel.UpperClouds, half: true)) _panel = Panel.UpperClouds;
+        PanelButton("Upper clouds", Panel.UpperClouds, half: true);
         if (!hasFloor) ImGui.EndDisabled();
         if (!hasFloor) ImGui.TextDisabled("Pick a floor to unlock these.");
 
@@ -62,18 +61,22 @@ public sealed partial class MapEditorScene
         ToolButton(Tool.PaintTexture, "Paint texture", "Select cells (click / drag), then paint them with a material from the right panel.");
         ToolButton(Tool.PlaceProp, "Place art (props)", "Pick a PNG on the right, then click to place it anywhere. Drag to move.");
         ToolButton(Tool.Interaction, "Add interaction", "Click a cell, choose a trigger (proximity lets you drag the radius), then fill in what happens.");
-        if (PanelButton(_reference is null ? "Reference tile..." : $"Reference: {_reference.DisplayName}", Panel.Reference))
-        {
-            _panel = Panel.Reference;
-            if (_reference is null) ImGui.OpenPopup("pickref");
-        }
+        if (PanelButton(_reference is null ? "Reference tile..." : $"Reference: {_reference.DisplayName}", Panel.Reference) && _reference is null)
+            ImGui.OpenPopup("pickref");
         ReferencePickerPopup();
 
         // ---- view
         ImGui.SeparatorText("View");
         ImGui.Checkbox("Art", ref _showArt); ImGui.SameLine();
-        ImGui.Checkbox("Grid", ref _showGrid); ImGui.SameLine();
-        ImGui.Checkbox("Labels", ref _showLabels);
+        if (ImGui.Checkbox("Grid", ref _showGrid)) { _prefs.ShowGrid = _showGrid; _prefs.Save(); }
+        ImGui.SameLine();
+        if (ColorSwatch("##gridcol", _prefs.GridColor, "Grid line colour")) _prefs.Save();
+        ImGui.SameLine();
+        bool centre = _prefs.ShowCenterLines;
+        if (ImGui.Checkbox("Centre lines", ref centre)) { _prefs.ShowCenterLines = centre; _prefs.Save(); }
+        ImGui.SameLine();
+        if (ColorSwatch("##centrecol", _prefs.CenterLineColor, "Centre line colour")) _prefs.Save();
+        ImGui.Checkbox("Labels", ref _showLabels); ImGui.SameLine();
         ImGui.Checkbox("Markers", ref _showMarkers); ImGui.SameLine();
         ImGui.Checkbox("Cloud lines", ref _showCloudLines);
         if (ImGui.Checkbox("Neighbouring tiles", ref _showNeighbours) && _showNeighbours && Services.Canvas.Zoom > 0.8f)
@@ -96,13 +99,16 @@ public sealed partial class MapEditorScene
         ImGui.End();
     }
 
+    /// <summary>A button that opens a right-panel page; clicking it again closes the page. Returns true when it opened.</summary>
     private bool PanelButton(string label, Panel panel, bool half = false)
     {
         bool active = _panel == panel;
         if (active) ImGui.PushStyleColor(ImGuiCol.Button, new Num.Vector4(0.35f, 0.42f, 0.7f, 1));
         bool clicked = ImGui.Button(label, new Num.Vector2(half ? (LeftW - 28) / 2f : -1, 0));
         if (active) ImGui.PopStyleColor();
-        return clicked;
+        if (!clicked) return false;
+        _panel = active ? Panel.Selection : panel;
+        return !active;
     }
 
     private void ToolButton(Tool tool, string label, string tip)
@@ -140,16 +146,62 @@ public sealed partial class MapEditorScene
                 var chosen = f;
                 if (FloorDirty) Guard(() => SetFloor(chosen)); else SetFloor(chosen);
             }
-        if (ImGui.Selectable("+ New floor"))
+        if (ImGui.Selectable("+ New floor..."))
         {
-            int n = floors.Count == 0 ? 1 : floors.Max(f => f.Number) + 1;
-            var nf = new FloorDef { Id = $"floor_{n}", Number = n, Name = $"Floor {n}" };
-            Services.Defs.Save(nf);
-            SetFloor(nf);
-            Status($"Created floor {n}. Rename it in Floor properties.");
+            _newFloorNumber = floors.Count == 0 ? 1 : floors.Max(f => f.Number) + 1;
+            _newFloorName = "";
+            _openNewFloor = true;
         }
         ImGui.EndCombo();
     }
+
+    private bool _openNewFloor;
+    private int _newFloorNumber = 1;
+    private string _newFloorName = "";
+
+    /// <summary>Asks which floor number (and a name) for a new floor.</summary>
+    private void NewFloorPopup()
+    {
+        if (_openNewFloor) { ImGui.OpenPopup("New floor"); _openNewFloor = false; }
+        CenterNextWindow();
+        if (!ImGui.BeginPopupModal("New floor", ImGuiWindowFlags.AlwaysAutoResize)) return;
+        ImGui.Text("Floor number:");
+        ImGui.SetNextItemWidth(160);
+        ImGui.InputInt("##num", ref _newFloorNumber);
+        ImGui.Text("Name (optional):");
+        ImGui.SetNextItemWidth(300);
+        ImGui.InputTextWithHint("##fname", $"Floor {_newFloorNumber}", ref _newFloorName, 80);
+        var taken = Services.Defs.All<FloorDef>().FirstOrDefault(f => f.Number == _newFloorNumber);
+        if (taken is not null) ImGui.TextColored(new Num.Vector4(1, 0.45f, 0.4f, 1), $"Floor {_newFloorNumber} already exists ({taken.DisplayName}).");
+        if (_newFloorNumber < 0) ImGui.TextColored(new Num.Vector4(1, 0.45f, 0.4f, 1), "Floor numbers can't be negative.");
+        ImGui.BeginDisabled(taken is not null || _newFloorNumber < 0);
+        if (ImGui.Button("Create", new Num.Vector2(140, 0)))
+        {
+            int n = _newFloorNumber;
+            var nf = new FloorDef { Id = $"floor_{n}", Number = n, Name = string.IsNullOrWhiteSpace(_newFloorName) ? $"Floor {n}" : _newFloorName.Trim() };
+            Services.Defs.Save(nf);
+            Guard(() => SetFloor(nf));
+            Status($"Created floor {n}.");
+            ImGui.CloseCurrentPopup();
+        }
+        ImGui.EndDisabled();
+        ImGui.SameLine();
+        if (ImGui.Button("Cancel", new Num.Vector2(140, 0))) ImGui.CloseCurrentPopup();
+        ImGui.EndPopup();
+    }
+
+    private static bool ColorSwatch(string id, float[] rgba, string tooltip)
+    {
+        var v = new Num.Vector4(rgba[0], rgba[1], rgba[2], rgba[3]);
+        bool changed = ImGui.ColorEdit4(id, ref v, ImGuiColorEditFlags.NoInputs | ImGuiColorEditFlags.AlphaBar | ImGuiColorEditFlags.AlphaPreviewHalf);
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip(tooltip + " (click to change; includes transparency)");
+        if (changed) { rgba[0] = v.X; rgba[1] = v.Y; rgba[2] = v.Z; rgba[3] = v.W; }
+        return changed;
+    }
+
+    /// <summary>Next popup/window appears centred on screen (so it never opens off the edge).</summary>
+    private static void CenterNextWindow() =>
+        ImGui.SetNextWindowPos(ImGui.GetIO().DisplaySize / 2, ImGuiCond.Appearing, new Num.Vector2(0.5f, 0.5f));
 
     private void SetFloor(FloorDef? f)
     {

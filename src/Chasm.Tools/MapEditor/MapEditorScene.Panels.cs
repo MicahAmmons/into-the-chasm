@@ -257,7 +257,8 @@ public sealed partial class MapEditorScene
 
     private void NewMaterialPopup()
     {
-        if (!ImGui.BeginPopup("newmat")) return;
+        CenterNextWindow();
+        if (!ImGui.BeginPopupModal("newmat", ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoTitleBar)) return;
         ImGui.Text("New material name (e.g. 'Cliff Left'):");
         ImGui.SetNextItemWidth(260);
         bool enter = ImGui.InputText("##n", ref _newMaterialName, 80, ImGuiInputTextFlags.EnterReturnsTrue);
@@ -269,6 +270,8 @@ public sealed partial class MapEditorScene
             Edited();
             ImGui.CloseCurrentPopup();
         }
+        ImGui.SameLine();
+        if (ImGui.Button("Cancel")) ImGui.CloseCurrentPopup();
         ImGui.EndPopup();
     }
 

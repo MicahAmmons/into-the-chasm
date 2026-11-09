@@ -216,6 +216,7 @@ public sealed partial class MapEditorScene
             _triggerCell = cell;
             ImGui.OpenPopup("trigger?");
         }
+        CenterNextWindow();
         if (ImGui.BeginPopup("trigger?"))
         {
             ImGui.TextDisabled($"Interaction at {_triggerCell}. What triggers it?");
