@@ -28,6 +28,9 @@ public interface ISummonPolicy
     IEnumerable<string> PlayerAbilities => Array.Empty<string>();
 }
 
+/// <summary>An item the player brings into a fight: which ability it grants and how many.</summary>
+public sealed record CombatItem(string ItemId, string AbilityId, int Count, bool Consumed);
+
 public sealed record SummonBonus(int Hp, int Ap, int Mp, IReadOnlyList<string> Abilities)
 {
     public static readonly SummonBonus None = new(0, 0, 0, Array.Empty<string>());

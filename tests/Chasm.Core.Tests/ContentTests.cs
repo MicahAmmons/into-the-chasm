@@ -27,10 +27,21 @@ public class ContentTests
     {
         var reg = new DefRegistry();
         reg.LoadAll(DefsRoot());
-        var problems = ContentValidator.ValidateAll(reg)
-            // Known: the original Floor 2 data has exits to tiles that were never made.
-            .Where(p => !p.Contains("missing TileDef 'f2_")).ToList();
+        var problems = ContentValidator.ValidateAll(reg);
         Assert.True(problems.Count == 0, string.Join("\n", problems));
+    }
+
+    [Fact]
+    public void Every_exit_has_a_matching_return_exit()
+    {
+        var reg = new DefRegistry();
+        reg.LoadAll(DefsRoot());
+        foreach (var t in reg.All<Chasm.Core.World.TileDef>())
+            foreach (var ex in t.Exits)
+            {
+                var back = reg.Get<Chasm.Core.World.TileDef>(ex.TargetTile);
+                Assert.Contains(back.Exits, b => b.TargetTile == t.Id && b.Edge == Chasm.Core.Grid.EdgeExtensions.Opposite(ex.Edge));
+            }
     }
 
     [Fact]

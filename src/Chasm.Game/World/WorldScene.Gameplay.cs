@@ -142,6 +142,10 @@ public partial class WorldScene
             Enemies = enc.Monsters.SelectMany(s => Enumerable.Repeat(s.Monster, s.Count)).ToList(),
             PlayerMaxHp = prog.MaxHp(cfg), PlayerHp = prog.Hp_(cfg), PlayerAp = prog.MaxAp(cfg), PlayerMp = prog.MaxMp(cfg),
             PlayerInitiative = cfg.PlayerInitiative, Summons = policy, CanFlee = enc.CanFlee,
+            Items = Session.Inventory.Items
+                .Select(kv => Session.Defs.TryGet<ItemDef>(kv.Key, out var it) && !string.IsNullOrEmpty(it.CombatAbility)
+                    ? new CombatItem(it.Id, it.CombatAbility, kv.Value, it.ConsumedInCombat) : null)
+                .Where(i => i is not null).Cast<CombatItem>().ToList(),
             PlayerWorldCell = Player.Cell, Stats = Session.Stats,
             OnFinished = (outcome, engine) => AfterFight(enc, group, outcome, engine),
         }));

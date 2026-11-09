@@ -93,5 +93,5 @@
       "EncounterRange": 3
     }
   ],
-  "Notes": "Ported from JustPlaying MapTile_0_0_1.json. Old monsters: ['EarthOoze']. Had trigger PathToLevel2 (wind/turtle aspect message) - see placements."
+  "Notes": "Ported from JustPlaying MapTile_0_0_1.json. Old monsters: ['EarthOoze']. Had trigger PathToLevel2 (wind/turtle aspect message) - see placements. Test floor (will be rebuilt)."
 }

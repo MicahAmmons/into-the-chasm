@@ -300,5 +300,5 @@
       "Aggressive": false
     }
   ],
-  "Notes": "Ported from JustPlaying MapTile_0_-1_0.json. Old monsters: ['FireOoze']."
+  "Notes": "Ported from JustPlaying MapTile_0_-1_0.json. Old monsters: ['FireOoze']. Test floor (will be rebuilt)."
 }

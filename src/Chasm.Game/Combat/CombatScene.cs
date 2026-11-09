@@ -27,6 +27,7 @@ public sealed class CombatRequest
     public int PlayerMp { get; init; } = 3;
     public int PlayerInitiative { get; init; } = 10;
     public ISummonPolicy Summons { get; init; } = new UnlimitedSummons(Array.Empty<string>());
+    public List<CombatItem> Items { get; init; } = new();
     public bool CanFlee { get; init; } = true;
     public int? Seed { get; init; }
     /// <summary>Where the player stood in the world (start cells nearest to it are offered first).</summary>
@@ -104,7 +105,7 @@ public sealed class CombatScene : Scene
         {
             Defs = Services.Defs, Walkable = _req.Tile.IsWalkable, PlayerCell = playerCell,
             PlayerMaxHp = _req.PlayerMaxHp, PlayerHp = _req.PlayerHp, PlayerAp = _req.PlayerAp, PlayerMp = _req.PlayerMp,
-            PlayerInitiative = _req.PlayerInitiative, Enemies = _enemyPlacement!, Summons = _req.Summons, CanFlee = _req.CanFlee,
+            PlayerInitiative = _req.PlayerInitiative, Enemies = _enemyPlacement!, Summons = _req.Summons, CanFlee = _req.CanFlee, Items = _req.Items,
             Seed = _req.Seed ?? Environment.TickCount,
         });
         foreach (var u in _engine.Units) _views[u.Id] = new UnitView(u, MakeAnim(u));
@@ -258,7 +259,15 @@ public sealed class CombatScene : Scene
         foreach (var a in e.Abilities(me))
         {
             bool ok = me.Ap >= a.ApCost && !(me.Cooldowns.TryGetValue(a.Id, out int cd) && cd > 0);
-            list.Add((ButtonKind.Ability, a.DisplayName, ok, ok ? "" : me.Ap < a.ApCost ? $"Needs {a.ApCost} AP." : "On cooldown.", a, null, a.ApCost));
+            string label = a.DisplayName;
+            if (me.Kind == CombatantKind.Player && e.ItemFor(a.Id) is { } item)
+            {
+                string itemName = Services.Defs.TryGet<Core.Items.ItemDef>(item.ItemId, out var idef) ? idef.DisplayName : item.ItemId;
+                int left = e.ItemCharges(a.Id);
+                label = item.Consumed ? $"{itemName} ({left})" : itemName;
+                if (left <= 0) ok = false;
+            }
+            list.Add((ButtonKind.Ability, label, ok, ok ? "" : me.Ap < a.ApCost ? $"Needs {a.ApCost} AP." : "Can't use that now.", a, null, a.ApCost));
         }
         list.Add((ButtonKind.EndTurn, "End turn", true, "", null, null, 0));
         if (me.Kind == CombatantKind.Player) list.Add((ButtonKind.Flee, "Flee", e.CanFlee, "You can't flee this fight!", null, null, 0));

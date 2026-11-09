@@ -22,3 +22,4 @@ public sealed record DiedEvent(int Unit, int? Killer) : CombatEvent;
 public sealed record SummonedEvent(int Unit, int Summoner, string Monster, CellCoord Cell) : CombatEvent;
 public sealed record CombatEndedEvent(CombatOutcome Outcome) : CombatEvent;
 public sealed record LogEvent(string Text) : CombatEvent;
+public sealed record ItemConsumedEvent(string ItemId) : CombatEvent;

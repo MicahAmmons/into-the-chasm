@@ -23,6 +23,9 @@ public sealed class GameConfigDef : Def
     [Range(0.5, 120), Tooltip("Minutes of real time per in-game day.")]
     public float DayLengthMinutes { get; set; } = 10;
 
+    [Range(0, 600), Tooltip("Placeholder: in-game minutes that pass per fight (real-time minutes of the day cycle).")]
+    public float MinutesPerFight { get; set; } = 1;
+
     [Range(0, 1), Tooltip("Fraction of the day when night begins (0.65 = last 35% is night).")]
     public float NightStartsAt { get; set; } = 0.65f;
 

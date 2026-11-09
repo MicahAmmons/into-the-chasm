@@ -19,6 +19,9 @@ public static class CombatRewards
         var prog = session.Progress;
         var player = engine.Player;
         prog.CurrentHp = outcome == CombatOutcome.Defeat ? -1 : player.Hp;
+        foreach (var used in engine.Log.OfType<ItemConsumedEvent>()) session.Inventory.Remove(used.ItemId);
+        // Placeholder until time runs during fights: every fight takes a fixed slice of the day.
+        session.Clock.Advance(cfg.MinutesPerFight * 60f);
         if (outcome == CombatOutcome.Fled) return msgs;
 
         int damageTaken = 0, apSpent = 0, cellsWalked = 0;

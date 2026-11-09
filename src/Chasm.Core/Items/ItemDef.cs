@@ -43,4 +43,9 @@ public sealed class ItemDef : Def
     public List<RuleDef> UseRules { get; set; } = new();
 
     public string NoUseMessage { get; set; } = "No reason to use that here...";
+
+    [Group("In combat"), Ref(typeof(Combat.AbilityDef)), Tooltip("Ability the player can use in fights while carrying this. Empty = not usable in combat.")]
+    public string CombatAbility { get; set; } = "";
+    [Group("In combat"), Tooltip("Used up when used in a fight (one per use).")]
+    public bool ConsumedInCombat { get; set; } = true;
 }

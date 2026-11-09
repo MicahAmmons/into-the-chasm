@@ -18,6 +18,8 @@ public sealed class CombatSetup
     public List<(string Monster, CellCoord Cell)> Enemies { get; init; } = new();
     public ISummonPolicy Summons { get; init; } = new UnlimitedSummons(Array.Empty<string>());
     public bool CanFlee { get; init; } = true;
+    /// <summary>Items the player carries that can be used in this fight.</summary>
+    public List<CombatItem> Items { get; init; } = new();
     public int Seed { get; init; } = Environment.TickCount;
 }
 
@@ -43,6 +45,12 @@ public sealed class CombatEngine
     private int _turn;
     private int _nextId = 1;
     private readonly List<CombatEvent> _log = new();
+    private readonly Dictionary<string, int> _itemCharges = new();
+    private readonly Dictionary<string, CombatItem> _itemForAbility = new();
+
+    /// <summary>The item behind an ability the player has, if it comes from an item.</summary>
+    public CombatItem? ItemFor(string abilityId) => _itemForAbility.GetValueOrDefault(abilityId);
+    public int ItemCharges(string abilityId) => _itemCharges.GetValueOrDefault(abilityId);
     private List<CombatEvent> _pending = new();
 
     public DefRegistry Defs => _setup.Defs;
@@ -70,6 +78,12 @@ public sealed class CombatEngine
             BaseAp = setup.PlayerAp, BaseMp = setup.PlayerMp, Initiative = setup.PlayerInitiative, Cell = setup.PlayerCell,
         });
         Player.ExtraAbilities.AddRange(setup.Summons.PlayerAbilities);
+        foreach (var item in setup.Items.Where(i => i.Count > 0))
+        {
+            _itemCharges[item.AbilityId] = _itemCharges.GetValueOrDefault(item.AbilityId) + (item.Consumed ? item.Count : int.MaxValue / 2);
+            _itemForAbility.TryAdd(item.AbilityId, item);
+            Player.ExtraAbilities.Add(item.AbilityId);
+        }
         foreach (var (monster, cell) in setup.Enemies)
             Add(CreateMonster(monster, Team.Enemy, CombatantKind.Monster, cell, null));
     }
@@ -167,6 +181,8 @@ public sealed class CombatEngine
         reason = "";
         if (!Abilities(c).Contains(a)) { reason = "Can't use that."; return false; }
         if (c.Ap < a.ApCost) { reason = $"Needs {a.ApCost} AP."; return false; }
+        if (c == Player && _itemCharges.TryGetValue(a.Id, out int charges) && charges <= 0 && !(c.Monster?.Abilities.Contains(a.Id) ?? false))
+        { reason = "None left."; return false; }
         if (c.Cooldowns.TryGetValue(a.Id, out int cd) && cd > 0) { reason = $"Ready in {cd} turn(s)."; return false; }
         if (a.UsesPerTurn > 0 && c.UsesThisTurn.GetValueOrDefault(a.Id) >= a.UsesPerTurn) { reason = "No uses left this turn."; return false; }
         int dist = c.Cell.ManhattanTo(target);
@@ -268,6 +284,11 @@ public sealed class CombatEngine
     private void UseAbility(Combatant user, AbilityDef a, CellCoord target)
     {
         user.Ap -= a.ApCost;
+        if (user == Player && _itemForAbility.TryGetValue(a.Id, out var item))
+        {
+            _itemCharges[a.Id]--;
+            if (item.Consumed) Emit(new ItemConsumedEvent(item.ItemId));
+        }
         if (a.Cooldown > 0) user.Cooldowns[a.Id] = a.Cooldown;
         user.UsesThisTurn[a.Id] = user.UsesThisTurn.GetValueOrDefault(a.Id) + 1;
         var hit = AffectedCells(a, target).Select(At).Where(u => u is not null).Cast<Combatant>().ToList();

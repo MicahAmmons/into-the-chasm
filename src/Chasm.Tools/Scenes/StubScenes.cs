@@ -26,7 +26,8 @@ public sealed class CombatSandboxScene : Scene
     private readonly StatsTracker _stats = new();
     private string _lastResult = "";
     private List<string> _lastLog = new();
-    private string _addEnemy = "", _addSummon = "";
+    private string _addEnemy = "", _addSummon = "", _addItem = "";
+    private readonly List<string> _items = new();
     private bool _autoStartPending;
 
     public CombatSandboxScene(string? startArg = null)
@@ -78,6 +79,24 @@ public sealed class CombatSandboxScene : Scene
         ImGui.Text("Summons you can use:");
         MonsterList(_summons, ref _addSummon, "summons");
         ImGui.SetNextItemWidth(120); ImGui.InputInt("Max of each summon on the field", ref _maxPerType);
+        ImGui.Text("Items you carry (only items with a combat ability show up in the fight):");
+        ImGui.PushID("items");
+        int removeItem = -1;
+        foreach (var g in _items.Select((id, i) => (id, i)).GroupBy(x => x.id))
+        {
+            string name = Services.Defs.TryGet<Chasm.Core.Items.ItemDef>(g.Key, out var it) ? it.DisplayName : g.Key;
+            ImGui.PushID(g.Key);
+            if (ImGui.SmallButton("-")) removeItem = g.Last().i;
+            ImGui.SameLine();
+            ImGui.Text($"{g.Count()}x {name}{(it is not null && string.IsNullOrEmpty(it.CombatAbility) ? "  (no combat use)" : "")}");
+            ImGui.PopID();
+        }
+        if (removeItem >= 0) _items.RemoveAt(removeItem);
+        ImGui.SetNextItemWidth(-60);
+        ToolContext.Wizards.Inspector.RefPicker(typeof(Chasm.Core.Items.ItemDef), ref _addItem);
+        ImGui.SameLine();
+        if (ImGui.Button("Add") && _addItem.Length > 0) _items.Add(_addItem);
+        ImGui.PopID();
         ImGui.Checkbox("Can flee", ref _canFlee);
 
         ImGui.SeparatorText("Run");
@@ -139,6 +158,10 @@ public sealed class CombatSandboxScene : Scene
             Tile = tile, Enemies = _enemies.Where(e => Services.Defs.Exists(typeof(MonsterDef), e)).ToList(),
             PlayerHp = _hp, PlayerMaxHp = _hp, PlayerAp = _ap, PlayerMp = _mp, PlayerInitiative = _init,
             Summons = new UnlimitedSummons(_summons.Distinct(), Math.Max(1, _maxPerType)), CanFlee = _canFlee,
+            Items = _items.GroupBy(i => i)
+                .Select(g => Services.Defs.TryGet<Chasm.Core.Items.ItemDef>(g.Key, out var it) && !string.IsNullOrEmpty(it.CombatAbility)
+                    ? new CombatItem(it.Id, it.CombatAbility, g.Count(), it.ConsumedInCombat) : null)
+                .Where(i => i is not null).Cast<CombatItem>().ToList(),
             Seed = _randomSeed ? null : _seed, Stats = _stats,
             OnFinished = (outcome, engine) =>
             {

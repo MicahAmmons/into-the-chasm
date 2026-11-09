@@ -126,3 +126,32 @@ public class ProgressionTests
         public void Confirm(string question, Action<bool> answered) => answered(true);
     }
 }
+
+public class CombatItemAndTimeTests
+{
+    [Fact]
+    public void Items_with_a_combat_ability_are_used_up_and_removed_after_the_fight()
+    {
+        var d = new DefRegistry();
+        d.Put(new GameConfigDef { Id = "game", MinutesPerFight = 1, DayLengthMinutes = 10 });
+        d.Put(new AbilityDef { Id = "throw_rock", ApCost = 1, MinRange = 1, MaxRange = 5, Effects = { new DamageEffect { Min = 1, Max = 1 } } });
+        d.Put(new Chasm.Core.Items.ItemDef { Id = "rock", CombatAbility = "throw_rock", ConsumedInCombat = true });
+        d.Put(new MonsterDef { Id = "blob", Health = 5, AP = 1, MP = 1, Initiative = 0 });
+        var s = new GameSession(d);
+        s.Inventory.Add("rock", 2);
+        var e = new CombatEngine(new CombatSetup
+        {
+            Defs = d, Walkable = _ => true, PlayerCell = new CellCoord(10, 2), PlayerAp = 6, Seed = 1,
+            Enemies = { ("blob", new CellCoord(13, 2)) }, Items = { new CombatItem("rock", "throw_rock", 2, true) },
+        });
+        e.Start();
+        Assert.True(e.Apply(new UseAbilityAction("throw_rock", new CellCoord(13, 2))).Ok);
+        Assert.True(e.Apply(new UseAbilityAction("throw_rock", new CellCoord(13, 2))).Ok);
+        Assert.False(e.Apply(new UseAbilityAction("throw_rock", new CellCoord(13, 2))).Ok); // none left
+        e.Apply(new FleeAction());
+        float before = s.Clock.Time;
+        CombatRewards.Apply(s, e, CombatOutcome.Fled);
+        Assert.False(s.Inventory.Has("rock"));
+        Assert.Equal(0.1f, s.Clock.Time - before, 3); // 1 of 10 minutes
+    }
+}
