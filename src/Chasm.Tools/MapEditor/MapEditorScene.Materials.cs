@@ -116,11 +116,13 @@ public sealed partial class MapEditorScene
                 "Click or drag on the map to add cells; click a selected cell (or right-drag) to remove.\nThe texture shows through live."))
         {
             _cutOutMaterial = picking ? null : reference;
+            if (!picking) _stencilRegionId = null;
             if (!picking) Status($"Selecting cut-out cells for '{m.Name}'. Click/drag cells; Esc when done.");
         }
         ImGui.SameLine();
         Ui.Colored(count > 0 ? Ui.Good : Ui.Muted, $"{count} cell(s) on this tile");
         if (region is not null && m.Fade != CloudFade.None) RegionFadeOverride(region, m);
+        if (region is not null) StencilControls(region);
         if (region is not null)
         {
             if (ImGui.Button("Clear cells")) { region.Cells.Clear(); t.PaintRegions.Remove(region); Edited(); }
@@ -208,12 +210,90 @@ public sealed partial class MapEditorScene
         }
     }
 
+    // ------------------------------------------------------------------ stencils (carve-outs)
+
+    private string _stencilKey = "";
+    private bool _stencilFlipX, _stencilFlipY;
+    /// <summary>Id of the region whose cells are getting stencils from map clicks.</summary>
+    private string? _stencilRegionId;
+
+    private void StencilControls(PaintRegion region)
+    {
+        ImGui.PushID("stencils_" + region.Id);
+        Ui.Section("Carve (stencils)");
+        Ui.Hint("Hand-drawn shapes that cut away part of a cell: opaque keeps, transparent cuts. Draw your own from art/stencils/_template_cell.png.");
+        // Quick picker: every PNG in art/stencils as a thumbnail.
+        var keys = Services.Textures.AllKeys().Where(k => k.StartsWith("stencils/", StringComparison.OrdinalIgnoreCase)).ToList();
+        float size = 54;
+        float cellW = size + ImGui.GetStyle().FramePadding.X * 2 + 4;
+        int perRow = Math.Max(1, (int)((ImGui.GetContentRegionAvail().X + 4) / cellW));
+        for (int i = 0; i < keys.Count; i++)
+        {
+            if (i % perRow != 0) ImGui.SameLine(0, 4);
+            var k = keys[i];
+            var tex = Services.Textures.Get(k);
+            bool sel = k == _stencilKey;
+            ImGui.PushStyleColor(ImGuiCol.Button, sel ? Ui.AccentDark : new Num.Vector4(0.16f, 0.18f, 0.24f, 1));
+            if (ImGui.ImageButton("st" + i, ImGuiExtension.Instance!.Renderer.BindTexture(tex), new Num.Vector2(size, size / 2))) _stencilKey = k;
+            ImGui.PopStyleColor();
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip(Path.GetFileNameWithoutExtension(k));
+        }
+        if (keys.Count > 0) ImGui.SameLine(0, 4);
+        if (ImGui.Button("...##stlib", new Num.Vector2(30, size / 2 + 6))) Art.ArtBrowser.OpenPick(_stencilKey.Length > 0 ? _stencilKey : "stencils/_template_cell.png", k => _stencilKey = k);
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Art library (add or organise stencils)");
+        ImGui.SameLine(0, 4);
+        if (ImGui.Button("+##stadd", new Num.Vector2(30, size / 2 + 6))) Art.ArtBrowser.OpenPick(null, k => _stencilKey = k, addNew: true);
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Add a stencil PNG from your computer (put it in the 'stencils' folder)");
+
+        ImGui.Checkbox("Flip X##st", ref _stencilFlipX);
+        ImGui.SameLine(0, 20);
+        ImGui.Checkbox("Flip Y##st", ref _stencilFlipY);
+
+        bool placing = _stencilRegionId == region.Id;
+        ImGui.BeginDisabled(_stencilKey.Length == 0 && !placing);
+        if (Ui.ToggleButton(placing ? "Done placing (Esc)" : "Place stencil on cells", placing, new Num.Vector2(210, 0),
+                "Click / drag over this region's cells to carve them with the chosen stencil.\nClick a carved cell again (or right-drag) to remove it."))
+        {
+            _stencilRegionId = placing ? null : region.Id;
+            if (!placing) { _cutOutMaterial = null; Status($"Carving with {Path.GetFileNameWithoutExtension(_stencilKey)}. Click/drag cells; Esc when done."); }
+        }
+        ImGui.EndDisabled();
+        if (_stencilKey.Length == 0 && !placing) { ImGui.SameLine(); ImGui.TextDisabled("pick a stencil first"); }
+        ImGui.SameLine();
+        Ui.Colored(region.Stencils.Count > 0 ? Ui.Good : Ui.Muted, $"{region.Stencils.Count} carved");
+        if (region.Stencils.Count > 0 && ImGui.Button("Clear stencils")) { region.Stencils.Clear(); Edited(); }
+        ImGui.PopID();
+    }
+
+    /// <summary>Map clicks while placing stencils. Returns true if it handled the input.</summary>
+    private bool UpdateStencilPlacing(InputState input)
+    {
+        if (_stencilRegionId is not { } id) return false;
+        var t = _tile!;
+        var region = t.PaintRegions.FirstOrDefault(r => r.Id == id);
+        if (region is null || _stencilKey.Length == 0) { _stencilRegionId = null; return false; }
+        if (input.Pressed(InputAction.Cancel) && !input.KeyboardCapturedByUi) { _stencilRegionId = null; Status("Done placing stencils."); return true; }
+        if (input.LeftReleased || input.RightReleased) _dragMode = null;
+        if (_hoverCell is { } hc && !region.Cells.Contains(hc)) ImGui.SetTooltip("Stencils go on this region's cells only.");
+        bool Same(CellStencil s) => s.Stencil == _stencilKey && s.FlipX == _stencilFlipX && s.FlipY == _stencilFlipY;
+        PaintCells(input,
+            c => region.Stencils.Any(s => s.Cell == c && Same(s)),
+            (c, v) =>
+            {
+                if (!region.Cells.Contains(c)) return;
+                region.Stencils.RemoveAll(s => s.Cell == c);
+                if (v) region.Stencils.Add(new CellStencil { Cell = c, Stencil = _stencilKey, FlipX = _stencilFlipX, FlipY = _stencilFlipY });
+            }, rightPaintsFalse: true);
+        return true;
+    }
+
     /// <summary>Map clicks while picking cut-out cells. Returns true if it handled the input.</summary>
     private bool UpdateCutOutPicking(InputState input)
     {
         if (_cutOutMaterial is not { } reference) return false;
         var t = _tile!;
         if (t.FindMaterial(reference, _floor) is null) { _cutOutMaterial = null; return false; }
+        _stencilRegionId = null;
         if (input.Pressed(InputAction.Cancel) && !input.KeyboardCapturedByUi) { _cutOutMaterial = null; Status("Done selecting cut-out cells."); return true; }
         if (input.LeftReleased || input.RightReleased) _dragMode = null;
         PaintCells(input,
@@ -231,6 +311,7 @@ public sealed partial class MapEditorScene
                 else
                 {
                     region.Cells.Remove(c);
+                    region.Stencils.RemoveAll(s => s.Cell == c);
                     if (region.Cells.Count == 0) t.PaintRegions.Remove(region);
                 }
             }, rightPaintsFalse: true);

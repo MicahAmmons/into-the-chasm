@@ -175,6 +175,7 @@ public sealed partial class MapEditorScene
             }
             Edit(sel, p => p.Name is nameof(PaintRegion.Layer) or nameof(PaintRegion.Feather) or nameof(PaintRegion.Opacity));
             if (t.FindMaterial(sel.Material, _floor) is { Fade: not CloudFade.None } selMat) RegionFadeOverride(sel, selMat);
+            StencilControls(sel);
             ImGui.BeginDisabled(_selection.Count == 0);
             if (ImGui.Button("Add selection")) { foreach (var c in _selection) if (!sel.Cells.Contains(c)) sel.Cells.Add(c); Edited(); }
             ImGui.SameLine();

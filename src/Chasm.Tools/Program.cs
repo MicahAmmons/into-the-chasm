@@ -21,6 +21,14 @@ if (args.Contains("--resave"))
     return;
 }
 
+// --generate-stencils: (re)build the starter carve-out stencils in content/art/stencils.
+if (args.Contains("--generate-stencils"))
+{
+    var stPaths = Chasm.Game.Assets.ContentPaths.Resolve();
+    foreach (var f in Chasm.Tools.Art.StencilArt.Generate(stPaths.Art)) Console.WriteLine($"  {Path.GetRelativePath(stPaths.Root, f)}");
+    return;
+}
+
 // --generate-art: (re)build the placeholder art pack in content/art/placeholder.
 if (args.Contains("--generate-art"))
 {

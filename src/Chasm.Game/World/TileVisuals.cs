@@ -60,7 +60,16 @@ public sealed class TileVisuals : IDisposable
         _textures = textures;
         _defs = defs;
         _batch = new SpriteBatch(device);
-        _textures.Reloaded += _ => InvalidateAll();
+        _textures.Reloaded += key =>
+        {
+            // A redrawn stencil changes masks that use it: drop its pixels and every cached mask.
+            if (_stencils.Remove(key))
+            {
+                foreach (var (m, _) in _masks.Values) m.Dispose();
+                _masks.Clear();
+            }
+            InvalidateAll();
+        };
         _defs.Changed += d => { if (d is FloorDef) InvalidateAll(); else if (d is TileDef t) Invalidate(t); };
     }
 
@@ -170,12 +179,13 @@ public sealed class TileVisuals : IDisposable
         var sb = new StringBuilder();
         foreach (var c in region.Cells.OrderBy(c => c.Q).ThenBy(c => c.R)) sb.Append(c.Q).Append(',').Append(c.R).Append(' ');
         sb.Append('|').Append(feather).Append('|').Append(fade?.ToString() ?? "nofade");
+        foreach (var st in region.Stencils) sb.Append("|s").Append(st.Cell.Q).Append(',').Append(st.Cell.R).Append(':').Append(st.Stencil).Append(st.FlipX ? "x" : "").Append(st.FlipY ? "y" : "");
         string key = sb.ToString();
         _tick++;
         if (_masks.TryGetValue(key, out var hit)) { _masks[key] = (hit.mask, _tick); return hit.mask; }
 
         var tex = new Texture2D(_device, RegionMask.Width, RegionMask.Height, false, SurfaceFormat.Color);
-        tex.SetData(BuildMask(region.Cells, feather, fade));
+        tex.SetData(BuildMask(region.Cells, feather, fade, region.Stencils, LoadStencil));
         _masks[key] = (tex, _tick);
         if (_masks.Count > MaxMasks)
             foreach (var old in _masks.OrderBy(kv => kv.Value.used).Take(_masks.Count - MaxMasks).ToList())
@@ -184,9 +194,10 @@ public sealed class TileVisuals : IDisposable
     }
 
     /// <summary>Region mask as texture data (alpha in every channel: white * alpha).</summary>
-    public static Color[] BuildMask(IReadOnlyCollection<CellCoord> cells, int featherPx, EdgeFade? fade)
+    public static Color[] BuildMask(IReadOnlyCollection<CellCoord> cells, int featherPx, EdgeFade? fade,
+        IReadOnlyList<CellStencil>? stencils = null, Func<string, StencilImage?>? loadStencil = null)
     {
-        var a = RegionMask.Build(cells, featherPx, fade);
+        var a = RegionMask.Build(cells, featherPx, fade, stencils, loadStencil);
         var colors = new Color[a.Length];
         for (int i = 0; i < a.Length; i++)
         {
@@ -194,6 +205,29 @@ public sealed class TileVisuals : IDisposable
             colors[i] = new Color(v, v, v, v);
         }
         return colors;
+    }
+
+    // ------------------------------------------------------------------ stencils
+
+    private readonly Dictionary<string, StencilImage?> _stencils = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>A stencil PNG's alpha, read back from the loaded texture (cached; cleared on hot reload).</summary>
+    public StencilImage? LoadStencil(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return null;
+        if (_stencils.TryGetValue(key, out var hit)) return hit;
+        StencilImage? img = null;
+        if (_textures.Exists(key))
+        {
+            var tex = _textures.Get(key);
+            var px = new Color[tex.Width * tex.Height];
+            tex.GetData(px);
+            var alpha = new float[px.Length];
+            for (int i = 0; i < px.Length; i++) alpha[i] = px[i].A / 255f;
+            img = new StencilImage(tex.Width, tex.Height, alpha);
+        }
+        _stencils[key] = img;
+        return img;
     }
 
     public void Dispose()

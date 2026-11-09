@@ -142,6 +142,26 @@ public class RegionMaskTests
     }
 
     [Fact]
+    public void Stencil_cuts_away_part_of_its_cell_only()
+    {
+        var cells = new List<CellCoord> { new(10, 2), new(11, 2) };
+        // 2x2 stencil: top row kept, bottom row cut.
+        var img = new StencilImage(2, 2, new[] { 1f, 1f, 0f, 0f });
+        var stencils = new List<CellStencil> { new() { Cell = cells[0], Stencil = "s.png" } };
+        var m = RegionMask.Build(cells, 0, null, stencils, _ => img);
+        var c0 = IsoGrid.CellCenter(cells[0]);
+        Assert.Equal(1f, At(m, c0.X, c0.Y - 20), 2);   // top of the stencilled cell kept
+        Assert.Equal(0f, At(m, c0.X, c0.Y + 24), 2);   // bottom cut
+        var c1 = IsoGrid.CellCenter(cells[1]);
+        Assert.Equal(1f, At(m, c1.X, c1.Y + 24), 2);   // neighbour untouched
+        // Flipped vertically: the other half is cut instead.
+        stencils[0].FlipY = true;
+        var f = RegionMask.Build(cells, 0, null, stencils, _ => img);
+        Assert.Equal(0f, At(f, c0.X, c0.Y - 20), 2);
+        Assert.Equal(1f, At(f, c0.X, c0.Y + 24), 2);
+    }
+
+    [Fact]
     public void Upper_fade_is_measured_up_from_the_bottom_edge()
     {
         var cells = Stack(4, 2, 4);

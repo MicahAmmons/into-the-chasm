@@ -69,6 +69,33 @@ public enum PaintLayer
 }
 
 /// <summary>
+/// A stencil on one cell of a region. The stencil PNG is stretched over the cell's 128x64 box:
+/// opaque pixels keep the texture, transparent pixels cut it away (partly transparent = partly).
+/// </summary>
+public sealed class CellStencil
+{
+    public CellCoord Cell { get; set; }
+    [Texture] public string Stencil { get; set; } = "";
+    public bool FlipX { get; set; }
+    public bool FlipY { get; set; }
+}
+
+/// <summary>A stencil's alpha channel, 0..1, row by row.</summary>
+public sealed record StencilImage(int Width, int Height, float[] Alpha)
+{
+    /// <summary>Bilinear sample at u, v in 0..1.</summary>
+    public float Sample(float u, float v)
+    {
+        float fx = Math.Clamp(u * Width - 0.5f, 0, Width - 1), fy = Math.Clamp(v * Height - 0.5f, 0, Height - 1);
+        int x0 = (int)fx, y0 = (int)fy, x1 = Math.Min(Width - 1, x0 + 1), y1 = Math.Min(Height - 1, y0 + 1);
+        float tx = fx - x0, ty = fy - y0;
+        float a = Alpha[y0 * Width + x0] * (1 - tx) + Alpha[y0 * Width + x1] * tx;
+        float b = Alpha[y1 * Width + x0] * (1 - tx) + Alpha[y1 * Width + x1] * tx;
+        return a * (1 - ty) + b * ty;
+    }
+}
+
+/// <summary>
 /// "This material covers these cells." The region list order on a tile is the stacking order.
 /// </summary>
 public sealed class PaintRegion
@@ -85,6 +112,8 @@ public sealed class PaintRegion
     [Hidden] public float? FadeStart { get; set; }
     [Hidden] public float? FadeLength { get; set; }
     [Hidden] public FadeAngle? FadeAngle { get; set; }
+    /// <summary>Hand-drawn carve-outs: a stencil image cuts away part of a cell's texture.</summary>
+    [Hidden] public List<CellStencil> Stencils { get; set; } = new();
 
     /// <summary>The fade this region bakes with, or null when its material doesn't fade.</summary>
     public EdgeFade? FadeFor(MaterialDef mat) => mat.Fade == CloudFade.None ? null

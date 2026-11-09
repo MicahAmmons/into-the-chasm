@@ -46,6 +46,7 @@ public sealed partial class MapEditorScene
     private void UpdateTool(InputState input)
     {
         var t = _tile!;
+        if (UpdateStencilPlacing(input)) return;
         if (UpdateCutOutPicking(input)) return;
         if (input.Pressed(InputAction.Cancel) && !input.KeyboardCapturedByUi)
         {

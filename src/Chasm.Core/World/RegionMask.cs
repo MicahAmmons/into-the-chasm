@@ -19,10 +19,14 @@ public static class RegionMask
     private const float Slope = 0.5f;   // iso cell edges: 1 down per 2 across (same at half resolution)
     private const int Window = 32;      // straightening window each side, half-res px (one cell wide in total)
 
-    public static float[] Build(IReadOnlyCollection<CellCoord> cells, int featherPx, EdgeFade? fade)
+    public static float[] Build(IReadOnlyCollection<CellCoord> cells, int featherPx, EdgeFade? fade,
+        IReadOnlyList<CellStencil>? stencils = null, Func<string, StencilImage?>? loadStencil = null)
     {
         var inside = Inside(cells);
         var a = (float[])inside.Clone();
+        // Carve first, so the soft edge and fade apply to the carved shape. The fade itself is
+        // still measured from the uncarved edge, so carving a lip doesn't move the fade.
+        if (stencils is { Count: > 0 } && loadStencil is not null) Carve(a, cells, stencils, loadStencil);
         int r = Math.Max(0, featherPx / 2);
         if (r > 0)
         {
@@ -46,6 +50,30 @@ public static class RegionMask
             }
         }
         return a;
+    }
+
+    /// <summary>Multiplies each stencilled cell's pixels by its stencil (stretched over the cell's box).</summary>
+    public static void Carve(float[] a, IReadOnlyCollection<CellCoord> cells, IReadOnlyList<CellStencil> stencils, Func<string, StencilImage?> loadStencil)
+    {
+        var set = cells as HashSet<CellCoord> ?? cells.ToHashSet();
+        foreach (var s in stencils)
+        {
+            if (!set.Contains(s.Cell) || loadStencil(s.Stencil) is not { } img) continue;
+            var centre = IsoGrid.CellCenter(s.Cell);
+            float left = centre.X - IsoGrid.HalfW, top = centre.Y - IsoGrid.HalfH;
+            int x0 = Math.Max(0, (int)(left / 2) - 1), x1 = Math.Min(Width - 1, (int)((centre.X + IsoGrid.HalfW) / 2) + 1);
+            int y0 = Math.Max(0, (int)(top / 2) - 1), y1 = Math.Min(Height - 1, (int)((centre.Y + IsoGrid.HalfH) / 2) + 1);
+            for (int y = y0; y <= y1; y++)
+                for (int x = x0; x <= x1; x++)
+                {
+                    var p = new System.Numerics.Vector2(x * 2 + 1, y * 2 + 1);
+                    if (IsoGrid.CellAt(p) != s.Cell) continue;
+                    float u = (p.X - left) / IsoGrid.CellWidth, v = (p.Y - top) / IsoGrid.CellHeight;
+                    if (s.FlipX) u = 1 - u;
+                    if (s.FlipY) v = 1 - v;
+                    a[y * Width + x] *= img.Sample(u, v);
+                }
+        }
     }
 
     /// <summary>1 where a pixel's centre is in one of the cells.</summary>
