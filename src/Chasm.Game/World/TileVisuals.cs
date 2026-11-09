@@ -166,22 +166,16 @@ public sealed class TileVisuals : IDisposable
     private Texture2D Mask(PaintRegion region, MaterialDef mat, FloorDef? floor)
     {
         int feather = region.Feather ?? floor?.DefaultFeather ?? 6;
-        var cloud = mat.Fade switch
-        {
-            CloudFade.IntoLowerClouds => floor?.LowerClouds,
-            CloudFade.IntoUpperClouds => floor?.UpperClouds,
-            _ => null,
-        };
+        var fade = region.FadeFor(mat);
         var sb = new StringBuilder();
         foreach (var c in region.Cells.OrderBy(c => c.Q).ThenBy(c => c.R)) sb.Append(c.Q).Append(',').Append(c.R).Append(' ');
-        sb.Append('|').Append(feather).Append('|').Append(mat.Fade);
-        if (cloud is not null) sb.Append('|').Append(cloud.Enabled).Append(cloud.Line).Append('/').Append(cloud.FadeLength);
+        sb.Append('|').Append(feather).Append('|').Append(fade?.ToString() ?? "nofade");
         string key = sb.ToString();
         _tick++;
         if (_masks.TryGetValue(key, out var hit)) { _masks[key] = (hit.mask, _tick); return hit.mask; }
 
         var tex = new Texture2D(_device, RegionMask.Width, RegionMask.Height, false, SurfaceFormat.Color);
-        tex.SetData(BuildMask(region.Cells, feather, cloud, mat.Fade == CloudFade.IntoLowerClouds));
+        tex.SetData(BuildMask(region.Cells, feather, fade));
         _masks[key] = (tex, _tick);
         if (_masks.Count > MaxMasks)
             foreach (var old in _masks.OrderBy(kv => kv.Value.used).Take(_masks.Count - MaxMasks).ToList())
@@ -190,9 +184,9 @@ public sealed class TileVisuals : IDisposable
     }
 
     /// <summary>Region mask as texture data (alpha in every channel: white * alpha).</summary>
-    public static Color[] BuildMask(IReadOnlyCollection<CellCoord> cells, int featherPx, CloudLayerDef? cloud, bool lower)
+    public static Color[] BuildMask(IReadOnlyCollection<CellCoord> cells, int featherPx, EdgeFade? fade)
     {
-        var a = RegionMask.Build(cells, featherPx, cloud, lower);
+        var a = RegionMask.Build(cells, featherPx, fade);
         var colors = new Color[a.Length];
         for (int i = 0; i < a.Length; i++)
         {

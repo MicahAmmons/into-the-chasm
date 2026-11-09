@@ -79,6 +79,13 @@ public sealed partial class MapEditorScene
         string[] fades = { "No fade", "Fades into the lower clouds", "Fades into the upper clouds" };
         int fade = (int)m.Fade;
         if (ImGui.Combo("##fade", ref fade, fades, fades.Length)) { m.Fade = (CloudFade)fade; changed = true; }
+        if (m.Fade != CloudFade.None)
+        {
+            float start = m.FadeStart, length = m.FadeLength;
+            var angle = m.FadeAngle;
+            if (FadeControls(label, ref start, ref length, ref angle, m.Fade == CloudFade.IntoLowerClouds))
+            { m.FadeStart = start; m.FadeLength = length; m.FadeAngle = angle; changed = true; }
+        }
 
         // Cut out
         ImGui.Spacing();
@@ -113,6 +120,7 @@ public sealed partial class MapEditorScene
         }
         ImGui.SameLine();
         Ui.Colored(count > 0 ? Ui.Good : Ui.Muted, $"{count} cell(s) on this tile");
+        if (region is not null && m.Fade != CloudFade.None) RegionFadeOverride(region, m);
         if (region is not null)
         {
             if (ImGui.Button("Clear cells")) { region.Cells.Clear(); t.PaintRegions.Remove(region); Edited(); }
@@ -120,6 +128,84 @@ public sealed partial class MapEditorScene
             if (ImGui.Button("Region settings (layer, feather)")) { _selectedRegion = region; SetTool(Tool.PaintTexture); }
         }
         ImGui.Unindent();
+    }
+
+    /// <summary>Fade start / length (cells) and angle. Returns true when changed.</summary>
+    private static bool FadeControls(float label, ref float start, ref float length, ref FadeAngle angle, bool lower)
+    {
+        bool changed = false;
+        string edge = lower ? "top edge" : "bottom edge";
+        ImGui.TextUnformatted("Fade starts"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
+        if (ImGui.SliderFloat("##fstart", ref start, 0, 8, "%.2f cells")) changed = true;
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip($"How far from the {edge} the fade begins (1 cell = 64 px). Ctrl+click to type.");
+        ImGui.TextUnformatted("Fade length"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
+        if (ImGui.SliderFloat("##flen", ref length, 0.1f, 8, "%.2f cells")) changed = true;
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("How far it takes to go from solid to fully faded.");
+        ImGui.TextUnformatted("Fade angle"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
+        string[] angles = { "Auto (follow the cliff edge)", "Down-right  \\  (cell edge)", "Down-left  /  (cell edge)", "Level  -" };
+        int a = (int)angle;
+        if (ImGui.Combo("##fangle", ref a, angles, angles.Length)) { angle = (FadeAngle)a; changed = true; }
+        return changed;
+    }
+
+    /// <summary>"Own fade on this tile": per-region override of the material's fade numbers.</summary>
+    private void RegionFadeOverride(PaintRegion region, MaterialDef m)
+    {
+        bool own = region.FadeStart is not null || region.FadeLength is not null || region.FadeAngle is not null;
+        if (ImGui.Checkbox("Own fade on this tile", ref own))
+        {
+            if (own) { region.FadeStart = m.FadeStart; region.FadeLength = m.FadeLength; region.FadeAngle = m.FadeAngle; }
+            else { region.FadeStart = null; region.FadeLength = null; region.FadeAngle = null; }
+            Edited();
+        }
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Off: uses the material's fade. On: this tile's cells get their own fade numbers.");
+        if (!own) return;
+        ImGui.PushID("regionfade");
+        float start = region.FadeStart ?? m.FadeStart, length = region.FadeLength ?? m.FadeLength;
+        var angle = region.FadeAngle ?? m.FadeAngle;
+        if (FadeControls(120, ref start, ref length, ref angle, m.Fade == CloudFade.IntoLowerClouds))
+        { region.FadeStart = start; region.FadeLength = length; region.FadeAngle = angle; Edited(); }
+        ImGui.PopID();
+    }
+
+    // ------------------------------------------------------------------ fade lines on the map
+
+    private string? _fadeLinesKey;
+    private float[]? _fadeEdge;
+
+    /// <summary>
+    /// The region whose fade lines to show: the one being cut out, else the selected region.
+    /// Draws the detected edge (white dashes), where the fade starts (orange) and where it's gone (faint).
+    /// </summary>
+    private void DrawFadeLines(Microsoft.Xna.Framework.Graphics.SpriteBatch b)
+    {
+        var t = _tile!;
+        PaintRegion? region = _cutOutMaterial is { } cut ? t.PaintRegions.FirstOrDefault(r => r.Material == cut) : _selectedRegion;
+        if (region is null || region.Cells.Count == 0 || !t.PaintRegions.Contains(region)) return;
+        var mat = t.FindMaterial(region.Material, _floor);
+        if (mat is null || region.FadeFor(mat) is not { } fade) return;
+        string key = string.Join(' ', region.Cells.OrderBy(c => c.Q).ThenBy(c => c.R)) + "|" + fade;
+        if (key != _fadeLinesKey)
+        {
+            _fadeLinesKey = key;
+            _fadeEdge = RegionMask.Edge(RegionMask.Inside(region.Cells), fade);
+        }
+        var edge = _fadeEdge!;
+        float dir = fade.Lower ? 1 : -1;
+        float start = fade.StartCells * EdgeFade.CellPx, end = start + fade.LengthCells * EdgeFade.CellPx;
+        var d = Services.Draw;
+        var white = Microsoft.Xna.Framework.Color.White;
+        var orange = new Microsoft.Xna.Framework.Color(255, 170, 60);
+        const int step = 4; // half-res columns per segment
+        for (int x = 0; x + step < RegionMask.Width; x += step)
+        {
+            if (float.IsNaN(edge[x]) || float.IsNaN(edge[x + step])) continue;
+            var p0 = new Microsoft.Xna.Framework.Vector2(x * 2, edge[x] * 2);
+            var p1 = new Microsoft.Xna.Framework.Vector2((x + step) * 2, edge[x + step] * 2);
+            if ((x / step) % 3 != 2) d.Line(b, p0, p1, white * 0.9f, 2);
+            d.Line(b, p0 + new Microsoft.Xna.Framework.Vector2(0, dir * start), p1 + new Microsoft.Xna.Framework.Vector2(0, dir * start), orange, 2);
+            if ((x / step) % 2 == 0) d.Line(b, p0 + new Microsoft.Xna.Framework.Vector2(0, dir * end), p1 + new Microsoft.Xna.Framework.Vector2(0, dir * end), orange * 0.55f, 2);
+        }
     }
 
     /// <summary>Map clicks while picking cut-out cells. Returns true if it handled the input.</summary>

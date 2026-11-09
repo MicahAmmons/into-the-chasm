@@ -3,12 +3,31 @@ using Chasm.Core.Grid;
 
 namespace Chasm.Core.World;
 
-/// <summary>Where a material fades into the clouds (see FloorDef cloud lines).</summary>
+/// <summary>Whether a material fades into the clouds, and which way (measured from its own edge).</summary>
 public enum CloudFade
 {
     [Label("No fade")] None,
     [Label("Fades into the lower clouds (cliffs going down)")] IntoLowerClouds,
     [Label("Fades into the upper clouds (walls going up)")] IntoUpperClouds,
+}
+
+/// <summary>The angle of the fade's lines: along the cell edges (iso angle) or level.</summary>
+public enum FadeAngle
+{
+    [Label("Auto (follow the cliff edge)")] Auto,
+    [Label("Down-right  \\  (cell edge angle)")] DownRight,
+    [Label("Down-left  /  (cell edge angle)")] DownLeft,
+    [Label("Level  -")] Level,
+}
+
+/// <summary>
+/// Edge fade settings for one region, in cells (1 cell = 64 px down the screen).
+/// Measured from the region's own top edge (lower clouds) or bottom edge (upper clouds),
+/// so a cliff fades the same way wherever it sits on screen.
+/// </summary>
+public readonly record struct EdgeFade(bool Lower, float StartCells, float LengthCells, FadeAngle Angle)
+{
+    public const float CellPx = 64f;
 }
 
 /// <summary>
@@ -32,6 +51,12 @@ public sealed class MaterialDef
     public bool FlipX { get; set; }
     public bool FlipY { get; set; }
     public CloudFade Fade { get; set; } = CloudFade.None;
+    [Range(0, 8), Tooltip("Cells below the cliff's top edge where the fade begins (1 cell = 64 px).")]
+    public float FadeStart { get; set; } = 1f;
+    [Range(0.1f, 8), Tooltip("Cells it takes to go from solid to fully faded.")]
+    public float FadeLength { get; set; } = 1f;
+    [Tooltip("Angle of the fade lines. Auto picks the cell-edge angle that matches the cliff's top edge.")]
+    public FadeAngle FadeAngle { get; set; } = FadeAngle.Auto;
     [Label("Use for cut out"), Tooltip("Pick cells on a tile and this texture shows through them (one region per tile).")]
     public bool UseForCutOut { get; set; }
     public override string ToString() => string.IsNullOrEmpty(Name) ? Id : Name;
@@ -56,6 +81,14 @@ public sealed class PaintRegion
     public int? Feather { get; set; }
     [Range(0, 1)] public float Opacity { get; set; } = 1f;
     [Hidden] public List<CellCoord> Cells { get; set; } = new();
+    /// <summary>Per-tile fade overrides (null = use the material's).</summary>
+    [Hidden] public float? FadeStart { get; set; }
+    [Hidden] public float? FadeLength { get; set; }
+    [Hidden] public FadeAngle? FadeAngle { get; set; }
+
+    /// <summary>The fade this region bakes with, or null when its material doesn't fade.</summary>
+    public EdgeFade? FadeFor(MaterialDef mat) => mat.Fade == CloudFade.None ? null
+        : new EdgeFade(mat.Fade == CloudFade.IntoLowerClouds, FadeStart ?? mat.FadeStart, FadeLength ?? mat.FadeLength, FadeAngle ?? mat.FadeAngle);
     public override string ToString() => $"{Material} ({Cells.Count} cells)";
 }
 

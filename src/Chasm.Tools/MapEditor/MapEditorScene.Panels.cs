@@ -174,6 +174,7 @@ public sealed partial class MapEditorScene
                 ImGui.EndCombo();
             }
             Edit(sel, p => p.Name is nameof(PaintRegion.Layer) or nameof(PaintRegion.Feather) or nameof(PaintRegion.Opacity));
+            if (t.FindMaterial(sel.Material, _floor) is { Fade: not CloudFade.None } selMat) RegionFadeOverride(sel, selMat);
             ImGui.BeginDisabled(_selection.Count == 0);
             if (ImGui.Button("Add selection")) { foreach (var c in _selection) if (!sel.Cells.Contains(c)) sel.Cells.Add(c); Edited(); }
             ImGui.SameLine();
@@ -357,9 +358,8 @@ public sealed partial class MapEditorScene
         var cloud = lower ? _floor.LowerClouds : _floor.UpperClouds;
         Ui.Section(lower ? "Lower clouds (cliffs fade down into these)" : "Upper clouds (walls fade up into these)");
         ImGui.TextColored(Warn, "Floor-wide: affects every tile on this floor.");
-        ImGui.TextWrapped(lower
-            ? "Line: where the cloud starts (0 = top of screen, 1 = bottom). Materials set to 'fade into the lower clouds' are fully visible above the line and gone 'Fade Length' below it."
-            : "Mirror image: materials set to 'fade into the upper clouds' disappear going UP past the line.");
+        ImGui.TextWrapped("The cloud picture shown behind the tiles. How cliffs and walls fade into it is set per material "
+            + "(Textures > Cloud fade), measured from each cliff's own edge. Line / Fade Length here only matter for the 'Band' coverage look.");
         _showCloudLines = true;
         if (Edit(cloud)) Services.TileVisuals.InvalidateAll();
         ImGui.TextDisabled("Placeholder visuals: drifts right and wraps. More FX settings come with the cloud rework.");

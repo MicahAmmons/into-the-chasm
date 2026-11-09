@@ -72,6 +72,7 @@ public sealed partial class MapEditorScene
 
         // Paint selection + selected region.
         foreach (var c in _selection) d.DiamondFill(b, IsoGrid.CellCenter(c), 110, 55, new Color(255, 220, 60) * 0.45f);
+        DrawFadeLines(b);
         if (_cutOutMaterial is { } cutRef && t.PaintRegions.FirstOrDefault(r => r.Material == cutRef) is { } cutReg)
             foreach (var c in cutReg.Cells) d.DiamondOutline(b, IsoGrid.CellCenter(c), 118, 59, new Color(255, 190, 70), 2);
         if (_selectedRegion is { } reg)

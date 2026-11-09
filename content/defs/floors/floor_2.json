@@ -41,7 +41,11 @@
       "Tint": "#9fe0b0",
       "FlipX": false,
       "FlipY": false,
-      "Fade": "IntoLowerClouds"
+      "Fade": "IntoLowerClouds",
+      "FadeStart": 1,
+      "FadeLength": 1,
+      "FadeAngle": "Auto",
+      "UseForCutOut": false
     },
     {
       "Id": "grass_test",
@@ -51,7 +55,11 @@
       "Tint": "#ffffff",
       "FlipX": false,
       "FlipY": false,
-      "Fade": "None"
+      "Fade": "None",
+      "FadeStart": 1,
+      "FadeLength": 1,
+      "FadeAngle": "Auto",
+      "UseForCutOut": false
     },
     {
       "Id": "ph_cliff",
@@ -61,7 +69,11 @@
       "Tint": "#ffffff",
       "FlipX": false,
       "FlipY": false,
-      "Fade": "IntoLowerClouds"
+      "Fade": "IntoLowerClouds",
+      "FadeStart": 1,
+      "FadeLength": 1.5,
+      "FadeAngle": "Auto",
+      "UseForCutOut": true
     },
     {
       "Id": "ph_cliff_right",
@@ -71,7 +83,11 @@
       "Tint": "#ffffff",
       "FlipX": true,
       "FlipY": false,
-      "Fade": "IntoLowerClouds"
+      "Fade": "IntoLowerClouds",
+      "FadeStart": 1,
+      "FadeLength": 1.5,
+      "FadeAngle": "Auto",
+      "UseForCutOut": true
     },
     {
       "Id": "ph_wall",
@@ -81,7 +97,11 @@
       "Tint": "#ffffff",
       "FlipX": false,
       "FlipY": false,
-      "Fade": "IntoUpperClouds"
+      "Fade": "IntoUpperClouds",
+      "FadeStart": 1,
+      "FadeLength": 1,
+      "FadeAngle": "Auto",
+      "UseForCutOut": false
     },
     {
       "Id": "ph_grass",
@@ -91,7 +111,11 @@
       "Tint": "#ffffff",
       "FlipX": false,
       "FlipY": false,
-      "Fade": "None"
+      "Fade": "None",
+      "FadeStart": 1,
+      "FadeLength": 1,
+      "FadeAngle": "Auto",
+      "UseForCutOut": false
     },
     {
       "Id": "ph_dirt",
@@ -101,7 +125,11 @@
       "Tint": "#ffffff",
       "FlipX": false,
       "FlipY": false,
-      "Fade": "None"
+      "Fade": "None",
+      "FadeStart": 1,
+      "FadeLength": 1,
+      "FadeAngle": "Auto",
+      "UseForCutOut": false
     },
     {
       "Id": "ph_moss",
@@ -111,7 +139,11 @@
       "Tint": "#ffffff",
       "FlipX": false,
       "FlipY": false,
-      "Fade": "None"
+      "Fade": "None",
+      "FadeStart": 1,
+      "FadeLength": 1,
+      "FadeAngle": "Auto",
+      "UseForCutOut": false
     }
   ],
   "Notes": "Ported from JustPlaying."

@@ -85,24 +85,69 @@ public class RegionMaskTests
     {
         var cell = new CellCoord(15, 0);
         var c = IsoGrid.CellCenter(cell);
-        var hard = RegionMask.Build(new[] { cell }, 0, null, true);
+        var hard = RegionMask.Build(new[] { cell }, 0, null);
         Assert.Equal(1f, At(hard, c.X, c.Y));
         Assert.Equal(0f, At(hard, c.X + 200, c.Y));
-        var soft = RegionMask.Build(new[] { cell }, 16, null, true);
+        var soft = RegionMask.Build(new[] { cell }, 16, null);
         float edge = At(soft, c.X + IsoGrid.HalfW - 2, c.Y);
         Assert.InRange(edge, 0.05f, 0.95f);
     }
 
+    /// <summary>A vertical stack of cells: (q, r), (q+1, r+1), ... each 64 px lower on screen.</summary>
+    private static List<CellCoord> Stack(int q, int r, int n) => Enumerable.Range(0, n).Select(i => new CellCoord(q + i, r + i)).ToList();
+
     [Fact]
-    public void Lower_cloud_fade_hides_cells_below_the_line()
+    public void Fade_is_measured_from_the_regions_own_top_edge_not_the_screen()
     {
-        var cells = IsoGrid.AllCells.ToList();
-        var cloud = new CloudLayerDef { Line = 0.5f, FadeLength = 0.1f };
-        var m = RegionMask.Build(cells, 0, cloud, lower: true);
-        Assert.Equal(1f, At(m, 960, 300));      // above the line
-        Assert.Equal(0f, At(m, 960, 800));      // well below line + fade
-        var up = RegionMask.Build(cells, 0, new CloudLayerDef { Line = 0.5f, FadeLength = 0.1f }, lower: false);
-        Assert.Equal(0f, At(up, 960, 300));     // walls fade going up
-        Assert.Equal(1f, At(up, 960, 800));
+        var fade = new EdgeFade(true, 1.5f, 1.5f, FadeAngle.Level);
+        foreach (var (q, r) in new[] { (3, 1), (10, 2) }) // same shape, different places on screen
+        {
+            var cells = Stack(q, r, 4);
+            var m = RegionMask.Build(cells, 0, fade);
+            var top = IsoGrid.CellCenter(cells[0]);
+            float lip = top.Y - IsoGrid.HalfH;
+            Assert.Equal(1f, At(m, top.X, lip + 64), 2);          // 1 cell down: still solid
+            float mid = At(m, top.X, lip + 64 * 2.25f);           // halfway through the fade
+            Assert.InRange(mid, 0.35f, 0.65f);
+            Assert.Equal(0f, At(m, top.X, lip + 64 * 3.4f), 2);   // past start + length: gone
+        }
+    }
+
+    [Fact]
+    public void Fade_continues_across_cells_as_one_gradient()
+    {
+        var cells = Stack(5, 1, 4);
+        var m = RegionMask.Build(cells, 0, new EdgeFade(true, 1f, 2f, FadeAngle.Level));
+        var x = IsoGrid.CellCenter(cells[0]).X;
+        float prev = 2;
+        for (float y = IsoGrid.CellCenter(cells[0]).Y; y < IsoGrid.CellCenter(cells[3]).Y + 30; y += 8)
+        {
+            float v = At(m, x, y);
+            Assert.True(v <= prev + 0.02f, $"fade went back up at y={y}");
+            prev = v;
+        }
+    }
+
+    [Fact]
+    public void Diagonal_cliff_top_is_straightened_along_the_cell_edge()
+    {
+        // A row of cells along +q runs down-right at the cell-edge angle; its top is a saw-tooth.
+        var row = Enumerable.Range(2, 8).Select(q => new CellCoord(q, 3)).ToList();
+        var inside = RegionMask.Inside(row);
+        var edge = RegionMask.Edge(inside, new EdgeFade(true, 1, 1, FadeAngle.Auto));
+        // Straightened: the edge follows a single line of slope 0.5 (no zig-zag) across the middle.
+        int x0 = (int)(IsoGrid.CellCenter(row[2]).X / 2), x1 = (int)(IsoGrid.CellCenter(row[5]).X / 2);
+        for (int x = x0; x <= x1; x++)
+            Assert.Equal(edge[x0] + 0.5f * (x - x0), edge[x], 1);
+    }
+
+    [Fact]
+    public void Upper_fade_is_measured_up_from_the_bottom_edge()
+    {
+        var cells = Stack(4, 2, 4);
+        var m = RegionMask.Build(cells, 0, new EdgeFade(false, 1f, 1f, FadeAngle.Level));
+        var bottom = IsoGrid.CellCenter(cells[^1]);
+        Assert.Equal(1f, At(m, bottom.X, bottom.Y), 2);
+        Assert.Equal(0f, At(m, bottom.X, bottom.Y - 64 * 2.4f), 2);
     }
 }
