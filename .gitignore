@@ -16,3 +16,6 @@ saves/
 .DS_Store
 Thumbs.db
 *.bundle
+
+# Tool window layout (now kept in AppData)
+imgui.ini
