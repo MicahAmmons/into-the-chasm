@@ -418,6 +418,8 @@ public sealed partial class MapEditorScene
     private FloorDef? _previewFloor;
     /// <summary>Grid and captions in the wall / prefab previews. Off = as in game.</summary>
     private bool _previewHelpers;
+    /// <summary>Builder preview: use the current floor's fade and bottom edges for this wall (they belong to the floor, not the wall).</summary>
+    private bool _showFloorFade = true;
     private int _variantTab;
     /// <summary>Builder: each corner / end in the preview shows a different variant, side by side.</summary>
     private bool _compareVariants;
@@ -448,6 +450,7 @@ public sealed partial class MapEditorScene
         _panel = Panel.WallEdit;
         // Carry on from the first step not yet approved.
         _wallStep = WallSteps.Select(x => x.step).FirstOrDefault(st => !w.Approved.Contains(st.ToString()), WallStep.Review);
+        _showFloorFade = _wallStep != WallStep.EndCaps;
         BuildPreview();
     }
 
@@ -490,8 +493,9 @@ public sealed partial class MapEditorScene
         f.Id = "__builder_floor";
         f.WallsDown = new(); f.WallsUp = new();
         var builderEntry = new FloorWall { Wall = "__builder_wall" };
-        // Preview with this floor's fade and bottom edges for the wall, if it's on the floor.
-        if (_floor is not null && (up ? _floor.WallsUp : _floor.WallsDown).FirstOrDefault(x => x.Wall == w.Id) is { } real)
+        // Optionally with this floor's fade and bottom edges for the wall (else the full depth, no fade).
+        if (!_showFloorFade) builderEntry.FadeMode = WallFadeMode.None;
+        else if (_floor is not null && (up ? _floor.WallsUp : _floor.WallsDown).FirstOrDefault(x => x.Wall == w.Id) is { } real)
         {
             builderEntry.FadeMode = real.FadeMode;
             builderEntry.Fade = ChasmJson.Clone(real.Fade);
@@ -558,6 +562,11 @@ public sealed partial class MapEditorScene
         Ui.Title($"{idx + 1}. {title}");
         Ui.Hint(help);
         if (Ui.ToggleButton("Grid & captions", _previewHelpers, new Num.Vector2(0, 0), "Show the grid and labels on the preview (H).")) _previewHelpers = !_previewHelpers;
+        ImGui.SameLine(0, 12);
+        string floorName = _floor?.DisplayName ?? "the floor";
+        if (ImGui.Checkbox($"Show {floorName}'s fade & bottom edge", ref _showFloorFade)) BuildPreview();
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("The fade into the clouds and the bottom edge belong to each floor, not the wall:\nset them on the Walls page (this wall's entry on the floor).\nOff: the wall at its full depth, no fade.");
 
         ImGui.BeginChild("stepbody", new Num.Vector2(0, -78));
         bool changed = step switch
@@ -614,7 +623,12 @@ public sealed partial class MapEditorScene
     private void GoToStep(WallStep step)
     {
         if (_capDraft is not null) EndCapDraft(keep: false);
+        // Wall ends are designed at the wall's full depth: the floor's fade would hide the lower cells.
+        bool showFade = step != WallStep.EndCaps;
+        bool rebuild = showFade != _showFloorFade;
+        _showFloorFade = showFade;
         _wallStep = step;
+        if (rebuild) BuildPreview();
         _variantTab = 0;
         _rowTab = 0;
         PreviewChanged();
