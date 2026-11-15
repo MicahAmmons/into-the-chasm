@@ -395,7 +395,8 @@ public sealed partial class MapEditorScene
             ImGui.SameLine();
             if (Ui.ToggleButton(_prefabHandles ? "Hide handles" : "Corner handles", _prefabHandles, new Num.Vector2(150, 0), "Drag the corners on the map preview.")) _prefabHandles = !_prefabHandles;
         }
-        Ui.Hint("The map shows a preview of the prefab. The orange line is its lip (or foot): that line sits on the edge of its cells when placed.");
+        if (Ui.ToggleButton("Grid & highlights", _previewHelpers, new Num.Vector2(0, 0), "Outline, lip line and caption on the preview. Off = as in game.")) _previewHelpers = !_previewHelpers;
+        Ui.Hint("The map shows a preview of the prefab. With highlights on, the orange line is its lip (or foot): that line sits on the edge of its cells when placed.");
         ImGui.EndChild();
 
         // Save / revert / close
@@ -511,6 +512,7 @@ public sealed partial class MapEditorScene
         var tex = Services.Textures.Get(p.Texture);
         var c = PrefabPreviewCorners(p, tex);
         Services.TileVisuals.DrawQuad(tex, c, p.Tint, p.FlipX, p.FlipY);
+        if (!_previewHelpers && !(_prefabHandles && p.Warp is not null)) return; // clean view
         batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend);
         float px = 1f / CanvasScale();
         var col = new Color(255, 200, 80);

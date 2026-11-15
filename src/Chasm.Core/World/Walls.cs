@@ -85,7 +85,8 @@ public sealed class TileWallPaint
 /// faces share a corner cell. The piece drawn first keeps a hard edge just past the line; the
 /// piece drawn second fades in across it, so together they cover the cell exactly once.
 /// </summary>
-public sealed record ClipZone(IReadOnlyCollection<CellCoord> Cells, float X, bool KeepLeft, bool Ramp, float Blend)
+/// <remarks>Cells = null: applies to the whole mask (used to trim a face to its edge's width).</remarks>
+public sealed record ClipZone(IReadOnlyCollection<CellCoord>? Cells, float X, bool KeepLeft, bool Ramp, float Blend)
 {
     public float Factor(float x)
     {
@@ -96,7 +97,7 @@ public sealed record ClipZone(IReadOnlyCollection<CellCoord> Cells, float X, boo
         return KeepLeft ? 1f - t : t;
     }
 
-    public string Key => $"{X:0.#}{(KeepLeft ? "L" : "R")}{(Ramp ? "r" : "h")}{Blend:0.#}:{string.Join(' ', Cells.OrderBy(c => c.Q).ThenBy(c => c.R))}";
+    public string Key => $"{X:0.#}{(KeepLeft ? "L" : "R")}{(Ramp ? "r" : "h")}{Blend:0.#}:{(Cells is null ? "all" : string.Join(' ', Cells.OrderBy(c => c.Q).ThenBy(c => c.R)))}";
 }
 
 /// <summary>One drawn piece of a wall on a tile: a face run (with its corners and caps) or a rim strip.</summary>
@@ -211,8 +212,11 @@ public static class AutoWalls
         foreach (bool isLeft in new[] { true, false }) // left faces first: corner seams rely on this order
         {
             var open = isLeft ? leftOpen : rightOpen;
-            Func<CellCoord, int> key = isLeft ? (c => c.R) : (c => c.Q);
-            Func<CellCoord, int> pos = isLeft ? (c => c.Q) : (c => c.R);
+            // Cells whose open edges lie on one straight line, and their order along it:
+            //   down: lower-left edges of (q, r), (q+1, r)...   lower-right edges of (q, r), (q, r+1)...
+            //   up:   upper-left edges of (q, r), (q, r-1)...   upper-right edges of (q, r), (q+1, r)...
+            Func<CellCoord, int> key = (isLeft ^ up) ? (c => c.R) : (c => c.Q);
+            Func<CellCoord, int> pos = !up ? (isLeft ? (c => c.Q) : (c => c.R)) : (isLeft ? (c => -c.R) : (c => c.Q));
             foreach (var line in open.GroupBy(key))
             {
                 var sorted = line.OrderBy(pos).ToList();
@@ -312,6 +316,21 @@ public static class AutoWalls
                         foreach (var c in col) piece.Stencils.Add(new CellStencil { Cell = c, Stencil = wall.EndCapStencil, FlipX = !endOnRight });
                 }
             }
+            // A face only reaches as wide as the edges it hangs from (half a cell per edge on screen).
+            // Whole diamond cells stick out half a cell past the ends, which showed wherever no
+            // neighbouring face covered it (lone cells, cells touching only at a corner point).
+            // At corners the trim leaves room for the soft seam.
+            float minX = float.MaxValue, maxX = float.MinValue;
+            foreach (var w in run)
+            {
+                float cx = IsoGrid.CellCenter(w).X;
+                float a = isLeft ? cx - IsoGrid.HalfW : cx, b = isLeft ? cx : cx + IsoGrid.HalfW;
+                minX = Math.Min(minX, a); maxX = Math.Max(maxX, b);
+            }
+            float seam = wall.CornerBlend / 2f + 0.5f;
+            // Whole mask, not just inside the cells: the soft edge (feather) spills past cell borders.
+            piece.Clips.Add(new ClipZone(null, maxX + seam, KeepLeft: true, Ramp: false, 0));
+            piece.Clips.Add(new ClipZone(null, minX - seam, KeepLeft: false, Ramp: false, 0));
             var distinct = piece.Cells.Distinct().ToList();
             piece.Cells.Clear();
             piece.Cells.AddRange(distinct);

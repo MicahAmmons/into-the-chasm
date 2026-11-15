@@ -55,6 +55,18 @@ public static class RegionMask
     public static void ApplyClips(float[] a, IReadOnlyList<ClipZone> clips)
     {
         foreach (var clip in clips)
+        {
+            if (clip.Cells is null)
+            {
+                // Whole mask: one factor per pixel column.
+                for (int x = 0; x < Width; x++)
+                {
+                    float f = clip.Factor(x * 2 + 1);
+                    if (f >= 1f) continue;
+                    for (int y = 0; y < Height; y++) a[y * Width + x] *= f;
+                }
+                continue;
+            }
             foreach (var c in clip.Cells)
             {
                 var centre = IsoGrid.CellCenter(c);
@@ -68,6 +80,7 @@ public static class RegionMask
                         a[y * Width + x] *= clip.Factor(p.X);
                     }
             }
+        }
     }
 
     /// <summary>Multiplies a mask by the edge fade, measured from <paramref name="edge"/> (see <see cref="Edge"/>).</summary>

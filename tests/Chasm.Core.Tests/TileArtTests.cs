@@ -196,6 +196,37 @@ public class TileArtTests
     }
 
     [Fact]
+    public void Faces_stop_at_the_edge_they_hang_from()
+    {
+        // Two cells touching only at a corner point: nothing may spill past the walkway's ends.
+        var t = WalkableTile(new CellCoord(10, 2), new CellCoord(11, 1));
+        var (floor, walls, _, _) = WallFloor();
+        var pieces = AutoWalls.Build(t, floor, false, walls);
+        var a = IsoGrid.CellCenter(new CellCoord(10, 2));
+        float leftEnd = a.X - IsoGrid.HalfW;                   // the lone cell's left point
+        foreach (var p in pieces)
+        {
+            var m = RegionMask.BuildBase(p.Cells, 0, clips: p.Clips).shape;
+            for (float y = a.Y; y < a.Y + 120; y += 8)
+                Assert.Equal(0f, At(m, leftEnd - 20, y), 2);   // nothing left of the walkway
+        }
+    }
+
+    [Fact]
+    public void Walls_up_join_a_straight_edge_into_one_piece()
+    {
+        // A row along +q: its upper-RIGHT edges are one straight line (one piece), its upper-left
+        // edges each start a new line.
+        var t = WalkableTile(Enumerable.Range(6, 5).Select(q => new CellCoord(q, 3)).ToArray());
+        var up = new WallDef { Id = "up", Texture = "u.png", Kind = MaterialKind.WallUp, Depth = 2, MaxRun = 10 };
+        var floor = new FloorDef { Id = "f" };
+        floor.WallsUp.Add(new FloorWall { Wall = "up" });
+        var pieces = AutoWalls.Build(t, floor, up: true, id => id == "up" ? up : null);
+        Assert.Single(pieces, p => p.RightFace);
+        Assert.All(pieces, p => Assert.All(p.Cells, c => Assert.False(t.IsWalkable(c))));
+    }
+
+    [Fact]
     public void Painted_cells_switch_wall_or_remove_it_and_walls_keep_their_own_fade()
     {
         var t = WalkableTile(Enumerable.Range(4, 6).Select(q => new CellCoord(q, 3)).ToArray());

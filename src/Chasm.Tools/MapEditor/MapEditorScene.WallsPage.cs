@@ -256,6 +256,8 @@ public sealed partial class MapEditorScene
     private FloorDef? _previewFloor;
     private int _sampleSeed = 1;
     private bool _openBackdrop, _previewPaint = true;
+    /// <summary>Grid, walkable outlines, outlines and captions in the wall / prefab previews. Off = as in game.</summary>
+    private bool _previewHelpers;
     private (float taper, float squash) _wallTaper;
 
     private void StartNewWall(MaterialKind kind)
@@ -383,6 +385,8 @@ public sealed partial class MapEditorScene
         if (_backdrop == Backdrop.Sample) { if (ImGui.Button("Reshuffle sample")) { _sampleSeed++; BuildPreview(); } ImGui.SameLine(); }
         if (Ui.ToggleButton(_previewPaint ? "Painting walkable" : "Paint walkable", _previewPaint, new Num.Vector2(170, 0),
                 "Click / drag on the map to add or remove walkable cells in the preview. The wall builds itself around them.")) _previewPaint = !_previewPaint;
+        ImGui.SameLine();
+        if (Ui.ToggleButton("Grid & highlights", _previewHelpers, new Num.Vector2(0, 0), "Show the grid, walkable outlines and captions (H).\nOff = the preview looks as it will in the game.")) _previewHelpers = !_previewHelpers;
         Ui.Hint("The preview is a copy: painting here never changes your real tile.");
         ImGui.BeginChild("walled", new Num.Vector2(0, -40));
 
@@ -550,6 +554,7 @@ public sealed partial class MapEditorScene
     private bool UpdateWallPreviewInput(InputState input)
     {
         if (_panel != Panel.WallEdit || _previewTile is null) return false;
+        if (input.KeyPressed(Microsoft.Xna.Framework.Input.Keys.H) && !input.KeyboardCapturedByUi) _previewHelpers = !_previewHelpers;
         if (!_previewPaint) return true;
         if (input.LeftReleased || input.RightReleased) _dragMode = null;
         bool before = false;
@@ -565,6 +570,7 @@ public sealed partial class MapEditorScene
         var s = Services;
         TileRenderer.QueueLayers(_queue, s, t, _previewFloor, includeProps: _backdrop == Backdrop.ThisTile);
         _queue.Flush(batch);
+        if (!_previewHelpers) return; // clean: exactly what the game draws
         batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend);
         var d = s.Draw;
         bool grid = _backdrop != Backdrop.Blank;
