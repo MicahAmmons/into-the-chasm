@@ -312,6 +312,12 @@ public sealed class CloudLayer
     /// </summary>
     [Ref(typeof(CloudPrefabDef)), Tooltip("Use a saved cloud prefab (all its layers) instead of this layer's own settings.")]
     public string Prefab { get; set; } = "";
+    /// <summary>
+    /// A prefab entry's layers edited here and not saved to the prefab (null = the prefab as saved).
+    /// Saving them over the prefab, or as a new one, is the editor's choice.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public List<CloudLayer>? Layers { get; set; }
     [Texture] public string Texture { get; set; } = "";
     [Tooltip("Multiplied over the clouds, #RRGGBB. White = unchanged.")] public string Tint { get; set; } = "#ffffff";
     [Range(0, 1), Tooltip("0 = invisible, 1 = solid.")] public float Opacity { get; set; } = 1f;
@@ -332,7 +338,12 @@ public sealed class CloudLayer
     [Range(40, 2000), Tooltip("Ripple only: distance between wave crests, in pixels.")]
     public float RippleLength { get; set; } = 320f;
 
-    public CloudLayer Copy() => (CloudLayer)MemberwiseClone();
+    public CloudLayer Copy()
+    {
+        var c = (CloudLayer)MemberwiseClone();
+        c.Layers = Layers?.Select(l => l.Copy()).ToList();
+        return c;
+    }
 
     /// <summary>The layer's scroll + pattern at a time (seconds). Ripple's banding is applied by the renderer.</summary>
     public CloudMotion MotionAt(double seconds)
@@ -412,9 +423,11 @@ public static class CloudStack
             if (!effective.Enabled || effective.Opacity <= 0) continue;
             if (!string.IsNullOrEmpty(effective.Prefab))
             {
-                // A prefab: all its layers, back to front, faded by this entry's opacity.
-                if (prefabs?.Invoke(effective.Prefab) is not { } prefab) continue;
-                foreach (var inner in prefab.Layers)
+                // A prefab: all its layers (or this entry's unsaved edits of them), back to front,
+                // faded by this entry's opacity.
+                var inners = effective.Layers ?? prefabs?.Invoke(effective.Prefab)?.Layers;
+                if (inners is null) continue;
+                foreach (var inner in inners)
                 {
                     if (!inner.Enabled || inner.Opacity <= 0 || string.IsNullOrEmpty(inner.Texture) || !string.IsNullOrEmpty(inner.Prefab)) continue;
                     var c = inner.Copy();

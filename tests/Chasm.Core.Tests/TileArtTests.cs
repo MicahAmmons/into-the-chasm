@@ -421,6 +421,12 @@ public class TileArtTests
         var swapped = new TileDef { Id = "s" };
         swapped.CloudOverrides.Add(new TileCloudOverride { Layer = "c1", Settings = new CloudLayer { Id = "c1", Prefab = "calm" } });
         Assert.Equal(new[] { "c1/layer_1" }, CloudStack.Resolve(floor, swapped, find).Select(c => c.Texture == "d.png" ? c.Id : "?"));
+        // Edited on this floor only: the floor shows its own copy; the prefab is untouched.
+        floor.Clouds[0].Layers = new() { new CloudLayer { Id = "layer_1", Texture = "x.png", Speed = 5 } };
+        Assert.Equal("x.png", CloudStack.Resolve(floor, new TileDef { Id = "t" }, find).Single().Texture);
+        Assert.Equal(3, storm.Layers.Count);
+        Assert.NotSame(floor.Clouds[0].Layers, floor.Clouds[0].Copy().Layers);         // copies don't share edits
+        floor.Clouds[0].Layers = null;
         var hidden = new TileDef { Id = "h" };
         hidden.CloudOverrides.Add(new TileCloudOverride { Layer = "c1", Settings = new CloudLayer { Id = "c1", Prefab = "storm", Enabled = false } });
         Assert.Empty(CloudStack.Resolve(floor, hidden, find));

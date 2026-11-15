@@ -12,27 +12,22 @@ namespace Chasm.Tools.MapEditor;
 /// </summary>
 public sealed partial class MapEditorScene
 {
-    private readonly HashSet<string> _dirtyCloudPrefabs = new();
     private string? _openPrefabLayer;
     private bool _openAddCloudPrefab;
     private bool _openSaveCloudPrefab;
     private string _cloudPrefabName = "";
     private readonly HashSet<string> _cloudPrefabPick = new();
     private bool _cloudPrefabReplace = true;
+    private bool _openSaveAsCloudPrefab;
+    private CloudLayer? _saveAsEntry;
+    /// <summary>A change to the floor's cloud list that has to wait until the list is drawn.</summary>
+    private Action? _afterCloudList;
 
     private CloudPrefabDef? PrefabOf(CloudLayer entry) =>
         !string.IsNullOrEmpty(entry.Prefab) && Services.Defs.TryGet<CloudPrefabDef>(entry.Prefab, out var p) ? p : null;
 
-    private void SaveCloudPrefabs()
-    {
-        foreach (var id in _dirtyCloudPrefabs)
-            if (Services.Defs.TryGet<CloudPrefabDef>(id, out var p))
-            {
-                Services.DefReload.IgnoreNextChange(Services.Defs.PathFor(typeof(CloudPrefabDef), id));
-                Services.Defs.Save(p);
-            }
-        _dirtyCloudPrefabs.Clear();
-    }
+    /// <summary>The layers a prefab entry shows: its unsaved edits, else the prefab's.</summary>
+    private List<CloudLayer>? PrefabLayersOf(CloudLayer entry) => entry.Layers ?? PrefabOf(entry)?.Layers;
 
     /// <summary>Show / opacity / which prefab: what a floor entry or a tile override sets for a prefab.</summary>
     private bool PrefabEntryFields(CloudLayer e)
@@ -51,13 +46,22 @@ public sealed partial class MapEditorScene
         if (ImGui.BeginCombo("##ppick", current?.DisplayName ?? "(missing)"))
         {
             foreach (var p in Services.Defs.All<CloudPrefabDef>().OrderBy(p => p.DisplayName))
-                if (ImGui.Selectable($"{p.DisplayName}  ({p.Layers.Count} layers)##{p.Id}", p == current)) { e.Prefab = p.Id; changed = true; }
+                if (ImGui.Selectable($"{p.DisplayName}  ({p.Layers.Count} layers)##{p.Id}", p == current) && p != current)
+                {
+                    e.Prefab = p.Id;
+                    e.Layers = null;   // edits were for the other prefab
+                    changed = true;
+                }
             ImGui.EndCombo();
         }
         return changed;
     }
 
-    /// <summary>A prefab entry on the floor, opened: its settings, then the prefab's own layers (linked).</summary>
+    /// <summary>
+    /// A prefab entry on the floor, opened: its settings, then its layers. Editing a layer doesn't
+    /// touch the saved prefab: the edits stay on this floor ("edited here") until you Save them over
+    /// the prefab, Save them as a new prefab, or Revert.
+    /// </summary>
     private bool PrefabEntry(FloorDef floor, List<CloudLayer> list, int index)
     {
         var e = list[index];
@@ -66,76 +70,151 @@ public sealed partial class MapEditorScene
         string name = e.Name;
         if (ImGui.InputText("##pname", ref name, 80)) { e.Name = name; changed = true; }
         changed |= PrefabEntryFields(e);
-        if (PrefabOf(e) is not { } prefab)
+        var prefab = PrefabOf(e);
+        if (prefab is null && e.Layers is null)
         {
-            Ui.Colored(Ui.Warn, "This prefab is missing (deleted?). Pick another or delete the entry.");
+            Ui.Colored(Ui.Warn, "This prefab is missing (deleted?). Pick another or remove the entry.");
             return changed;
         }
-        Ui.ColoredWrapped(Ui.Blue, $"Linked to '{prefab.DisplayName}': editing its layers below changes it everywhere it's used (saved with Save).");
 
-        // The prefab's layers, back to front.
-        Ui.Colored(Ui.Muted, "Prefab layers (top = furthest back):");
-        int up = -1, down = -1, remove = -1;
-        for (int i = 0; i < prefab.Layers.Count; i++)
+        // Saved, or edited here?
+        if (e.Layers is not null)
         {
-            var l = prefab.Layers[i];
-            ImGui.PushID("pl" + l.Id);
+            Ui.ColoredWrapped(Ui.Warn, prefab is null
+                ? "Edited here; the prefab it came from is gone. Save as a new prefab to keep it."
+                : $"Edited here: these changes are only on this floor. '{prefab.DisplayName}' itself is unchanged until you save over it.");
+            if (prefab is not null)
+            {
+                if (Ui.AccentButton("Save to prefab"))
+                {
+                    prefab.Layers = e.Layers.Select(l => l.Copy()).ToList();
+                    Services.DefReload.IgnoreNextChange(Services.Defs.PathFor(typeof(CloudPrefabDef), prefab.Id));
+                    Services.Defs.Save(prefab);
+                    e.Layers = null;
+                    changed = true;
+                    Status($"Saved over '{prefab.DisplayName}'. Every floor and tile using it now shows this.");
+                }
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Overwrite '{prefab.DisplayName}' with these layers (every floor using it updates).");
+                ImGui.SameLine();
+            }
+            if (ImGui.Button("Save as new prefab...")) { _saveAsEntry = e; _cloudPrefabName = (prefab?.DisplayName ?? e.Name) + " 2"; _openSaveAsCloudPrefab = true; }
+            if (prefab is not null)
+            {
+                ImGui.SameLine();
+                if (ImGui.Button("Revert")) { e.Layers = null; changed = true; }
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Throw away the changes made here: back to the prefab as saved.");
+            }
+        }
+        else Ui.Hint($"Using '{prefab!.DisplayName}' as saved. Change a layer below and it stays on this floor only, until you choose to save it.");
+        SaveAsCloudPrefabPopup();
+
+        // The layers, back to front, each collapsible. Edits go to this entry's own copy.
+        var layers = e.Layers ?? prefab!.Layers;
+        List<CloudLayer> Own() => e.Layers ??= prefab!.Layers.Select(l => l.Copy()).ToList();
+        int up = -1, down = -1, remove = -1;
+        for (int i = 0; i < layers.Count; i++)
+        {
+            var l = layers[i];
+            // Not edited yet: edit a copy, and only make this entry's own copy if something changes.
+            var target = e.Layers is not null ? l : l.Copy();
+            bool lc = false;
+            ImGui.PushID("pl" + i);
             if (ImGui.ArrowButton("up", ImGuiDir.Up)) up = i;
             ImGui.SameLine(0, 2);
             if (ImGui.ArrowButton("down", ImGuiDir.Down)) down = i;
             ImGui.SameLine();
-            bool on = l.Enabled;
-            if (ImGui.Checkbox("##on", ref on)) { l.Enabled = on; MarkPrefab(prefab); }
+            bool on = target.Enabled;
+            if (ImGui.Checkbox("##on", ref on)) { target.Enabled = on; lc = true; }
             ImGui.SameLine();
-            Thumb(l.Texture, 22);
+            Thumb(target.Texture, 22);
             ImGui.SameLine();
-            string key = prefab.Id + "/" + l.Id;
-            bool open = _openPrefabLayer == key;
-            if (ImGui.Selectable(l.Name, open, ImGuiSelectableFlags.None, new Num.Vector2(0, 22))) _openPrefabLayer = open ? null : key;
-            if (open)
+            bool open = _openPrefabLayer == l.Id;
+            ImGui.SetNextItemOpen(open);
+            bool node = ImGui.TreeNodeEx($"{target.Name}###layer", ImGuiTreeNodeFlags.SpanAvailWidth);
+            if (node != open) _openPrefabLayer = node ? l.Id : null;
+            if (node)
             {
-                ImGui.Indent();
-                if (CloudFields(l)) MarkPrefab(prefab);
+                lc |= CloudFields(target);
                 if (ImGui.Button("Delete layer")) remove = i;
-                ImGui.Unindent();
+                ImGui.TreePop();
                 ImGui.Spacing();
             }
+            if (lc) { if (e.Layers is null) Own()[i] = target; changed = true; }
             ImGui.PopID();
         }
-        if (up > 0) { (prefab.Layers[up - 1], prefab.Layers[up]) = (prefab.Layers[up], prefab.Layers[up - 1]); MarkPrefab(prefab); }
-        if (down >= 0 && down < prefab.Layers.Count - 1) { (prefab.Layers[down + 1], prefab.Layers[down]) = (prefab.Layers[down], prefab.Layers[down + 1]); MarkPrefab(prefab); }
-        if (remove >= 0) { prefab.Layers.RemoveAt(remove); MarkPrefab(prefab); }
-        if (ImGui.Button("+ Add layer to prefab"))
+        if (up > 0) { var o = Own(); (o[up - 1], o[up]) = (o[up], o[up - 1]); changed = true; }
+        if (down >= 0 && down < layers.Count - 1) { var o = Own(); (o[down + 1], o[down]) = (o[down], o[down + 1]); changed = true; }
+        if (remove >= 0) { Own().RemoveAt(remove); changed = true; }
+        if (ImGui.Button("+ Add layer"))
         {
-            var layer = new CloudLayer { Id = prefab.NewLayerId(), Name = $"Layer {prefab.Layers.Count + 1}", Texture = "" };
-            prefab.Layers.Add(layer);
-            _openPrefabLayer = prefab.Id + "/" + layer.Id;
-            MarkPrefab(prefab);
-            Art.ArtBrowser.OpenPick(null, k => { layer.Texture = k; MarkPrefab(prefab); });
+            var o = Own();
+            var layer = new CloudLayer { Id = NewLayerId(o), Name = $"Layer {o.Count + 1}", Texture = "" };
+            o.Add(layer);
+            _openPrefabLayer = layer.Id;
+            changed = true;
+            Art.ArtBrowser.OpenPick(null, k => { layer.Texture = k; Edited(); });
         }
         ImGui.SameLine();
         if (ImGui.Button("Unlink (copy its layers here)"))
         {
-            // The prefab's layers become this floor's own layers, in its place.
-            list.RemoveAt(index);
-            int at = index;
-            foreach (var l in prefab.Layers)
+            var copy = layers.Select(l => l.Copy()).ToList();
+            _afterCloudList = () =>
             {
-                var copy = l.Copy();
-                copy.Id = CloudStack.NewId(floor);
-                copy.Opacity *= e.Opacity;
-                if (!e.Enabled) copy.Enabled = false;
-                list.Insert(at++, copy);
-            }
-            _openCloud = null;
-            changed = true;
-            Status($"Unlinked: '{prefab.DisplayName}' is now {prefab.Layers.Count} layer(s) of this floor. The prefab is unchanged.");
+                // The layers become this floor's own plain layers, in the prefab's place.
+                int at = list.IndexOf(e);
+                if (at < 0) return;
+                list.RemoveAt(at);
+                foreach (var l in copy)
+                {
+                    l.Id = CloudStack.NewId(floor);
+                    l.Opacity *= e.Opacity;
+                    if (!e.Enabled) l.Enabled = false;
+                    list.Insert(at++, l);
+                }
+                _openCloud = null;
+                Edited();
+                Status($"Unlinked: now {copy.Count} layer(s) of this floor. The prefab is unchanged.");
+            };
         }
-        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Copies the layers onto this floor so you can change them here only.");
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Turns it into this floor's own plain layers (no longer a prefab).");
         return changed;
     }
 
-    private void MarkPrefab(CloudPrefabDef p) => _dirtyCloudPrefabs.Add(p.Id);
+    private static string NewLayerId(List<CloudLayer> layers)
+    {
+        for (int n = 1; ; n++)
+            if (layers.All(l => l.Id != "layer_" + n)) return "layer_" + n;
+    }
+
+    private void SaveAsCloudPrefabPopup()
+    {
+        if (_openSaveAsCloudPrefab) { ImGui.OpenPopup("Save as a new cloud prefab"); _openSaveAsCloudPrefab = false; }
+        CenterNextWindow();
+        if (!ImGui.BeginPopupModal("Save as a new cloud prefab", ImGuiWindowFlags.AlwaysAutoResize)) return;
+        Ui.Hint("Saves these layers as a new prefab (the original stays as it was). This floor then uses the new one.");
+        ImGui.SetNextItemWidth(300);
+        if (ImGui.IsWindowAppearing()) ImGui.SetKeyboardFocusHere();
+        bool enter = ImGui.InputTextWithHint("##sacp", "Prefab name", ref _cloudPrefabName, 60, ImGuiInputTextFlags.EnterReturnsTrue);
+        bool ok = _cloudPrefabName.Trim().Length > 0 && _saveAsEntry is not null;
+        ImGui.BeginDisabled(!ok);
+        if (Ui.AccentButton("Save", new Num.Vector2(120, 0)) || (enter && ok))
+        {
+            var e = _saveAsEntry!;
+            var p = new CloudPrefabDef { Name = _cloudPrefabName.Trim(), Layers = (PrefabLayersOf(e) ?? new()).Select(l => l.Copy()).ToList() };
+            p.Id = Services.Defs.SuggestId(typeof(CloudPrefabDef), p.Name);
+            Services.Defs.Save(p);
+            e.Prefab = p.Id;
+            e.Name = p.Name;
+            e.Layers = null;
+            Edited();
+            Status($"Saved new cloud prefab '{p.Name}'. This floor now uses it.");
+            ImGui.CloseCurrentPopup();
+        }
+        ImGui.EndDisabled();
+        ImGui.SameLine();
+        if (ImGui.Button("Cancel", new Num.Vector2(100, 0))) ImGui.CloseCurrentPopup();
+        ImGui.EndPopup();
+    }
 
     private void AddCloudPrefabPopup(FloorDef floor, List<CloudLayer> clouds)
     {
