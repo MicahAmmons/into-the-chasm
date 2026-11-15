@@ -68,7 +68,7 @@ public sealed partial class MapEditorScene : Scene
         ToolContext.Wizards.Inspector.CellPicker = cb => { _cellPick = cb; Status("Click a cell on the map (Esc cancels)."); };
         Art.ArtLibrary.KeysMoved += OnArtMoved;
         if (_openOnStart is not null && Services.Defs.TryGet<TileDef>(_openOnStart, out var t)) Open(t);
-        // Dev convenience for automated screenshots: CHASM_EDITOR=tool[:panel][:neighbours][:mat=<id>][:cut][:dup][:game]
+        // Dev convenience for automated screenshots: CHASM_EDITOR=tool[:panel][:neighbours][:mat=<id>][:cut][:dup][:warp][:game]
         if (_tile is not null && Environment.GetEnvironmentVariable("CHASM_EDITOR") is { } dev)
         {
             var parts = dev.Split(':');
@@ -80,6 +80,13 @@ public sealed partial class MapEditorScene : Scene
                 _editingMaterial = md.Id;
                 if (parts.Contains("cut")) { md.UseForCutOut = true; _cutOutMaterial = md.Id; }
                 if (parts.Contains("dup")) AskDuplicateMaterial(md, _floor.Materials, true);
+                if (parts.Contains("warp"))
+                {
+                    var wt = Services.Textures.Get(md.Texture);
+                    md.Warp = MaterialWarp.Taper(0.55f, 0.25f, wt.Width, wt.Height);
+                    md.Scale = 1.2f;
+                    _sheetMaterial = md.Id;
+                }
             }
             if (parts.Contains("game")) ToggleGameView();
             if (parts.Contains("selectall")) foreach (var c in IsoGrid.AllCells.Where(c => _tile.Walkable[c])) _selection.Add(c);

@@ -81,6 +81,7 @@ public sealed partial class MapEditorScene
         // Paint selection + selected region.
         foreach (var c in _selection) d.DiamondFill(b, IsoGrid.CellCenter(c), 110, 55, new Color(255, 220, 60) * 0.45f);
         DrawFadeLines(b);
+        DrawSheetHandles(b);
         // Carved cells of the region being stencilled (or the selected region).
         var stRegion = _stencilRegionId is { } stId ? t.PaintRegions.FirstOrDefault(r => r.Id == stId) : _selectedRegion;
         if (stRegion is not null)

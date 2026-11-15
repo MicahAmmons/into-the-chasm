@@ -137,9 +137,13 @@ public sealed class TileVisuals : IDisposable
             // 1. texture into scratch
             _device.SetRenderTarget(_scratch);
             _device.Clear(Color.Transparent);
-            _batch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.LinearWrap);
-            DrawMaterial(_batch, mat, region.Opacity);
-            _batch.End();
+            if (mat.Warp is not null) DrawWarped(mat, region.Opacity);
+            else
+            {
+                _batch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.LinearWrap);
+                DrawMaterial(_batch, mat, region.Opacity);
+                _batch.End();
+            }
             // 2. multiply by mask
             var mask = Mask(region, mat, floor);
             _batch.Begin(SpriteSortMode.Immediate, MultiplyByAlpha, SamplerState.LinearClamp);
@@ -155,19 +159,79 @@ public sealed class TileVisuals : IDisposable
     }
 
     /// <summary>
-    /// Draws a material as a full-screen layer (no mask): centred on the screen, rotated around the
-    /// centre, flipped, tinted, repeating so any rotation covers the screen. The batch must use
-    /// SamplerState.LinearWrap.
+    /// Draws a material (no warp) as a full-screen layer: centred on the screen plus its offset,
+    /// zoomed by its scale, rotated around its centre, flipped, tinted, and repeating so any
+    /// rotation covers the screen. The batch must use SamplerState.LinearWrap.
     /// </summary>
     public void DrawMaterial(SpriteBatch batch, MaterialDef mat, float opacity = 1f)
     {
         var tex = _textures.Get(mat.Texture);
-        const int cover = 2210; // >= screen diagonal (2203), so any rotation covers 1920x1080
+        float scale = Math.Clamp(mat.Scale, 0.05f, 16f);
+        // Enough texture (in texture pixels) to cover the screen at any rotation and offset.
+        float coverPx = 2210 + 2 * (Math.Abs(mat.OffsetX) + Math.Abs(mat.OffsetY));
+        int cover = (int)MathF.Ceiling(coverPx / scale);
         int w = Math.Max(cover, tex.Width), h = Math.Max(cover, tex.Height);
         var src = new Rectangle(tex.Width / 2 - w / 2, tex.Height / 2 - h / 2, w, h);
         var fx = (mat.FlipX ? SpriteEffects.FlipHorizontally : 0) | (mat.FlipY ? SpriteEffects.FlipVertically : 0);
         var tint = TileRenderer.ParseColor(mat.Tint, Color.White) * opacity;
-        batch.Draw(tex, new Vector2(960, 540), src, tint, MathHelper.ToRadians(mat.Rotation), new Vector2(w / 2f, h / 2f), 1f, fx, 0);
+        var centre = MaterialSheet.Centre(mat);
+        batch.Draw(tex, new Vector2(centre.X, centre.Y), src, tint, MathHelper.ToRadians(mat.Rotation), new Vector2(w / 2f, h / 2f), scale, fx, 0);
+    }
+
+    // ------------------------------------------------------------------ perspective warp
+
+    private BasicEffect? _warpEffect;
+    private const int WarpGrid = 32; // the warped sheet is drawn as a 32x32 mesh, so perspective stays smooth
+    private VertexPositionColorTexture[]? _warpVerts;
+    private short[]? _warpIndices;
+
+    /// <summary>
+    /// Draws one copy of a material's texture pinned to its four warped corners, with true
+    /// perspective (the far end shrinks smoothly). Outside the shape stays empty.
+    /// Draws into whatever render target is set.
+    /// </summary>
+    public void DrawWarped(MaterialDef mat, float opacity = 1f)
+    {
+        var tex = _textures.Get(mat.Texture);
+        var c = MaterialSheet.Corners(mat, tex.Width, tex.Height);
+        var h = Homography.SquareToQuad(c[0], c[1], c[2], c[3]);
+        var tint = TileRenderer.ParseColor(mat.Tint, Color.White) * opacity;
+        int n = WarpGrid;
+        _warpVerts ??= new VertexPositionColorTexture[(n + 1) * (n + 1)];
+        if (_warpIndices is null)
+        {
+            _warpIndices = new short[n * n * 6];
+            int k = 0;
+            for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                {
+                    short i0 = (short)(y * (n + 1) + x), i1 = (short)(i0 + 1), i2 = (short)(i0 + n + 1), i3 = (short)(i2 + 1);
+                    _warpIndices[k++] = i0; _warpIndices[k++] = i1; _warpIndices[k++] = i2;
+                    _warpIndices[k++] = i1; _warpIndices[k++] = i3; _warpIndices[k++] = i2;
+                }
+        }
+        for (int y = 0; y <= n; y++)
+            for (int x = 0; x <= n; x++)
+            {
+                float u = x / (float)n, v = y / (float)n;
+                var p = h.Map(u, v);
+                float tu = mat.FlipX ? 1 - u : u, tv = mat.FlipY ? 1 - v : v;
+                _warpVerts[y * (n + 1) + x] = new VertexPositionColorTexture(new Vector3(p.X, p.Y, 0), tint, new Vector2(tu, tv));
+            }
+        _warpEffect ??= new BasicEffect(_device) { TextureEnabled = true, VertexColorEnabled = true, LightingEnabled = false };
+        _warpEffect.Texture = tex;
+        _warpEffect.World = Matrix.Identity;
+        _warpEffect.View = Matrix.Identity;
+        _warpEffect.Projection = Matrix.CreateOrthographicOffCenter(0, 1920, 1080, 0, 0, 1);
+        _device.BlendState = BlendState.AlphaBlend;
+        _device.SamplerStates[0] = SamplerState.LinearClamp;
+        _device.RasterizerState = RasterizerState.CullNone;
+        _device.DepthStencilState = DepthStencilState.None;
+        foreach (var pass in _warpEffect.CurrentTechnique.Passes)
+        {
+            pass.Apply();
+            _device.DrawUserIndexedPrimitives(PrimitiveType.TriangleList, _warpVerts, 0, _warpVerts.Length, _warpIndices, 0, _warpIndices.Length / 3);
+        }
     }
 
     // ------------------------------------------------------------------ masks
@@ -235,6 +299,7 @@ public sealed class TileVisuals : IDisposable
         foreach (var (_, b) in _bakes) b.Dispose();
         foreach (var (m, _) in _masks.Values) m.Dispose();
         _scratch?.Dispose();
+        _warpEffect?.Dispose();
         _batch.Dispose();
     }
 }

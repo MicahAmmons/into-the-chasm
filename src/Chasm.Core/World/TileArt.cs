@@ -11,6 +11,56 @@ public enum CloudFade
     [Label("Fades into the upper clouds (walls going up)")] IntoUpperClouds,
 }
 
+/// <summary>
+/// A material's perspective warp: how far each corner of the texture is pulled from where it
+/// would be (pixels, in the sheet's own unrotated frame). With a warp on, one copy of the texture
+/// is drawn (no repeating), so position and scale it to cover the cells.
+/// </summary>
+public sealed class MaterialWarp
+{
+    public float TopLeftX { get; set; }
+    public float TopLeftY { get; set; }
+    public float TopRightX { get; set; }
+    public float TopRightY { get; set; }
+    public float BottomRightX { get; set; }
+    public float BottomRightY { get; set; }
+    public float BottomLeftX { get; set; }
+    public float BottomLeftY { get; set; }
+
+    /// <summary>Corner offset by index: 0 top-left, 1 top-right, 2 bottom-right, 3 bottom-left.</summary>
+    public System.Numerics.Vector2 Get(int corner) => corner switch
+    {
+        0 => new(TopLeftX, TopLeftY),
+        1 => new(TopRightX, TopRightY),
+        2 => new(BottomRightX, BottomRightY),
+        _ => new(BottomLeftX, BottomLeftY),
+    };
+
+    public void Set(int corner, System.Numerics.Vector2 v)
+    {
+        switch (corner)
+        {
+            case 0: TopLeftX = v.X; TopLeftY = v.Y; break;
+            case 1: TopRightX = v.X; TopRightY = v.Y; break;
+            case 2: BottomRightX = v.X; BottomRightY = v.Y; break;
+            default: BottomLeftX = v.X; BottomLeftY = v.Y; break;
+        }
+    }
+
+    /// <summary>
+    /// Quick perspective: pinch the bottom (positive) or top (negative) edge toward the middle,
+    /// as a fraction of the width, and pull that edge in by <paramref name="squash"/> of the height.
+    /// </summary>
+    public static MaterialWarp Taper(float taper, float squash, float width, float height)
+    {
+        float dx = Math.Abs(taper) * width / 2f, dy = squash * height;
+        var w = new MaterialWarp();
+        if (taper >= 0) { w.BottomLeftX = dx; w.BottomRightX = -dx; w.BottomLeftY = w.BottomRightY = -dy; }
+        else { w.TopLeftX = dx; w.TopRightX = -dx; w.TopLeftY = w.TopRightY = dy; }
+        return w;
+    }
+}
+
 /// <summary>Which floor page a material lives on.</summary>
 public enum MaterialKind
 {
@@ -58,6 +108,11 @@ public sealed class MaterialDef
     public string Tint { get; set; } = "#ffffff";
     public bool FlipX { get; set; }
     public bool FlipY { get; set; }
+    [Hidden, Tooltip("Moves the texture sheet (pixels from the middle of the screen).")] public float OffsetX { get; set; }
+    [Hidden] public float OffsetY { get; set; }
+    [Hidden, Range(0.1f, 4), Tooltip("Size of the texture sheet. 1 = real size.")] public float Scale { get; set; } = 1f;
+    /// <summary>Perspective warp (corner pin). Null = off: the texture repeats to cover the screen.</summary>
+    [Hidden] public MaterialWarp? Warp { get; set; }
     public CloudFade Fade { get; set; } = CloudFade.None;
     [Range(0, 8), Tooltip("Cells below the cliff's top edge where the fade begins (1 cell = 64 px).")]
     public float FadeStart { get; set; } = 1f;

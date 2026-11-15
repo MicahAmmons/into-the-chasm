@@ -44,6 +44,8 @@ public sealed partial class MapEditorScene
         }
         bool overCanvas = canvas.Area.Contains(input.MouseWindow) && !input.MouseCapturedByUi;
         int wheel = overCanvas ? input.ScrollDelta : 0, hwheel = overCanvas ? input.HorizontalScrollDelta : 0;
+        // Shift + scroll zooms the texture whose handles are on the map (some trackpads send it sideways).
+        if (SheetScrollZoom(input, wheel != 0 ? wheel : hwheel)) { wheel = 0; hwheel = 0; }
 
         _gestureQuiet += dt;
         if (wheel != 0 || hwheel != 0)
@@ -136,7 +138,7 @@ public sealed partial class MapEditorScene
             _savedZoom = canvas.Zoom;
             _savedPan = canvas.Pan;
             _gameView = true;
-            _cutOutMaterial = null; _stencilRegionId = null; _panning = false;
+            _cutOutMaterial = null; _stencilRegionId = null; _sheetMaterial = null; _panning = false;
             canvas.ResetView();
             Status("Game view. Press G, Esc or the button to go back.");
         }

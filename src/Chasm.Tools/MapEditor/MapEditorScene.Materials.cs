@@ -103,6 +103,14 @@ public sealed partial class MapEditorScene
             { m.FadeStart = start; m.FadeLength = length; m.FadeAngle = angle; changed = true; }
         }
 
+        if (changed)
+        {
+            Edited();
+            if (isFloor) Services.TileVisuals.InvalidateAll();
+            changed = false;
+        }
+        SheetFields(m, reference);
+
         // Cut out
         ImGui.Spacing();
         bool cut = m.UseForCutOut;
@@ -132,7 +140,7 @@ public sealed partial class MapEditorScene
                 "Click or drag on the map to add cells; click a selected cell (or right-drag) to remove.\nThe texture shows through live."))
         {
             _cutOutMaterial = picking ? null : reference;
-            if (!picking) _stencilRegionId = null;
+            if (!picking) { _stencilRegionId = null; _sheetMaterial = null; }
             if (!picking) Status($"Selecting cut-out cells for '{m.Name}'. Click/drag cells; Esc when done.");
         }
         ImGui.SameLine();
@@ -271,7 +279,7 @@ public sealed partial class MapEditorScene
                 "Click / drag over this region's cells to carve them with the chosen stencil.\nClick a carved cell again (or right-drag) to remove it."))
         {
             _stencilRegionId = placing ? null : region.Id;
-            if (!placing) { _cutOutMaterial = null; Status($"Carving with {Path.GetFileNameWithoutExtension(_stencilKey)}. Click/drag cells; Esc when done."); }
+            if (!placing) { _cutOutMaterial = null; _sheetMaterial = null; Status($"Carving with {Path.GetFileNameWithoutExtension(_stencilKey)}. Click/drag cells; Esc when done."); }
         }
         ImGui.EndDisabled();
         if (_stencilKey.Length == 0 && !placing) { ImGui.SameLine(); ImGui.TextDisabled("pick a stencil first"); }

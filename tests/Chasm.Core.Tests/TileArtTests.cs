@@ -90,6 +90,32 @@ public class TileArtTests
     }
 
     [Fact]
+    public void Corner_pin_maps_square_corners_and_foreshortens()
+    {
+        var p0 = new System.Numerics.Vector2(0, 0); var p1 = new System.Numerics.Vector2(400, 0);
+        var p2 = new System.Numerics.Vector2(300, 200); var p3 = new System.Numerics.Vector2(100, 200);
+        var h = Homography.SquareToQuad(p0, p1, p2, p3);
+        Assert.Equal(p0, h.Map(0, 0)); Assert.True((h.Map(1, 0) - p1).Length() < 0.01f);
+        Assert.True((h.Map(1, 1) - p2).Length() < 0.01f); Assert.True((h.Map(0, 1) - p3).Length() < 0.01f);
+        // Perspective: the middle of the texture lands past the middle of the shape (far half shrinks).
+        Assert.True(h.Map(0.5f, 0.5f).Y > 100.5f);
+    }
+
+    [Fact]
+    public void Material_sheet_corners_follow_offset_scale_rotation_and_warp()
+    {
+        var m = new MaterialDef { OffsetX = 100, OffsetY = -20, Scale = 0.5f };
+        var c = MaterialSheet.Corners(m, 400, 200);
+        Assert.Equal(new System.Numerics.Vector2(960, 470), c[0]);     // 1060-100, 520-50
+        Assert.Equal(new System.Numerics.Vector2(1160, 570), c[2]);
+        m.Warp = MaterialWarp.Taper(0.5f, 0, 200, 100);                 // bottom edge pinched by half
+        c = MaterialSheet.Corners(m, 400, 200);
+        Assert.Equal(1110, c[2].X, 2); Assert.Equal(1010, c[3].X, 2);
+        m.Warp = null; m.Rotation = 90;
+        Assert.True((MaterialSheet.Corners(m, 400, 200)[0] - new System.Numerics.Vector2(1110, 420)).Length() < 0.01f);
+    }
+
+    [Fact]
     public void Cloud_direction_sets_scroll_offset()
     {
         var c = new CloudLayer { Speed = 10, Direction = 90 };
