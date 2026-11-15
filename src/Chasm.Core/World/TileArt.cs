@@ -83,7 +83,9 @@ public enum FadeAngle
 /// Measured from the region's own top edge (lower clouds) or bottom edge (upper clouds),
 /// so a cliff fades the same way wherever it sits on screen.
 /// </summary>
-public readonly record struct EdgeFade(bool Lower, float StartCells, float LengthCells, FadeAngle Angle)
+/// <param name="Curve">Shape of the thinning: 1 = even; above 1 stays solid longer then drops away; below 1 thins quickly at first.</param>
+/// <param name="Haze">0..1: how much the bottom of the fade takes on <paramref name="HazeColor"/> (distance haze).</param>
+public readonly record struct EdgeFade(bool Lower, float StartCells, float LengthCells, FadeAngle Angle, float Curve = 1f, float Haze = 0f, string HazeColor = "#a8acbc")
 {
     public const float CellPx = 64f;
 }
@@ -167,6 +169,30 @@ public sealed class CellStencil
 /// <summary>A stencil's alpha channel, 0..1, row by row.</summary>
 public sealed record StencilImage(int Width, int Height, float[] Alpha)
 {
+    private float[]? _reach;
+
+    /// <summary>
+    /// How far down the shape reaches at u (0..1 across): the lowest opaque point of that column,
+    /// 0 = top, 1 = bottom. Used when a bottom shape steers the fade instead of cutting it.
+    /// </summary>
+    public float ReachAt(float u)
+    {
+        if (_reach is null)
+        {
+            var r = new float[Width];
+            for (int x = 0; x < Width; x++)
+            {
+                int low = -1;
+                for (int y = Height - 1; y >= 0; y--) if (Alpha[y * Width + x] > 0.5f) { low = y; break; }
+                r[x] = (low + 1) / (float)Height;
+            }
+            _reach = r;
+        }
+        float fx = Math.Clamp(u * Width - 0.5f, 0, Width - 1);
+        int x0 = (int)fx, x1 = Math.Min(Width - 1, x0 + 1);
+        return _reach[x0] + (_reach[x1] - _reach[x0]) * (fx - x0);
+    }
+
     /// <summary>Bilinear sample at u, v in 0..1.</summary>
     public float Sample(float u, float v)
     {
@@ -286,6 +312,12 @@ public sealed class CloudLayer
     /// </summary>
     [Ref(typeof(CloudPrefabDef)), Tooltip("Use a saved cloud prefab (all its layers) instead of this layer's own settings.")]
     public string Prefab { get; set; } = "";
+    /// <summary>
+    /// A prefab entry's layers edited here and not saved to the prefab (null = the prefab as saved).
+    /// Saving them over the prefab, or as a new one, is the editor's choice.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public List<CloudLayer>? Layers { get; set; }
     [Texture] public string Texture { get; set; } = "";
     [Tooltip("Multiplied over the clouds, #RRGGBB. White = unchanged.")] public string Tint { get; set; } = "#ffffff";
     [Range(0, 1), Tooltip("0 = invisible, 1 = solid.")] public float Opacity { get; set; } = 1f;
@@ -306,7 +338,12 @@ public sealed class CloudLayer
     [Range(40, 2000), Tooltip("Ripple only: distance between wave crests, in pixels.")]
     public float RippleLength { get; set; } = 320f;
 
-    public CloudLayer Copy() => (CloudLayer)MemberwiseClone();
+    public CloudLayer Copy()
+    {
+        var c = (CloudLayer)MemberwiseClone();
+        c.Layers = Layers?.Select(l => l.Copy()).ToList();
+        return c;
+    }
 
     /// <summary>The layer's scroll + pattern at a time (seconds). Ripple's banding is applied by the renderer.</summary>
     public CloudMotion MotionAt(double seconds)
@@ -386,9 +423,11 @@ public static class CloudStack
             if (!effective.Enabled || effective.Opacity <= 0) continue;
             if (!string.IsNullOrEmpty(effective.Prefab))
             {
-                // A prefab: all its layers, back to front, faded by this entry's opacity.
-                if (prefabs?.Invoke(effective.Prefab) is not { } prefab) continue;
-                foreach (var inner in prefab.Layers)
+                // A prefab: all its layers (or this entry's unsaved edits of them), back to front,
+                // faded by this entry's opacity.
+                var inners = effective.Layers ?? prefabs?.Invoke(effective.Prefab)?.Layers;
+                if (inners is null) continue;
+                foreach (var inner in inners)
                 {
                     if (!inner.Enabled || inner.Opacity <= 0 || string.IsNullOrEmpty(inner.Texture) || !string.IsNullOrEmpty(inner.Prefab)) continue;
                     var c = inner.Copy();

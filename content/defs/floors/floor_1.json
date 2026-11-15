@@ -9,6 +9,7 @@
       "Id": "cloud_1",
       "Name": "Cloud sea",
       "Enabled": true,
+      "Prefab": "",
       "Texture": "Archive/Original Art/backgrounds/clouds/Cloud1.png",
       "Tint": "#ffffff",
       "Opacity": 1,
@@ -35,12 +36,20 @@
   "WallDownFade": {
     "Start": 1,
     "Length": 1.5,
-    "Angle": "Auto"
+    "Angle": "Auto",
+    "Curve": 1,
+    "Haze": 0,
+    "HazeColor": "#a8acbc",
+    "BottomEdges": []
   },
   "WallUpFade": {
     "Start": 1,
     "Length": 1.5,
-    "Angle": "Auto"
+    "Angle": "Auto",
+    "Curve": 1,
+    "Haze": 0,
+    "HazeColor": "#a8acbc",
+    "BottomEdges": []
   },
   "WallsDown": [],
   "WallsUp": [],

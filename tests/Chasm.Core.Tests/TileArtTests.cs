@@ -302,25 +302,34 @@ public class TileArtTests
         var t = WalkableTile(Enumerable.Range(4, 6).Select(q => new CellCoord(q, 3)).ToArray());
         var (floor, walls, _, _) = WallFloor();
         floor.WallDownFade = new WallFade { Start = 1, Length = 2, Angle = FadeAngle.Level };
-        var entry = floor.WallsDown[0];
-        entry.BottomEdges.Add(new BottomEdgeVariant { Name = "A", Stencil = "teeth", Height = 64, Repeat = 128 });
-        entry.BottomEdges.Add(new BottomEdgeVariant { Name = "B", Stencil = "crumble" });
+        floor.WallDownFade.BottomEdges.Add(new BottomEdgeVariant { Name = "A", Stencil = "teeth", Height = 64, Repeat = 128 });
+        floor.WallDownFade.BottomEdges.Add(new BottomEdgeVariant { Name = "B", Stencil = "crumble" });
         var junctions = new List<WallJunction>();
         var face = AutoWalls.Build(t, floor, false, walls, junctions).First(p => p.Kind == WallPieceKind.Face && !p.RightFace);
         Assert.All(face.Bottom, b => Assert.Equal("teeth", b.Stencil));
         Assert.Contains(junctions, j => j.Part == WallPart.BottomEdge && j.Count == 2);
-        // The strip: kept above, its picture inside, cut below - measured from the fade.
+        // Hard (cut-out): the fade ends at the strip's bottom and the strip cuts the outline.
         var area = MaskArea.Full;
         var a = Enumerable.Repeat(1f, RegionMask.Width * RegionMask.Height).ToArray();
         var edge = Enumerable.Repeat(100f, RegionMask.Width).ToArray();          // wall edge at half-res y 100
         var half = new StencilImage(1, 2, new[] { 1f, 0f });                       // strip: top kept, bottom cut
-        RegionMask.ApplyBottomIn(area, a, edge, floor.WallDownFade is var f ? new EdgeFade(true, f.Start, f.Length, f.Angle) : default,
-            new[] { new BottomSegment(0, 1920, "teeth", 0, 64, 128, false) }, _ => half);
-        // Strip bottom at (1 + 2*0.5) cells = 2 cells = 64 half-res px below the edge; 32 half-res tall.
-        Assert.Equal(1f, a[(100 + 20) * RegionMask.Width + 200], 2);               // above the strip
-        Assert.Equal(1f, a[(100 + 38) * RegionMask.Width + 200], 2);               // strip top half: kept
+        var fade = floor.WallDownFade.ToEdge(true);
+        RegionMask.ApplyFadeIn(area, a, edge, fade, new[] { new BottomSegment(0, 1920, "teeth", 0, 64, 128, false, Hardness: 1) }, _ => half);
+        // Fade starts 1 cell (32 half-res px) down; strip bottom at (1 + 2*0.5) cells = 64 half-res px; 32 tall.
+        Assert.Equal(1f, a[(100 + 20) * RegionMask.Width + 200], 2);               // above the fade
+        Assert.InRange(a[(100 + 38) * RegionMask.Width + 200], 0.7f, 0.9f);        // strip top half: kept, fading
         Assert.Equal(0f, a[(100 + 58) * RegionMask.Width + 200], 2);               // strip bottom half: cut
         Assert.Equal(0f, a[(100 + 80) * RegionMask.Width + 200], 2);               // below: cut
+        // Soft: the shape only steers the fade - it reaches half way down the strip here (y 48), smoothly.
+        var soft = Enumerable.Repeat(1f, a.Length).ToArray();
+        RegionMask.ApplyFadeIn(area, soft, edge, fade, new[] { new BottomSegment(0, 1920, "teeth", 0, 64, 128, false, Hardness: 0) }, _ => half);
+        Assert.InRange(soft[(100 + 40) * RegionMask.Width + 200], 0.45f, 0.55f);
+        Assert.Equal(0f, soft[(100 + 50) * RegionMask.Width + 200], 2);
+        // Haze: how far through the fade, times the amount.
+        var hz = new float[a.Length];
+        RegionMask.ApplyFadeIn(area, Enumerable.Repeat(1f, a.Length).ToArray(), edge, fade with { Haze = 0.5f }, null, null, hz);
+        Assert.Equal(0f, hz[(100 + 20) * RegionMask.Width + 200], 2);
+        Assert.InRange(hz[(100 + 64) * RegionMask.Width + 200], 0.2f, 0.3f);
         // A tile swaps one cell to B.
         t.WallVariants.Add(new TileWallVariant { Side = "down", Part = WallPart.BottomEdge, Cell = new(6, 4), Index = 1 });
         face = AutoWalls.Build(t, floor, false, walls).First(p => p.Kind == WallPieceKind.Face && !p.RightFace);
@@ -412,6 +421,12 @@ public class TileArtTests
         var swapped = new TileDef { Id = "s" };
         swapped.CloudOverrides.Add(new TileCloudOverride { Layer = "c1", Settings = new CloudLayer { Id = "c1", Prefab = "calm" } });
         Assert.Equal(new[] { "c1/layer_1" }, CloudStack.Resolve(floor, swapped, find).Select(c => c.Texture == "d.png" ? c.Id : "?"));
+        // Edited on this floor only: the floor shows its own copy; the prefab is untouched.
+        floor.Clouds[0].Layers = new() { new CloudLayer { Id = "layer_1", Texture = "x.png", Speed = 5 } };
+        Assert.Equal("x.png", CloudStack.Resolve(floor, new TileDef { Id = "t" }, find).Single().Texture);
+        Assert.Equal(3, storm.Layers.Count);
+        Assert.NotSame(floor.Clouds[0].Layers, floor.Clouds[0].Copy().Layers);         // copies don't share edits
+        floor.Clouds[0].Layers = null;
         var hidden = new TileDef { Id = "h" };
         hidden.CloudOverrides.Add(new TileCloudOverride { Layer = "c1", Settings = new CloudLayer { Id = "c1", Prefab = "storm", Enabled = false } });
         Assert.Empty(CloudStack.Resolve(floor, hidden, find));
@@ -427,7 +442,7 @@ public class TileArtTests
         var seg = new BottomSegment(0, 10, "s", 0, 64, 128, false);
         float bottom = RegionMask.BottomOf(f, seg);                      // start + length / 2 = 64
         var a = Enumerable.Repeat(1f, 200).ToArray();
-        RegionMask.ApplyFadeIn(area, a, edge, f, new[] { seg });
+        RegionMask.ApplyFadeIn(area, a, edge, f, new[] { seg }, _ => new StencilImage(1, 1, new[] { 1f }));
         Assert.Equal(1f, a[20]);                                         // above the start: solid
         Assert.InRange(a[48], 0.45f, 0.55f);                             // halfway from start to the shape's bottom
         Assert.True(a[(int)bottom - 1] < 0.05f);                         // gone by the bottom of the shape

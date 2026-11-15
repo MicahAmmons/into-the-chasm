@@ -53,21 +53,24 @@
       "Style": "None",
       "Softness": 48,
       "Rows": [],
-      "Combo": ""
+      "Combo": "",
+      "IsStraight": true
     },
     {
       "Name": "Soft end",
       "Style": "Soft",
       "Softness": 48,
       "Rows": [],
-      "Combo": ""
+      "Combo": "",
+      "IsStraight": false
     },
     {
       "Name": "Taper",
       "Style": "Stencil",
       "Softness": 48,
       "Rows": [],
-      "Combo": "taper_3_cells"
+      "Combo": "taper_3_cells",
+      "IsStraight": false
     }
   ],
   "Rim": false,

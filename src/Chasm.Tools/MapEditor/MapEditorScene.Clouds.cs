@@ -62,24 +62,34 @@ public sealed partial class MapEditorScene
             if (ImGui.Checkbox("##on", ref on)) { c.Enabled = on; Edited(); }
             if (ImGui.IsItemHovered()) ImGui.SetTooltip("Show this layer");
             ImGui.SameLine();
-            Thumb(PrefabOf(c)?.Layers.FirstOrDefault()?.Texture ?? c.Texture, 26);
+            Thumb(PrefabLayersOf(c)?.FirstOrDefault()?.Texture ?? c.Texture, 26);
             ImGui.SameLine();
             bool open = _openCloud == c.Id;
             bool isPrefab = !string.IsNullOrEmpty(c.Prefab);
-            string label = isPrefab ? $"{c.Name}  [prefab, {PrefabOf(c)?.Layers.Count ?? 0} layers]" : $"{c.Name}  [{c.Id}]";
-            if (isPrefab) ImGui.PushStyleColor(ImGuiCol.Text, Ui.Blue);
-            if (ImGui.Selectable(label, open, ImGuiSelectableFlags.None, new Num.Vector2(0, 26))) _openCloud = open ? null : c.Id;
-            if (isPrefab) ImGui.PopStyleColor();
-            if (open && isPrefab)
+            if (isPrefab)
             {
-                ImGui.Indent();
-                if (PrefabEntry(floor, clouds, i)) Edited();
-                if (ImGui.Button("Delete")) remove = i;
-                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Takes it off this floor. The prefab itself stays saved.");
-                ImGui.Unindent();
-                ImGui.Spacing();
+                // A prefab: one collapsible line, its settings and layers nested inside.
+                int n = PrefabLayersOf(c)?.Count ?? 0;
+                ImGui.PushStyleColor(ImGuiCol.Text, Ui.Blue);
+                ImGui.SetNextItemOpen(open);
+                bool node = ImGui.TreeNodeEx($"{c.Name}   (prefab, {n} layer{(n == 1 ? "" : "s")}{(c.Layers is not null ? ", edited here" : "")})###node",
+                    ImGuiTreeNodeFlags.SpanAvailWidth | ImGuiTreeNodeFlags.FramePadding);
+                ImGui.PopStyleColor();
+                if (node != open) _openCloud = node ? c.Id : null;
+                if (node)
+                {
+                    if (PrefabEntry(floor, clouds, i)) Edited();
+                    if (ImGui.Button("Remove from floor")) remove = i;
+                    if (ImGui.IsItemHovered()) ImGui.SetTooltip("Takes it off this floor. The prefab itself stays saved.");
+                    ImGui.TreePop();
+                    ImGui.Spacing();
+                }
             }
-            else if (open)
+            else
+            {
+                if (ImGui.Selectable($"{c.Name}  [{c.Id}]", open, ImGuiSelectableFlags.None, new Num.Vector2(0, 26))) _openCloud = open ? null : c.Id;
+            }
+            if (open && !isPrefab)
             {
                 ImGui.Indent();
                 if (CloudFields(c)) Edited();
@@ -97,6 +107,7 @@ public sealed partial class MapEditorScene
         if (up > 0) { (clouds[up - 1], clouds[up]) = (clouds[up], clouds[up - 1]); Edited(); }
         if (down >= 0 && down < clouds.Count - 1) { (clouds[down + 1], clouds[down]) = (clouds[down], clouds[down + 1]); Edited(); }
         if (remove >= 0) { clouds.RemoveAt(remove); _openCloud = null; Edited(); }
+        if (_afterCloudList is { } after) { _afterCloudList = null; after(); }
 
         ImGui.Spacing();
         if (Ui.AccentButton("+ Add cloud layer"))
@@ -138,7 +149,7 @@ public sealed partial class MapEditorScene
             }
             ImGui.SameLine();
             var shown = o?.Settings ?? c;
-            Thumb(PrefabOf(shown)?.Layers.FirstOrDefault()?.Texture ?? shown.Texture, 26);
+            Thumb(PrefabLayersOf(shown)?.FirstOrDefault()?.Texture ?? shown.Texture, 26);
             ImGui.SameLine();
             bool open = _openTileCloud == c.Id && o is not null;
             string state = o is null ? "(floor settings)" : o.Settings.Enabled ? "(overridden here)" : "(hidden on this tile)";

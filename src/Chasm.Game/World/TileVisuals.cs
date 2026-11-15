@@ -40,6 +40,8 @@ public sealed class TileVisuals : IDisposable
     private readonly SpriteBatch _batch;
     private readonly LinkedList<(string key, TileBake bake)> _bakes = new();
     private readonly Dictionary<string, (Texture2D mask, long used)> _masks = new();
+    /// <summary>Distance haze per mask slot: how much each pixel takes on the haze colour (premultiplied white x amount).</summary>
+    private readonly Dictionary<string, Texture2D> _hazes = new();
     private readonly HashSet<string> _dirty = new();
     private long _tick;
 
@@ -77,6 +79,8 @@ public sealed class TileVisuals : IDisposable
             {
                 foreach (var (m, _) in _masks.Values) m.Dispose();
                 _masks.Clear();
+                foreach (var h in _hazes.Values) h.Dispose();
+                _hazes.Clear();
                 _maskFade.Clear();
                 _maskArea.Clear();
                 _maskBases.Clear();
@@ -219,7 +223,25 @@ public sealed class TileVisuals : IDisposable
         string content = $"{maskKey}#{piece.Kind}|{(piece.IsOverlay ? "" : piece.Texture)}|{piece.Tint}|{piece.Opacity:0.###}|{piece.Wall.FlipX}{piece.Wall.FlipY}{string.Concat(copies.Select(CornersKey))}";
         string identity = $"wall:{piece.Kind}:{piece.Up}:{piece.RightFace}:{piece.Lip.X:0.#},{piece.Lip.Y:0.#}";
         bool flipX = !piece.IsOverlay && piece.Wall.FlipX, flipY = !piece.IsOverlay && piece.Wall.FlipY;
-        Piece(identity, content, mask, rect, target, r => { foreach (var c in copies) DrawQuad(tex, c, piece.Tint, flipX, flipY, piece.IsOverlay ? piece.Opacity : 1f, r); });
+        // Distance haze: the haze colour laid over the picture where the fade says (before the mask cuts it).
+        var hazeTex = !piece.IsOverlay && piece.Fade is { Haze: > 0 } hf ? HazeFor(maskKey) : null;
+        var hazeCol = hazeTex is null ? Color.Transparent : TileRenderer.ParseColor(piece.Fade!.Value.HazeColor, Color.LightGray);
+        Piece(identity, content, mask, rect, target, r =>
+        {
+            foreach (var c in copies) DrawQuad(tex, c, piece.Tint, flipX, flipY, piece.IsOverlay ? piece.Opacity : 1f, r);
+            if (hazeTex is null) return;
+            _batch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.LinearClamp);
+            _batch.Draw(hazeTex, new Rectangle(0, 0, r.Width, r.Height), hazeCol);
+            _batch.End();
+        });
+    }
+
+    /// <summary>The haze texture made with a mask (looked up by the key Mask returned).</summary>
+    private Texture2D? HazeFor(string maskKey)
+    {
+        int bar = maskKey.LastIndexOf("|f:", StringComparison.Ordinal);
+        string slot = bar < 0 ? maskKey : maskKey[..bar];
+        return _hazes.TryGetValue(slot, out var t) ? t : null;
     }
 
     // ------------------------------------------------------------------ piece cache
@@ -405,7 +427,7 @@ public sealed class TileVisuals : IDisposable
         if (_masks.TryGetValue(slot, out var hit) && _maskFade.TryGetValue(slot, out var had) && had == fadeKey && _maskArea.TryGetValue(slot, out var hitArea))
         {
             _masks[slot] = (hit.mask, _tick);
-            return (hit.mask, ToScreen(hitArea), slot + "|" + fadeKey);
+            return (hit.mask, ToScreen(hitArea), slot + "|f:" + fadeKey);
         }
 
         // Base shape (cells, carving, blur, clips) - reused while only the fade changes. The blurred
@@ -435,14 +457,28 @@ public sealed class TileVisuals : IDisposable
         _maskBases[baseKey] = (b.area, b.inside, b.shape, _tick);
 
         var a = (float[])b.shape.Clone();
+        float[]? haze = null;
         if (fade is { } f)
         {
             // The fade's edge only depends on the cells and direction, not on the cut lines.
             string edgeKey = shapeKey + "|" + f.Lower + "/" + f.Angle;
             if (!_edges.TryGetValue(edgeKey, out var edge)) _edges[edgeKey] = edge = RegionMask.EdgeIn(b.area, b.inside, f);
-            RegionMask.ApplyFadeIn(b.area, a, edge, f, bottom);
-            if (bottom is { Count: > 0 }) RegionMask.ApplyBottomIn(b.area, a, edge, f, bottom, LoadStencil);
+            haze = f.Haze > 0 ? new float[a.Length] : null;
+            RegionMask.ApplyFadeIn(b.area, a, edge, f, bottom, LoadStencil, haze);
         }
+        // Distance haze: its own little texture next to the mask (white x amount, premultiplied).
+        if (haze is not null)
+        {
+            var hc = new Color[haze.Length];
+            for (int i = 0; i < haze.Length; i++) { byte v = (byte)Math.Clamp((int)(haze[i] * 255f + 0.5f), 0, 255); hc[i] = new Color(v, v, v, v); }
+            if (!_hazes.TryGetValue(slot, out var ht) || ht.Width != b.area.W || ht.Height != b.area.H)
+            {
+                ht?.Dispose();
+                _hazes[slot] = ht = new Texture2D(_device, b.area.W, b.area.H, false, SurfaceFormat.Color);
+            }
+            ht.SetData(hc);
+        }
+        else if (_hazes.Remove(slot, out var gone)) gone.Dispose();
         var colors = new Color[a.Length];
         for (int i = 0; i < a.Length; i++)
         {
@@ -456,13 +492,13 @@ public sealed class TileVisuals : IDisposable
             existing = (new Texture2D(_device, b.area.W, b.area.H, false, SurfaceFormat.Color), _tick);
             if (_masks.Count >= MaxMasks)
                 foreach (var old in _masks.OrderBy(kv => kv.Value.used).Take(_masks.Count - MaxMasks + 1).ToList())
-                { old.Value.mask.Dispose(); _masks.Remove(old.Key); _maskFade.Remove(old.Key); _maskArea.Remove(old.Key); }
+                { old.Value.mask.Dispose(); _masks.Remove(old.Key); _maskFade.Remove(old.Key); _maskArea.Remove(old.Key); if (_hazes.Remove(old.Key, out var oh)) oh.Dispose(); }
         }
         existing.mask.SetData(colors);
         _masks[slot] = (existing.mask, _tick);
         _maskFade[slot] = fadeKey;
         _maskArea[slot] = b.area;
-        return (existing.mask, ToScreen(b.area), slot + "|" + fadeKey);
+        return (existing.mask, ToScreen(b.area), slot + "|f:" + fadeKey);
     }
 
     /// <summary>A half-resolution mask area as a full-resolution screen rectangle.</summary>

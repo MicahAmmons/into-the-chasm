@@ -136,35 +136,69 @@ public static class RegionMask
     }
 
     /// <summary>
-    /// Multiplies a mask by the edge fade, measured from <paramref name="edge"/> (see <see cref="EdgeIn"/>).
-    /// Where a bottom edge runs (<paramref name="bottom"/>), the fade ends exactly at the bottom of its
-    /// shape instead, so the shape's tips fade out rather than being cut while still half visible.
+    /// Multiplies a mask by the edge fade, measured from <paramref name="edge"/> (see <see cref="EdgeIn"/>):
+    /// solid down to the fade's start, then thinning (shaped by its <see cref="EdgeFade.Curve"/>) to gone.
+    ///
+    /// Where a bottom shape runs (<paramref name="bottom"/>), the shape decides how far down the fade
+    /// reaches: soft (hardness 0) = the fade simply ends lower under the shape's tips and higher between
+    /// them, a misty, ragged bottom; hard (1) = the fade ends at the shape's bottom and the shape cuts
+    /// the outline. Hardness mixes the two.
+    ///
+    /// <paramref name="haze"/> (optional, same size as the mask) receives how far through the fade each
+    /// pixel is, times the fade's haze amount: how much it should take on the haze colour.
     /// </summary>
-    public static void ApplyFadeIn(MaskArea area, float[] a, float[] edge, EdgeFade f, IReadOnlyList<BottomSegment>? bottom = null)
+    public static void ApplyFadeIn(MaskArea area, float[] a, float[] edge, EdgeFade f, IReadOnlyList<BottomSegment>? bottom = null,
+        Func<string, StencilImage?>? loadStencil = null, float[]? haze = null)
     {
         float start = f.StartCells * EdgeFade.CellPx / 2, len = Math.Max(0.5f, f.LengthCells * EdgeFade.CellPx / 2);
+        float curve = Math.Clamp(f.Curve, 0.1f, 10f);
+        float Thin(float t) => t <= 0 ? 1f : t >= 1 ? 0f : 1f - MathF.Pow(t, curve);
         for (int x = 0; x < area.W; x++)
         {
             float e = edge[x];
             if (float.IsNaN(e)) continue;
-            float l = len;
-            if (bottom is { Count: > 0 })
-            {
-                float sx = (area.X + x) * 2 + 1;
+            float sx = (area.X + x) * 2 + 1;
+            BottomSegment? seg = null;
+            StencilImage? img = null;
+            if (bottom is { Count: > 0 } && loadStencil is not null)
                 foreach (var sg in bottom)
-                    if (sx >= sg.MinX && sx <= sg.MaxX) { l = Math.Max(0.5f, BottomOf(f, sg) - start); break; }
+                    if (sx >= sg.MinX && sx <= sg.MaxX) { seg = sg; img = loadStencil(sg.Stencil); break; }
+            if (seg is null || img is null)
+            {
+                for (int y = 0; y < area.H; y++)
+                {
+                    float depth = Depth(y);
+                    if (depth <= start) continue;
+                    float t = (depth - start) / len;
+                    a[y * area.W + x] *= Thin(t);
+                    if (haze is not null) haze[y * area.W + x] = Math.Min(1f, t) * f.Haze;
+                }
+                continue;
             }
+            // The shape: a strip ending at 'bottom', 'h' tall, repeating along the wall.
+            float bot = BottomOf(f, seg), h = Math.Max(1, seg.Height / 2), top = bot - h;
+            float u = sx / Math.Max(8, seg.Repeat);
+            u -= MathF.Floor(u);
+            if (seg.FlipX) u = 1 - u;
+            float lSoft = Math.Max(0.5f, top + img.ReachAt(u) * h - start);   // soft: the fade ends where the shape reaches
+            float lHard = Math.Max(0.5f, bot - start);                        // hard: ends at the strip's bottom, then cut
+            float k = Math.Clamp(seg.Hardness, 0f, 1f);
             for (int y = 0; y < area.H; y++)
             {
-                float gy = area.Y + y + 0.5f;
-                float depth = f.Lower ? gy - e : e - gy;
-                if (depth <= start) continue;
-                a[y * area.W + x] *= Math.Clamp(1f - (depth - start) / l, 0f, 1f);
+                float depth = Depth(y);
+                float tS = (depth - start) / lSoft, tH = (depth - start) / lHard;
+                float cut = depth <= top ? 1f : depth >= bot ? 0f : img.Sample(u, (depth - top) / h);
+                float alpha = (1 - k) * Thin(tS) + k * Thin(tH) * cut;
+                if (alpha >= 1f) continue;
+                a[y * area.W + x] *= alpha;
+                if (haze is not null && depth > start) haze[y * area.W + x] = Math.Min(1f, (1 - k) * tS + k * tH) * f.Haze;
             }
+
+            float Depth(int y) { float gy = area.Y + y + 0.5f; return f.Lower ? gy - e : e - gy; }
         }
     }
 
-    /// <summary>Where a bottom edge's strip ends, measured from the wall's edge (half-res px).</summary>
+    /// <summary>Where a bottom shape's strip ends, measured from the wall's edge (half-res px).</summary>
     public static float BottomOf(EdgeFade f, BottomSegment seg) => (f.StartCells + f.LengthCells * 0.5f + seg.Offset) * EdgeFade.CellPx / 2;
 
     /// <summary>Multiplies each stencilled cell's pixels by its stencil (stretched over the cell's box).</summary>
@@ -232,37 +266,6 @@ public static class RegionMask
                     if (su < 0 || su > 1 || sv < 0 || sv > 1) continue; // outside the mask: keep
                     a[i] *= img!.Sample(su, sv);
                 }
-            }
-        }
-    }
-
-    /// <summary>
-    /// Bottom edges: along the wall, a strip mask replaces the smooth end of the fade with a shape
-    /// (rock tips, crumbling...). The strip sits at the fade, so it moves with the cloud level.
-    /// Above the strip: kept. In it: the strip's own picture (opaque keeps). Below it: cut.
-    /// </summary>
-    public static void ApplyBottomIn(MaskArea area, float[] a, float[] edge, EdgeFade f, IReadOnlyList<BottomSegment> segments, Func<string, StencilImage?> loadStencil)
-    {
-        for (int x = 0; x < area.W; x++)
-        {
-            float e = edge[x];
-            if (float.IsNaN(e)) continue;
-            float sx = (area.X + x) * 2 + 1;
-            BottomSegment? seg = null;
-            foreach (var sg in segments) if (sx >= sg.MinX && sx <= sg.MaxX) { seg = sg; break; }
-            if (seg is null || loadStencil(seg.Stencil) is not { } img) continue;
-            // Where the strip's bottom sits, measured from the wall's edge (half-res px).
-            float bottom = BottomOf(f, seg);
-            float h = Math.Max(1, seg.Height / 2);
-            float u = sx / Math.Max(8, seg.Repeat);
-            u -= MathF.Floor(u);
-            if (seg.FlipX) u = 1 - u;
-            for (int y = 0; y < area.H; y++)
-            {
-                float gy = area.Y + y + 0.5f;
-                float depth = f.Lower ? gy - e : e - gy;
-                if (depth <= bottom - h) continue;
-                a[y * area.W + x] *= depth >= bottom ? 0f : img.Sample(u, (depth - (bottom - h)) / h);
             }
         }
     }

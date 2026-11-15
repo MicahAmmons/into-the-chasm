@@ -43,10 +43,8 @@ public sealed partial class MapEditorScene
         Ui.Section(_wallsUp ? "Fade into the top clouds (floor default)" : "Fade into the bottom clouds (floor default)");
         Ui.Hint("Used by every wall on this side unless the wall has its own fade (below).");
         var wf = _wallsUp ? _floor.WallUpFade : _floor.WallDownFade;
-        float fs = wf.Start, fl = wf.Length;
-        var fa = wf.Angle;
         ImGui.PushID("floorfade");
-        if (FadeControls(120, ref fs, ref fl, ref fa, !_wallsUp)) { wf.Start = fs; wf.Length = fl; wf.Angle = fa; Edited(); Services.TileVisuals.InvalidateAll(); }
+        WallFadeEditor(wf);
         ImGui.PopID();
 
         // ---- the floor's walls
@@ -87,7 +85,6 @@ public sealed partial class MapEditorScene
             {
                 ImGui.Indent();
                 WallEntryFade(e);
-                WallEntryBottom(e);
                 ImGui.Unindent();
                 ImGui.Spacing();
             }
@@ -165,7 +162,7 @@ public sealed partial class MapEditorScene
         Edited();
         string partName = hit.Part switch { WallPart.OuterCorner => "Outer corner", WallPart.InnerCorner => "Inner corner", WallPart.EndCap => "Wall end", _ => "Bottom edge" };
         var entry = WallList.FirstOrDefault(e => e.Wall == hit.Wall.Id);
-        string varName = (hit with { Index = next }).VariantName(entry);
+        string varName = (hit with { Index = next }).VariantName(entry?.EffectiveFade(_floor, hit.Up));
         Status($"{partName}: variant {next + 1} of {hit.Count} ({varName}).");
         return true;
     }
@@ -194,44 +191,101 @@ public sealed partial class MapEditorScene
 
     private int _bottomTab;
 
-    /// <summary>The floor's bottom-edge shapes for one wall: where it fades into the clouds.</summary>
-    private void WallEntryBottom(FloorWall e)
+    /// <summary>
+    /// Everything about how walls fade into the clouds: where (start, length, angle), how (curve),
+    /// distance haze, and the shape of the bottom. Used for the floor default and a wall's own fade.
+    /// </summary>
+    private void WallFadeEditor(WallFade f)
+    {
+        const float label = 120;
+        bool changed = false;
+        float fs = f.Start, fl = f.Length;
+        var fa = f.Angle;
+        if (FadeControls(label, ref fs, ref fl, ref fa, !_wallsUp)) { f.Start = fs; f.Length = fl; f.Angle = fa; changed = true; }
+        changed |= SliderRow("Fade curve", label, () => f.Curve, x => f.Curve = x, 0.2f, 4f, f.Curve > 1.05f ? "%.2f (holds, then drops)" : f.Curve < 0.95f ? "%.2f (thins early)" : "%.2f (even)", log: true);
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("How it thins: 1 = evenly. Higher = stays solid longer, then drops away. Lower = thins quickly at first, then lingers.");
+        changed |= SliderRow("Haze", label, () => f.Haze, x => f.Haze = x, 0, 1, f.Haze <= 0 ? "off" : "%.2f");
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Distance haze: as it fades, the wall also takes on the colour of the air (like things far away). 0 = off.");
+        if (f.Haze > 0)
+        {
+            ImGui.TextUnformatted("Haze colour"); ImGui.SameLine(label);
+            var col = HexToColor(f.HazeColor);
+            ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - 110);
+            if (ImGui.ColorEdit3("##hazecol", ref col, ImGuiColorEditFlags.PickerHueWheel | ImGuiColorEditFlags.DisplayHex)) { f.HazeColor = ColorToHex(col); changed = true; }
+            ImGui.SameLine(0, 4);
+            if (ImGui.Button("From clouds", new Num.Vector2(104, 0)) && CloudColour() is { } cc) { f.HazeColor = cc; changed = true; }
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("The average colour of this floor's clouds on this side.");
+        }
+        if (changed) { Edited(); Services.TileVisuals.InvalidateAll(); }
+        FadeShapes(f.BottomEdges);
+    }
+
+    /// <summary>Average colour of the floor's clouds on this side (bottom or top), tints included.</summary>
+    private string? CloudColour()
+    {
+        if (_floor is null || _tile is null) return null;
+        var layers = CloudStack.Resolve(_floor, _tile, id => Services.Defs.TryGet<CloudPrefabDef>(id, out var p) ? p : null);
+        var side = (_wallsUp ? _floor.TopClouds : _floor.Clouds).Select(c => c.Id).ToHashSet();
+        layers = layers.Where(l => side.Contains(l.Id.Split('/')[0])).ToList();
+        if (layers.Count == 0) { Status("No clouds on this side to take a colour from."); return null; }
+        float r = 0, g = 0, b = 0, wsum = 0;
+        foreach (var l in layers)
+        {
+            var tex = Services.Textures.Get(l.Texture);
+            var px = new Color[tex.Width * tex.Height];
+            tex.GetData(px);
+            float lr = 0, lg = 0, lb = 0, la = 0;
+            for (int i = 0; i < px.Length; i += 7) { float a = px[i].A / 255f; lr += px[i].R * a; lg += px[i].G * a; lb += px[i].B * a; la += a; }
+            if (la <= 0) continue;
+            var tint = TileRenderer.ParseColor(l.Tint, Color.White);
+            float wgt = l.Opacity;
+            r += lr / la * tint.R / 255f * wgt; g += lg / la * tint.G / 255f * wgt; b += lb / la * tint.B / 255f * wgt; wsum += wgt;
+        }
+        if (wsum <= 0) return null;
+        return $"#{(int)Math.Clamp(r / wsum, 0, 255):x2}{(int)Math.Clamp(g / wsum, 0, 255):x2}{(int)Math.Clamp(b / wsum, 0, 255):x2}";
+    }
+
+    /// <summary>The bottom shapes of a fade: where the wall fades into the clouds.</summary>
+    private void FadeShapes(List<BottomEdgeVariant> shapes)
     {
         ImGui.PushID("bottoms");
-        Ui.Section("Bottom edge");
-        Ui.Hint("A shape for the bottom where the wall fades away (rock tips, crumbling...). It sits at the fade, so it moves with the cloud level. The first is used everywhere; swap single cells with 'Swap corners & ends'.");
+        ImGui.Spacing();
+        Ui.Colored(Ui.Accent, "Bottom shape");
+        Ui.Hint("Gives the bottom of the fade a shape (rock tips, crumbling...). Hardness 0: the shape only steers how far the fade reaches, a misty, ragged bottom. 1: it cuts the outline. The first is used everywhere; swap single cells with 'Swap corners & ends'.");
         bool changed = false;
-        if (e.BottomEdges.Count == 0)
+        if (shapes.Count == 0)
         {
-            if (ImGui.Button("+ Add a bottom edge")) { e.BottomEdges.Add(new BottomEdgeVariant { Name = "Bottom 1", Stencil = "stencils/bottom edges/jagged_rocks.png" }); _bottomTab = 0; changed = true; }
+            if (ImGui.Button("+ Add a shape")) { shapes.Add(new BottomEdgeVariant { Name = "Shape 1", Stencil = "stencils/bottom edges/jagged_rocks.png" }); _bottomTab = 0; changed = true; }
             ImGui.SameLine(); ImGui.TextDisabled("(none: a smooth fade)");
         }
         else
         {
-            _bottomTab = Math.Clamp(_bottomTab, 0, e.BottomEdges.Count - 1);
-            for (int i = 0; i < e.BottomEdges.Count; i++)
+            _bottomTab = Math.Clamp(_bottomTab, 0, shapes.Count - 1);
+            for (int i = 0; i < shapes.Count; i++)
             {
                 if (i > 0) ImGui.SameLine(0, 4);
-                if (Ui.ToggleButton($"{i + 1}. {e.BottomEdges[i].Name}##bt{i}", _bottomTab == i, new Num.Vector2(0, 0), i == 0 ? "The default" : "Swap in on cells")) _bottomTab = i;
+                if (Ui.ToggleButton($"{i + 1}. {shapes[i].Name}##bt{i}", _bottomTab == i, new Num.Vector2(0, 0), i == 0 ? "The default" : "Swap in on cells")) _bottomTab = i;
                 if (ImGui.GetContentRegionAvail().X < 120) ImGui.NewLine();
             }
             ImGui.SameLine(0, 8);
-            if (ImGui.Button("+##addbottom")) { e.BottomEdges.Add(new BottomEdgeVariant { Name = $"Bottom {e.BottomEdges.Count + 1}", Stencil = e.BottomEdges[^1].Stencil }); _bottomTab = e.BottomEdges.Count - 1; changed = true; }
+            if (ImGui.Button("+##addbottom")) { var c = ChasmJson.Clone(shapes[^1]); c.Name = $"Shape {shapes.Count + 1}"; shapes.Add(c); _bottomTab = shapes.Count - 1; changed = true; }
             if (ImGui.IsItemHovered()) ImGui.SetTooltip("Add a variant");
-            var b = e.BottomEdges[_bottomTab];
+            var b = shapes[_bottomTab];
             const float label = 110;
             changed |= NameRow(b.Name, n => b.Name = n);
             string st = b.Stencil;
             if (StencilGrid("stencils/bottom edges", ref st, 96, 24)) { b.Stencil = st; changed = true; }
+            changed |= SliderRow("Hardness", label, () => b.Hardness, x => b.Hardness = x, 0, 1, b.Hardness < 0.05f ? "%.2f (misty)" : b.Hardness > 0.95f ? "%.2f (cut-out)" : "%.2f");
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("0 = the shape only steers how far the fade reaches (fades into the clouds).\n1 = the shape cuts the outline.");
             changed |= SliderRow("Position", label, () => b.Offset, x => b.Offset = x, -4, 4, "%.2f cells");
             if (ImGui.IsItemHovered()) ImGui.SetTooltip("Up (-) or down (+) from the middle of the fade.");
             changed |= SliderRow("Height", label, () => b.Height, x => b.Height = x, 8, 256, "%.0f px");
             changed |= SliderRow("Repeat width", label, () => b.Repeat, x => b.Repeat = x, 32, 1024, "%.0f px");
             bool fx = b.FlipX;
             if (ImGui.Checkbox("Flip X##bfx", ref fx)) { b.FlipX = fx; changed = true; }
-            if (_bottomTab > 0) { ImGui.SameLine(); if (ImGui.Button("Make default")) { e.BottomEdges.RemoveAt(_bottomTab); e.BottomEdges.Insert(0, b); _bottomTab = 0; changed = true; } }
+            if (_bottomTab > 0) { ImGui.SameLine(); if (ImGui.Button("Make default")) { shapes.RemoveAt(_bottomTab); shapes.Insert(0, b); _bottomTab = 0; changed = true; } }
             ImGui.SameLine();
-            if (ImGui.Button("Delete##bdel")) { e.BottomEdges.RemoveAt(_bottomTab); _bottomTab = Math.Max(0, _bottomTab - 1); changed = true; }
+            if (ImGui.Button("Delete##bdel")) { shapes.RemoveAt(_bottomTab); _bottomTab = Math.Max(0, _bottomTab - 1); changed = true; }
         }
         if (changed) { Edited(); Services.TileVisuals.InvalidateAll(); }
         ImGui.PopID();
@@ -277,6 +331,7 @@ public sealed partial class MapEditorScene
 
     private void WallEntryFade(FloorWall e)
     {
+        Ui.Colored(Ui.Accent, "Fade into the clouds");
         int mode = (int)e.FadeMode;
         if (ImGui.RadioButton("Floor default", mode == 0)) { e.FadeMode = WallFadeMode.Default; Edited(); }
         ImGui.SameLine();
@@ -284,19 +339,14 @@ public sealed partial class MapEditorScene
         {
             if (e.FadeMode != WallFadeMode.Own)
             {
-                var d = _wallsUp ? _floor!.WallUpFade : _floor!.WallDownFade;
-                e.Fade = new WallFade { Start = d.Start, Length = d.Length, Angle = d.Angle };
+                e.Fade = ChasmJson.Clone(_wallsUp ? _floor!.WallUpFade : _floor!.WallDownFade);
             }
             e.FadeMode = WallFadeMode.Own; Edited();
         }
         ImGui.SameLine();
         if (ImGui.RadioButton("No fade", mode == 2)) { e.FadeMode = WallFadeMode.None; Edited(); }
-        if (e.FadeMode == WallFadeMode.Own)
-        {
-            float s = e.Fade.Start, l = e.Fade.Length;
-            var a = e.Fade.Angle;
-            if (FadeControls(120, ref s, ref l, ref a, !_wallsUp)) { e.Fade.Start = s; e.Fade.Length = l; e.Fade.Angle = a; Edited(); }
-        }
+        if (e.FadeMode == WallFadeMode.Own) WallFadeEditor(e.Fade);
+        else if (e.FadeMode == WallFadeMode.Default) Ui.Hint("Uses the floor default above (start, curve, haze and shape). Pick 'Own fade' to give this wall its own.");
     }
 
     private void WallTooltip(WallDef w)
@@ -499,7 +549,6 @@ public sealed partial class MapEditorScene
         {
             builderEntry.FadeMode = real.FadeMode;
             builderEntry.Fade = ChasmJson.Clone(real.Fade);
-            builderEntry.BottomEdges = real.BottomEdges.Select(ChasmJson.Clone).ToList();
         }
         (up ? f.WallsUp : f.WallsDown).Add(builderEntry);
         _previewTile = t;

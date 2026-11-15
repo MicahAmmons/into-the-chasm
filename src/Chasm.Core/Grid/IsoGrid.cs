@@ -9,8 +9,9 @@ namespace Chasm.Core.Grid;
 /// Cells are 128x64 diamonds (matching the original art). Cell (0,0) is centred on canvas (0,0);
 /// the screen centre of (Q,R) is ((Q-R)*64, (Q+R)*32).
 ///
-/// A Tile contains every cell whose centre lies inside the 1920x1080 canvas; edge cells are cut in
-/// half by the screen border, exactly like the original game.
+/// A Tile contains every cell that shows on the 1920x1080 canvas, even partly: edge cells are cut by
+/// the screen border (half cells along the top and sides, and the slivers along the bottom, since
+/// 1080 isn't a whole number of rows). Cells that only touch the border at a point don't count.
 /// </summary>
 public static class IsoGrid
 {
@@ -39,8 +40,11 @@ public static class IsoGrid
 
     public static bool InTile(CellCoord c)
     {
+        // Does the diamond overlap the screen? Distance from the centre to the screen, in diamond units.
         var p = CellCenter(c);
-        return p.X >= 0 && p.X <= GameInfo.CanvasWidth && p.Y >= 0 && p.Y <= GameInfo.CanvasHeight;
+        float dx = Math.Max(0, Math.Max(-p.X, p.X - GameInfo.CanvasWidth));
+        float dy = Math.Max(0, Math.Max(-p.Y, p.Y - GameInfo.CanvasHeight));
+        return dx / HalfW + dy / HalfH < 0.999f;
     }
 
     /// <summary>Every cell in a Tile, top to bottom, left to right.</summary>
@@ -57,8 +61,8 @@ public static class IsoGrid
         var list = new List<CellCoord>();
         int maxA = GameInfo.CanvasWidth / (int)HalfW;   // Q-R range 0..30
         int maxB = GameInfo.CanvasHeight / (int)HalfH;  // Q+R range 0..33
-        for (int b = 0; b <= maxB; b++)
-            for (int a = 0; a <= maxA; a++)
+        for (int b = -1; b <= maxB + 2; b++)
+            for (int a = -1; a <= maxA + 1; a++)
             {
                 if (((a + b) & 1) != 0) continue;       // only coordinates that land on a cell centre
                 var c = new CellCoord((a + b) / 2, (b - a) / 2);

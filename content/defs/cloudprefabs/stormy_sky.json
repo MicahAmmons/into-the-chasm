@@ -32,7 +32,7 @@
       "Blend": "Screen",
       "Speed": 35,
       "Direction": 180,
-      "Scale": 1.0,
+      "Scale": 1,
       "Mirror": true,
       "Pattern": "Scroll",
       "PatternAmount": 40,
@@ -57,5 +57,6 @@
       "PatternCycle": 10,
       "RippleLength": 320
     }
-  ]
+  ],
+  "Notes": ""
 }

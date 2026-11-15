@@ -111,12 +111,14 @@ public sealed class BottomEdgeVariant
     [Range(8, 256), Tooltip("How tall the strip is (pixels).")] public float Height { get; set; } = 64f;
     [Range(32, 1024), Tooltip("How wide one repeat of the strip is (pixels).")] public float Repeat { get; set; } = 256f;
     public bool FlipX { get; set; }
+    [Range(0, 1), Tooltip("0 = the shape only steers how far the fade reaches (misty, fades into the clouds). 1 = the shape cuts the outline.")]
+    public float Hardness { get; set; } = 0.25f;
 }
 
 /// <summary>A stretch of a wall piece (screen x range) that uses one bottom edge.</summary>
-public sealed record BottomSegment(float MinX, float MaxX, string Stencil, float Offset, float Height, float Repeat, bool FlipX)
+public sealed record BottomSegment(float MinX, float MaxX, string Stencil, float Offset, float Height, float Repeat, bool FlipX, float Hardness = 1f)
 {
-    public string Key => $"{MinX:0},{MaxX:0}:{Stencil}/{Offset:0.##}/{Height:0}/{Repeat:0}{(FlipX ? "x" : "")}";
+    public string Key => $"{MinX:0},{MaxX:0}:{Stencil}/{Offset:0.##}/{Height:0}/{Repeat:0}{(FlipX ? "x" : "")}/h{Hardness:0.##}";
 }
 
 /// <summary>
@@ -194,8 +196,18 @@ public sealed class FloorWall
     [Ref(typeof(WallDef))] public string Wall { get; set; } = "";
     public WallFadeMode FadeMode { get; set; } = WallFadeMode.Default;
     public WallFade Fade { get; set; } = new();
-    /// <summary>Shapes for the bottom where the wall fades away (first = default; empty = a smooth fade).</summary>
-    public List<BottomEdgeVariant> BottomEdges { get; set; } = new();
+
+    /// <summary>Older files kept bottom shapes here; they move into the fade when the floor loads.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<BottomEdgeVariant>? BottomEdges { get; set; }
+
+    /// <summary>The fade this wall uses on a floor (null = no fade): its own, or the floor's default.</summary>
+    public WallFade? EffectiveFade(FloorDef? floor, bool up) => FadeMode switch
+    {
+        WallFadeMode.None => null,
+        WallFadeMode.Own => Fade,
+        _ => (up ? floor?.WallUpFade : floor?.WallDownFade) ?? new WallFade(),
+    };
 }
 
 /// <summary>Cells on a tile painted with a wall other than the floor's default ("-" = no wall).</summary>
@@ -223,13 +235,13 @@ public sealed class TileWallVariant
 /// <summary>A spot on a tile where a variant applies (for the editor's swap markers).</summary>
 public sealed record WallJunction(WallPart Part, CellCoord Cell, Vector2 Point, WallDef Wall, int Index, bool Up, int Count)
 {
-    /// <summary>The name of the variant in use.</summary>
-    public string VariantName(FloorWall? entry) => Part switch
+    /// <summary>The name of the variant in use (bottom shapes come from the fade the wall uses).</summary>
+    public string VariantName(WallFade? fade) => Part switch
     {
         WallPart.OuterCorner => Wall.Outer(Index).Name,
         WallPart.InnerCorner => Wall.Inner(Index).Name,
         WallPart.EndCap => Wall.Cap(Index).Name,
-        _ => entry is { BottomEdges.Count: > 0 } e ? e.BottomEdges[Math.Clamp(Index, 0, e.BottomEdges.Count - 1)].Name : "",
+        _ => fade is { BottomEdges.Count: > 0 } f ? f.BottomEdges[Math.Clamp(Index, 0, f.BottomEdges.Count - 1)].Name : "",
     };
 }
 
@@ -589,25 +601,26 @@ public static class AutoWalls
                 }
             }
 
-            // Bottom edges: each edge cell's stretch of the face can use its own variant.
-            if (fade is not null && entry.BottomEdges.Count > 0)
+            // Bottom shapes (from the fade the wall uses): each edge cell's stretch can use its own variant.
+            var shapes = entry.EffectiveFade(floor, up)?.BottomEdges ?? new List<BottomEdgeVariant>();
+            if (fade is not null && shapes.Count > 0)
                 foreach (var w in run)
                 {
                     float cx = IsoGrid.CellCenter(w).X;
                     float a = isLeft ? cx - IsoGrid.HalfW : cx, b = isLeft ? cx : cx + IsoGrid.HalfW;
                     var top = isLeft ? LeftN(w) : RightN(w);
-                    int vi = Math.Clamp(VariantAt(WallPart.BottomEdge, top), 0, entry.BottomEdges.Count - 1);
-                    var be = entry.BottomEdges[vi];
+                    int vi = Math.Clamp(VariantAt(WallPart.BottomEdge, top), 0, shapes.Count - 1);
+                    var be = shapes[vi];
                     // Corners: stretch the end segments over the seam so both sides of a corner match.
                     if (outer.Contains(w) || (isLeft ? notchLeft : notchRight).ContainsKey(w)) { a -= 40; b += 40; }
                     if (!string.IsNullOrEmpty(be.Stencil))
                     {
-                        var seg = new BottomSegment(a, b, be.Stencil, be.Offset, be.Height, be.Repeat, be.FlipX);
+                        var seg = new BottomSegment(a, b, be.Stencil, be.Offset, be.Height, be.Repeat, be.FlipX, be.Hardness);
                         piece.Bottom.Add(seg);
                         // The corner's bevel / highlight end the same way as the face beside them.
                         if (cornerExtras.TryGetValue(w, out var extras)) foreach (var x in extras) x.Bottom.Add(seg with { MinX = cx - 80, MaxX = cx + 80 });
                     }
-                    junctions?.Add(new WallJunction(WallPart.BottomEdge, top, EdgeMid(w, isLeft, up) + new Vector2(0, s * (fade.Value.StartCells + fade.Value.LengthCells * 0.5f) * EdgeFade.CellPx), wall, vi, up, entry.BottomEdges.Count));
+                    junctions?.Add(new WallJunction(WallPart.BottomEdge, top, EdgeMid(w, isLeft, up) + new Vector2(0, s * (fade.Value.StartCells + fade.Value.LengthCells * 0.5f) * EdgeFade.CellPx), wall, vi, up, shapes.Count));
                 }
 
             // Trim to the edges' width (whole mask: the soft edge spills past cell borders).
@@ -688,16 +701,7 @@ public static class AutoWalls
             return rim;
         }
 
-        EdgeFade? FadeFor(FloorWall entry)
-        {
-            WallFade? f = entry.FadeMode switch
-            {
-                WallFadeMode.None => null,
-                WallFadeMode.Own => entry.Fade,
-                _ => (up ? floor?.WallUpFade : floor?.WallDownFade) ?? new WallFade(),
-            };
-            return f is null ? null : new EdgeFade(!up, f.Start, f.Length, f.Angle);
-        }
+        EdgeFade? FadeFor(FloorWall entry) => entry.EffectiveFade(floor, up)?.ToEdge(!up);
     }
 
     /// <summary>Midpoint of a cell's lower-left / lower-right (or upper) edge.</summary>

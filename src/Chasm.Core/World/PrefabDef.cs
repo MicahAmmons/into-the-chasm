@@ -63,6 +63,16 @@ public sealed class WallFade
     [Range(0, 8), Tooltip("Cells from the edge before the fade begins.")] public float Start { get; set; } = 1f;
     [Range(0.1f, 8), Tooltip("Cells to go from solid to gone.")] public float Length { get; set; } = 1.5f;
     public FadeAngle Angle { get; set; } = FadeAngle.Auto;
+    [Range(0.2f, 4), Tooltip("How it thins: 1 = evenly; higher = stays solid longer, then drops away; lower = thins quickly, then lingers.")]
+    public float Curve { get; set; } = 1f;
+    [Range(0, 1), Tooltip("Distance haze: how much the wall takes on the haze colour as it fades.")]
+    public float Haze { get; set; }
+    [Tooltip("The colour of the air it fades into (usually the clouds').")]
+    public string HazeColor { get; set; } = "#a8acbc";
+    /// <summary>Walls: shapes for the bottom (first = default; empty = a smooth fade). See <see cref="BottomEdgeVariant"/>.</summary>
+    public List<BottomEdgeVariant> BottomEdges { get; set; } = new();
+
+    public EdgeFade ToEdge(bool lower) => new(lower, Start, Length, Angle, Curve, Haze, HazeColor);
 }
 
 /// <summary>Where a placed prefab sits and how its region fades.</summary>
@@ -119,6 +129,6 @@ public static class PrefabPlacement
         bool up = prefab.Kind == MaterialKind.WallUp;
         if (prefab.Kind == MaterialKind.General && region.FadeEnabled != true) return null;
         var d = (up ? floor?.WallUpFade : floor?.WallDownFade) ?? new WallFade();
-        return new EdgeFade(!up, region.FadeStart ?? d.Start, region.FadeLength ?? d.Length, region.FadeAngle ?? d.Angle);
+        return new EdgeFade(!up, region.FadeStart ?? d.Start, region.FadeLength ?? d.Length, region.FadeAngle ?? d.Angle, d.Curve, d.Haze, d.HazeColor);
     }
 }
