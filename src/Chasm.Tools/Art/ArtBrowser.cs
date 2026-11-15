@@ -28,6 +28,9 @@ public static class ArtBrowser
     private static string? _info;
     private static List<ArtLibrary.FileInfoRow>? _files;
     private static double _filesAge;
+    /// <summary>The file list needs reloading. Reloaded at the start of the next frame, never mid-frame:
+    /// the rest of the frame is still drawn from the current list.</summary>
+    private static bool _stale = true;
 
     // Drag and drop (ImGui payloads carry no managed data, so the key lives here).
     private static string? _dragFile, _dragFolder;
@@ -66,11 +69,11 @@ public static class ArtBrowser
     {
         _requestOpen = true;
         _error = null; _info = null;
-        _files = null;
+        _stale = true;
         _search = "";
     }
 
-    private static void Invalidate() => _files = null;
+    private static void Invalidate() => _stale = true;
 
     /// <summary>Call once per frame from the tool shell.</summary>
     public static void Draw(GameServices s)
@@ -84,7 +87,7 @@ public static class ArtBrowser
         if (_importOnOpen) { _importOnOpen = false; StartImport(); }
         if (!Directory.Exists(ArtLibrary.FullPath(s, _folder))) _folder = "";
         _filesAge += ImGui.GetIO().DeltaTime;
-        if (_files is null || _filesAge > 2) { _files = LoadFiles(s); _filesAge = 0; }
+        if (_files is null || _stale || _filesAge > 2) { _files = LoadFiles(s); _filesAge = 0; _stale = false; }
 
         Toolbar(s);
         float bottom = 92;
