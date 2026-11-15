@@ -135,23 +135,37 @@ public static class RegionMask
         }
     }
 
-    /// <summary>Multiplies a mask by the edge fade, measured from <paramref name="edge"/> (see <see cref="EdgeIn"/>).</summary>
-    public static void ApplyFadeIn(MaskArea area, float[] a, float[] edge, EdgeFade f)
+    /// <summary>
+    /// Multiplies a mask by the edge fade, measured from <paramref name="edge"/> (see <see cref="EdgeIn"/>).
+    /// Where a bottom edge runs (<paramref name="bottom"/>), the fade ends exactly at the bottom of its
+    /// shape instead, so the shape's tips fade out rather than being cut while still half visible.
+    /// </summary>
+    public static void ApplyFadeIn(MaskArea area, float[] a, float[] edge, EdgeFade f, IReadOnlyList<BottomSegment>? bottom = null)
     {
         float start = f.StartCells * EdgeFade.CellPx / 2, len = Math.Max(0.5f, f.LengthCells * EdgeFade.CellPx / 2);
         for (int x = 0; x < area.W; x++)
         {
             float e = edge[x];
             if (float.IsNaN(e)) continue;
+            float l = len;
+            if (bottom is { Count: > 0 })
+            {
+                float sx = (area.X + x) * 2 + 1;
+                foreach (var sg in bottom)
+                    if (sx >= sg.MinX && sx <= sg.MaxX) { l = Math.Max(0.5f, BottomOf(f, sg) - start); break; }
+            }
             for (int y = 0; y < area.H; y++)
             {
                 float gy = area.Y + y + 0.5f;
                 float depth = f.Lower ? gy - e : e - gy;
                 if (depth <= start) continue;
-                a[y * area.W + x] *= Math.Clamp(1f - (depth - start) / len, 0f, 1f);
+                a[y * area.W + x] *= Math.Clamp(1f - (depth - start) / l, 0f, 1f);
             }
         }
     }
+
+    /// <summary>Where a bottom edge's strip ends, measured from the wall's edge (half-res px).</summary>
+    public static float BottomOf(EdgeFade f, BottomSegment seg) => (f.StartCells + f.LengthCells * 0.5f + seg.Offset) * EdgeFade.CellPx / 2;
 
     /// <summary>Multiplies each stencilled cell's pixels by its stencil (stretched over the cell's box).</summary>
     public static void Carve(float[] a, IReadOnlyCollection<CellCoord> cells, IReadOnlyList<CellStencil> stencils, Func<string, StencilImage?> loadStencil) =>
@@ -238,7 +252,7 @@ public static class RegionMask
             foreach (var sg in segments) if (sx >= sg.MinX && sx <= sg.MaxX) { seg = sg; break; }
             if (seg is null || loadStencil(seg.Stencil) is not { } img) continue;
             // Where the strip's bottom sits, measured from the wall's edge (half-res px).
-            float bottom = (f.StartCells + f.LengthCells * 0.5f + seg.Offset) * EdgeFade.CellPx / 2;
+            float bottom = BottomOf(f, seg);
             float h = Math.Max(1, seg.Height / 2);
             float u = sx / Math.Max(8, seg.Repeat);
             u -= MathF.Floor(u);

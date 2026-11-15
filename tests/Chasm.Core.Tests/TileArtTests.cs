@@ -418,6 +418,25 @@ public class TileArtTests
     }
 
     [Fact]
+    public void With_a_bottom_edge_the_fade_runs_from_its_start_to_the_bottom_of_the_shape()
+    {
+        // One column, edge at y 0, fading downward: start 1 cell (32 half-res px), length 2 cells (64).
+        var area = new MaskArea(0, 0, 1, 200);
+        var f = new EdgeFade(Lower: true, 1, 2, FadeAngle.Level);
+        var edge = new[] { 0f };
+        var seg = new BottomSegment(0, 10, "s", 0, 64, 128, false);
+        float bottom = RegionMask.BottomOf(f, seg);                      // start + length / 2 = 64
+        var a = Enumerable.Repeat(1f, 200).ToArray();
+        RegionMask.ApplyFadeIn(area, a, edge, f, new[] { seg });
+        Assert.Equal(1f, a[20]);                                         // above the start: solid
+        Assert.InRange(a[48], 0.45f, 0.55f);                             // halfway from start to the shape's bottom
+        Assert.True(a[(int)bottom - 1] < 0.05f);                         // gone by the bottom of the shape
+        var plain = Enumerable.Repeat(1f, 200).ToArray();
+        RegionMask.ApplyFadeIn(area, plain, edge, f);
+        Assert.True(plain[(int)bottom - 1] > 0.4f);                      // without a bottom edge: the normal, longer fade
+    }
+
+    [Fact]
     public void Cloud_direction_sets_scroll_offset()
     {
         var c = new CloudLayer { Speed = 10, Direction = 90 };
