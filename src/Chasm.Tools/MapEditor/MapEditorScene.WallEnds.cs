@@ -212,7 +212,8 @@ public sealed partial class MapEditorScene
         t.WallPaint.Add(paint);
         FinishPreview(t, cells);
         if (_previewJunctions.FirstOrDefault(j => j.Part == WallPart.EndCap) is { } end)
-            FocusOn(new Vector2(end.Point.X - 40, end.Point.Y), 2.4f);
+            // The whole column, top to bottom (no fade in this view).
+            FocusOn(new Vector2(end.Point.X - 40, end.Point.Y + (up ? -1 : 1) * (depth - 1) * IsoGrid.HalfH), Math.Min(2.4f, 18f / depth));
     }
 
     /// <summary>Zooms to a canvas point and puts it in the middle of the map area.</summary>
