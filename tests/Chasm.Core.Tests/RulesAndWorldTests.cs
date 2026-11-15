@@ -100,7 +100,17 @@ public class RulesAndWorldTests
 
         var copy = new TileDef { Id = "t", WalkMap = tile.WalkMap };
         foreach (var c in IsoGrid.AllCells) Assert.Equal(expected[c], copy.IsWalkable(c));
-        Assert.Equal(34, tile.WalkMap.Count);
+        Assert.Equal(35, tile.WalkMap.Count);   // rows 0..34: the last is the sliver along the bottom
+    }
+
+    [Fact]
+    public void Tiles_include_every_cell_that_shows_on_screen()
+    {
+        Assert.Contains(new CellCoord(17, 17), IsoGrid.AllCells);        // centre (0, 1088): a sliver along the bottom
+        Assert.True(IsoGrid.InTile(new CellCoord(0, 0)));                 // top-left corner, a quarter shows
+        Assert.False(IsoGrid.InTile(new CellCoord(-1, 0)));               // above the top: only touches the border
+        Assert.False(IsoGrid.InTile(new CellCoord(0, 1)));                // left of the screen: only touches it
+        Assert.All(IsoGrid.AllCells, c => Assert.True(IsoGrid.CellCenter(c).Y <= 1088 && IsoGrid.CellCenter(c).X is >= 0 and <= 1920));
     }
 
     [Fact]
