@@ -105,6 +105,8 @@ public sealed partial class MapEditorScene : Scene
                 if (parts.FirstOrDefault(x => x.StartsWith("step=")) is { } sd && int.TryParse(sd[5..], out int si)) GoToStep((WallStep)si);
             }
             if (parts.Contains("swap")) _swapMode = true;
+            if (parts.Contains("bench")) _bench = true;
+            if (parts.Contains("slider")) { _bench = true; _benchSlider = true; }
             if (parts.Contains("selectall")) foreach (var c in IsoGrid.AllCells.Where(c => _tile.Walkable[c])) _selection.Add(c);
         }
     }
@@ -121,6 +123,9 @@ public sealed partial class MapEditorScene : Scene
     }
 
     private Action<CellCoord>? _cellPick;
+    private bool _bench, _benchSlider;
+    private int _benchFrames;
+    private long _benchTotal, _benchRedrawn;
 
     // ------------------------------------------------------------------ open / new / save
 
@@ -381,6 +386,21 @@ public sealed partial class MapEditorScene : Scene
         if (_cellPick is not null) UpdateCellPick(input);
         else if (!_panning) UpdateTool(input);
 
+        // Dev benchmark (CHASM_EDITOR=...:bench[:slider]): rebake directly, timed apart from screen drawing.
+        if (_bench && _benchFrames < 40)
+        {
+            if (_benchSlider && _wall is not null) { _wall.OuterCorners[0].BevelWidth = 10 + _benchFrames % 20; PreviewChanged(); }
+            var bt = _panel == Panel.WallEdit && _previewTile is not null ? _previewTile : _tile!;
+            var bf = _panel == Panel.WallEdit && _previewTile is not null ? _previewFloor : _floor;
+            var tv = Services.TileVisuals;
+            if (_benchFrames == 10) { tv.WallsTicks = 0; tv.MaskTicks = 0; _benchTotal = 0; _benchRedrawn = 0; }
+            tv.Invalidate(bt);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            tv.Get(bt, bf);
+            if (++_benchFrames > 10) { _benchTotal += sw.ElapsedTicks; _benchRedrawn += tv.RendersThisBake; }
+            if (_benchFrames == 40)
+                Console.WriteLine($"[bench] average bake {Chasm.Game.World.TileVisuals.TicksToMs(_benchTotal) / 30:0.0} ms  (walls {Chasm.Game.World.TileVisuals.TicksToMs(tv.WallsTicks) / 30:0.0} ms, masks {Chasm.Game.World.TileVisuals.TicksToMs(tv.MaskTicks) / 30:0.0} ms), {_benchRedrawn / 30.0:0.0} piece(s) redrawn per bake");
+        }
         // Sliders / drags in progress: let the tile bake skip frames so the editor stays smooth.
         Services.TileVisuals.LiveEditing = ImGui.IsAnyItemActive() || (_dragMode is not null) || _nudgeDragging || _sheetHandle >= 0 || _prefabHandle >= 0;
         MaybeCommitSnapshot();

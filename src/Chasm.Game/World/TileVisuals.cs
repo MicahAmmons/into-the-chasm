@@ -38,7 +38,6 @@ public sealed class TileVisuals : IDisposable
     private readonly TextureStore _textures;
     private readonly DefRegistry _defs;
     private readonly SpriteBatch _batch;
-    private RenderTarget2D? _scratch;
     private readonly LinkedList<(string key, TileBake bake)> _bakes = new();
     private readonly Dictionary<string, (Texture2D mask, long used)> _masks = new();
     private readonly HashSet<string> _dirty = new();
@@ -48,6 +47,9 @@ public sealed class TileVisuals : IDisposable
     public bool LiveEditing { get; set; }
     private readonly System.Diagnostics.Stopwatch _bakeClock = System.Diagnostics.Stopwatch.StartNew();
     private readonly Dictionary<string, long> _lastBake = new();
+    private long _lastBakeMs;
+    /// <summary>How long the last tile bake took (ms), for the editor's status bar.</summary>
+    public long LastBakeMs => _lastBakeMs;
 
     /// <summary>How many tile bakes to keep (current + 8 neighbours by default).</summary>
     public int MaxBakes { get; set; } = 9;
@@ -67,13 +69,18 @@ public sealed class TileVisuals : IDisposable
         _batch = new SpriteBatch(device);
         _textures.Reloaded += key =>
         {
+            // A redrawn picture: cached pieces may show it, so redraw them all.
+            foreach (var (rt, _, _) in _pieces.Values) rt.Dispose();
+            _pieces.Clear();
             // A redrawn stencil changes masks that use it: drop its pixels and every cached mask.
             if (_stencils.Remove(key))
             {
                 foreach (var (m, _) in _masks.Values) m.Dispose();
                 _masks.Clear();
                 _maskFade.Clear();
+                _maskArea.Clear();
                 _maskBases.Clear();
+                _maskShapes.Clear();
                 _edges.Clear();
             }
             InvalidateAll();
@@ -103,7 +110,9 @@ public sealed class TileVisuals : IDisposable
         var node = _bakes.First;
         while (node is not null && node.Value.key != key) node = node.Next;
         // While an editor slider is being dragged, rebake at most ~12 times a second.
-        bool throttled = node is not null && LiveEditing && _bakeClock.ElapsedMilliseconds - _lastBake.GetValueOrDefault(key) < 80;
+        // While dragging: quick bakes run every frame; only slow ones are spaced out.
+        bool throttled = node is not null && LiveEditing && _lastBakeMs > 12
+            && _bakeClock.ElapsedMilliseconds - _lastBake.GetValueOrDefault(key) < Math.Clamp(_lastBakeMs * 2, 33, 120);
         if (node is not null && (!_dirty.Contains(key) || throttled))
         {
             _bakes.Remove(node);
@@ -113,7 +122,9 @@ public sealed class TileVisuals : IDisposable
         _lastBake[key] = _bakeClock.ElapsedMilliseconds;
         var target = node?.Value.bake ?? NewBake();
         if (node is not null) _bakes.Remove(node);
+        long t0 = _bakeClock.ElapsedMilliseconds;
         var bake = Bake(tile, floor, target);
+        _lastBakeMs = _bakeClock.ElapsedMilliseconds - t0;
         _bakes.AddFirst((key, bake));
         _dirty.Remove(key);
         while (_bakes.Count > MaxBakes) { _bakes.Last!.Value.bake.Dispose(); _bakes.RemoveLast(); }
@@ -128,9 +139,11 @@ public sealed class TileVisuals : IDisposable
     private TileBake Bake(TileDef tile, FloorDef? floor, TileBake into)
     {
         var previous = _device.GetRenderTargets();
-        _scratch ??= NewTarget();
+        _tileKey = Key(tile);
+        RendersThisBake = 0;
         bool any0 = DrawLayer(tile, floor, PaintLayer.BehindCharacters, into.Behind);
         bool any1 = DrawLayer(tile, floor, PaintLayer.InFrontOfCharacters, into.Front);
+        EvictPieces();
         _device.SetRenderTargets(previous);
         return new TileBake { Behind = into.Behind, Front = into.Front, HasBehind = any0, HasFront = any1 };
     }
@@ -151,7 +164,9 @@ public sealed class TileVisuals : IDisposable
         _device.Clear(Color.Transparent);
         bool any = false;
         // Walls: faces behind everything painted; rims over the walkway after it.
+        long w0 = _bakeClock.ElapsedTicks;
         var walls = layer == PaintLayer.BehindCharacters ? WallsFor(tile, floor) : new List<WallPiece>();
+        WallsTicks += _bakeClock.ElapsedTicks - w0;
         int feather = floor?.DefaultFeather ?? 6;
         foreach (var piece in walls.Where(p => !p.Rim)) { DrawWallPiece(piece, feather, target); any = true; }
         foreach (var region in tile.PaintRegions.Where(r => r.Layer == layer && r.Cells.Count > 0))
@@ -160,33 +175,27 @@ public sealed class TileVisuals : IDisposable
             PrefabDef? prefab = region.Prefab is { } pid && _defs.TryGet<PrefabDef>(pid, out var pf) ? pf : null;
             var mat = prefab is not null ? prefab.AsMaterial() : tile.FindMaterial(region.Material, floor);
             if (mat is null || (region.Prefab is not null && prefab is null)) continue;
-            any = true;
-            // 1. texture into scratch
-            _device.SetRenderTarget(_scratch);
-            _device.Clear(Color.Transparent);
-            if (prefab is not null)
-            {
-                var ptex = _textures.Get(prefab.Texture);
-                DrawQuad(ptex, PrefabPlacement.Corners(region, prefab, ptex.Width, ptex.Height), mat.Tint, prefab.FlipX, prefab.FlipY, region.Opacity);
-            }
-            else if (mat.Warp is not null) DrawWarped(mat, region.Opacity);
-            else
-            {
-                _batch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.LinearWrap);
-                DrawMaterial(_batch, mat, region.Opacity);
-                _batch.End();
-            }
-            // 2. multiply by mask
+            // The mask first: its rectangle is all that gets drawn.
             var fade = prefab is not null ? PrefabPlacement.FadeFor(region, prefab, floor) : region.FadeFor(mat);
-            var mask = Mask(region, fade, floor);
-            _batch.Begin(SpriteSortMode.Immediate, MultiplyByAlpha, SamplerState.LinearClamp);
-            _batch.Draw(mask, new Rectangle(0, 0, 1920, 1080), Color.White);
-            _batch.End();
-            // 3. stack onto the layer
-            _device.SetRenderTarget(target);
-            _batch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp);
-            _batch.Draw(_scratch, Vector2.Zero, Color.White);
-            _batch.End();
+            var (mask, rect, maskKey) = Mask(region, fade, floor);
+            if (mask is null) continue;
+            any = true;
+            System.Numerics.Vector2[]? corners = null;
+            Texture2D? ptex = null;
+            if (prefab is not null) { ptex = _textures.Get(prefab.Texture); corners = PrefabPlacement.Corners(region, prefab, ptex.Width, ptex.Height); }
+            else if (mat.Warp is not null) { var t = _textures.Get(mat.Texture); corners = MaterialSheet.Corners(mat, t.Width, t.Height); }
+            string content = maskKey + "#" + LookKey(mat) + (corners is null ? "" : CornersKey(corners)) + $"|o{region.Opacity:0.###}";
+            Piece($"region:{region.Id}:{layer}", content, mask, rect, target, r =>
+            {
+                if (prefab is not null) DrawQuad(ptex!, corners!, mat.Tint, prefab.FlipX, prefab.FlipY, region.Opacity, r);
+                else if (mat.Warp is not null) DrawWarped(mat, region.Opacity, r);
+                else
+                {
+                    _batch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.LinearWrap, null, null, null, Matrix.CreateTranslation(-r.X, -r.Y, 0));
+                    DrawMaterial(_batch, mat, region.Opacity);
+                    _batch.End();
+                }
+            });
         }
         foreach (var piece in walls.Where(p => p.Rim)) { DrawWallPiece(piece, 0, target); any = true; }
         return any;
@@ -195,28 +204,71 @@ public sealed class TileVisuals : IDisposable
     /// <summary>One wall piece: its picture (pinned, slanted, maybe mirrored) cut to its cells, seams, caps and fade.</summary>
     private void DrawWallPiece(WallPiece piece, int feather, RenderTarget2D target)
     {
-        _device.SetRenderTarget(_scratch);
-        _device.Clear(Color.Transparent);
-        if (piece.IsOverlay)
+        var (mask, rect, maskKey) = Mask(piece.Cells, feather, piece.Stencils, piece.Clips, piece.Fade);
+        if (mask is null) return;
+        Texture2D tex = piece.IsOverlay ? _textures.Pixel : _textures.Get(piece.Texture);
+        var corners = piece.IsOverlay
+            ? new[] { new System.Numerics.Vector2(rect.Left, rect.Top), new System.Numerics.Vector2(rect.Right, rect.Top), new System.Numerics.Vector2(rect.Right, rect.Bottom), new System.Numerics.Vector2(rect.Left, rect.Bottom) }
+            : piece.Corners(tex.Width, tex.Height);
+        string content = $"{maskKey}#{piece.Kind}|{(piece.IsOverlay ? "" : piece.Texture)}|{piece.Tint}|{piece.Opacity:0.###}|{piece.Wall.FlipX}{piece.Wall.FlipY}{CornersKey(corners)}";
+        string identity = $"wall:{piece.Kind}:{piece.Up}:{piece.RightFace}:{piece.Lip.X:0.#},{piece.Lip.Y:0.#}";
+        bool flipX = !piece.IsOverlay && piece.Wall.FlipX, flipY = !piece.IsOverlay && piece.Wall.FlipY;
+        Piece(identity, content, mask, rect, target, r => DrawQuad(tex, corners, piece.Tint, flipX, flipY, piece.IsOverlay ? piece.Opacity : 1f, r));
+    }
+
+    // ------------------------------------------------------------------ piece cache
+    //
+    // Every wall piece and painted region keeps its finished picture (texture x mask) in a small
+    // render target the size of its rectangle. A rebake re-renders only pieces whose inputs
+    // changed and just pastes the others - so dragging a slider redraws the few pieces it affects.
+
+    private readonly Dictionary<string, (RenderTarget2D rt, string content, long used)> _pieces = new();
+    private string _tileKey = "";
+    private const int MaxPieces = 600;
+
+    private void Piece(string identity, string content, Texture2D mask, Rectangle rect, RenderTarget2D target, Action<Rectangle> drawPicture)
+    {
+        string key = _tileKey + "/" + identity;
+        _tick++;
+        if (!_pieces.TryGetValue(key, out var cached) || cached.content != content || cached.rt.Width != rect.Width || cached.rt.Height != rect.Height)
         {
-            // Highlight / shadow: plain colour over the whole screen, cut to a soft band by the mask.
-            var screen = new[] { new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(1920, 0), new System.Numerics.Vector2(1920, 1080), new System.Numerics.Vector2(0, 1080) };
-            DrawQuad(_textures.Pixel, screen, piece.Tint, false, false, piece.Opacity);
+            var rt = cached.rt;
+            if (rt is null || rt.IsDisposed || rt.Width != rect.Width || rt.Height != rect.Height)
+            {
+                rt?.Dispose();
+                rt = new RenderTarget2D(_device, rect.Width, rect.Height, false, SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+            }
+            _device.SetRenderTarget(rt);
+            _device.Clear(Color.Transparent);
+            drawPicture(rect);
+            _batch.Begin(SpriteSortMode.Immediate, MultiplyByAlpha, SamplerState.LinearClamp);
+            _batch.Draw(mask, new Rectangle(0, 0, rect.Width, rect.Height), Color.White);
+            _batch.End();
+            cached = (rt, content, _tick);
+            RendersThisBake++;
         }
-        else
-        {
-            var tex = _textures.Get(piece.Texture);
-            DrawQuad(tex, piece.Corners(tex.Width, tex.Height), piece.Tint, piece.Wall.FlipX, piece.Wall.FlipY);
-        }
-        var mask = Mask(piece.Cells, feather, piece.Stencils, piece.Clips, piece.Fade);
-        _batch.Begin(SpriteSortMode.Immediate, MultiplyByAlpha, SamplerState.LinearClamp);
-        _batch.Draw(mask, new Rectangle(0, 0, 1920, 1080), Color.White);
-        _batch.End();
+        _pieces[key] = (cached.rt, cached.content, _tick);
         _device.SetRenderTarget(target);
         _batch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp);
-        _batch.Draw(_scratch, Vector2.Zero, Color.White);
+        _batch.Draw(cached.rt, rect, Color.White);
         _batch.End();
     }
+
+    /// <summary>Pieces re-rendered in the last bake (the rest were reused).</summary>
+    public int RendersThisBake { get; private set; }
+
+    private void EvictPieces()
+    {
+        if (_pieces.Count <= MaxPieces) return;
+        foreach (var old in _pieces.OrderBy(kv => kv.Value.used).Take(_pieces.Count - MaxPieces).ToList())
+        { old.Value.rt.Dispose(); _pieces.Remove(old.Key); }
+    }
+
+    private static string CornersKey(System.Numerics.Vector2[] c) =>
+        string.Concat(c.Select(p => $"|{p.X:0.#},{p.Y:0.#}"));
+
+    private static string LookKey(MaterialDef m) =>
+        $"{m.Texture}|{m.Rotation:0.##}|{m.Tint}|{m.FlipX}{m.FlipY}|{m.OffsetX:0.#},{m.OffsetY:0.#}|{m.Scale:0.###}";
 
     /// <summary>
     /// Draws a material (no warp) as a full-screen layer: centred on the screen plus its offset,
@@ -250,14 +302,15 @@ public sealed class TileVisuals : IDisposable
     /// perspective (the far end shrinks smoothly). Outside the shape stays empty.
     /// Draws into whatever render target is set.
     /// </summary>
-    public void DrawWarped(MaterialDef mat, float opacity = 1f)
+    public void DrawWarped(MaterialDef mat, float opacity = 1f, Rectangle? into = null)
     {
         var tex = _textures.Get(mat.Texture);
-        DrawQuad(tex, MaterialSheet.Corners(mat, tex.Width, tex.Height), mat.Tint, mat.FlipX, mat.FlipY, opacity);
+        DrawQuad(tex, MaterialSheet.Corners(mat, tex.Width, tex.Height), mat.Tint, mat.FlipX, mat.FlipY, opacity, into);
     }
 
     /// <summary>One copy of a texture pinned to four screen corners (TL, TR, BR, BL) with true perspective.</summary>
-    public void DrawQuad(Texture2D tex, System.Numerics.Vector2[] c, string tintHex, bool flipX, bool flipY, float opacity = 1f)
+    /// <remarks><paramref name="into"/>: the render target is just this screen rectangle (a piece's own image).</remarks>
+    public void DrawQuad(Texture2D tex, System.Numerics.Vector2[] c, string tintHex, bool flipX, bool flipY, float opacity = 1f, Rectangle? into = null)
     {
         var h = Homography.SquareToQuad(c[0], c[1], c[2], c[3]);
         var tint = TileRenderer.ParseColor(tintHex, Color.White) * opacity;
@@ -287,7 +340,9 @@ public sealed class TileVisuals : IDisposable
         _warpEffect.Texture = tex;
         _warpEffect.World = Matrix.Identity;
         _warpEffect.View = Matrix.Identity;
-        _warpEffect.Projection = Matrix.CreateOrthographicOffCenter(0, 1920, 1080, 0, 0, 1);
+        _warpEffect.Projection = into is { } r
+            ? Matrix.CreateOrthographicOffCenter(r.Left, r.Right, r.Bottom, r.Top, 0, 1)
+            : Matrix.CreateOrthographicOffCenter(0, 1920, 1080, 0, 0, 1);
         _device.BlendState = BlendState.AlphaBlend;
         _device.SamplerStates[0] = SamplerState.LinearClamp;
         _device.RasterizerState = RasterizerState.CullNone;
@@ -301,42 +356,65 @@ public sealed class TileVisuals : IDisposable
 
     // ------------------------------------------------------------------ masks
 
-    // Masks are built in two steps so fade changes stay cheap:
-    //   base (cells, stencils, soft edge)  - cached by its shape
-    //   edge line for a fade direction     - cached by shape + direction + angle
-    //   final texture                      - one per shape + direction, refilled when only the fade numbers change
-    private readonly Dictionary<string, (float[] inside, float[] shape, long used)> _maskBases = new();
+    // Masks are built for each piece's own rectangle (cells + room for the soft edge), in steps:
+    //   base (cells, stencils, soft edge, clips) - cached by its shape
+    //   edge line for a fade direction          - cached by shape + direction + angle
+    //   final texture                           - one per shape + direction, refilled when only the fade numbers change
+    private readonly Dictionary<string, (MaskArea area, float[] inside, float[] shape, long used)> _maskBases = new();
     private readonly Dictionary<string, float[]> _edges = new();
+    private readonly Dictionary<string, (MaskArea area, float[] inside, float[] shape)> _maskShapes = new();
     private readonly Dictionary<string, string> _maskFade = new();
-    private float[]? _maskWork;
-    private Color[]? _maskColors;
-    private const int MaxBases = 64;
+    private readonly Dictionary<string, MaskArea> _maskArea = new();
+    private const int MaxBases = 160;
 
-    private Texture2D Mask(PaintRegion region, EdgeFade? fade, FloorDef? floor) =>
+    private (Texture2D? mask, Rectangle rect, string key) Mask(PaintRegion region, EdgeFade? fade, FloorDef? floor) =>
         Mask(region.Cells, region.Feather ?? floor?.DefaultFeather ?? 6, region.Stencils, null, fade);
 
-    private Texture2D Mask(IReadOnlyCollection<CellCoord> cells, int feather, IReadOnlyList<CellStencil> stencils, IReadOnlyList<ClipZone>? clips, EdgeFade? fade)
+    /// <summary>Profiling (dev): time spent working out walls and masks since last reset.</summary>
+    public long WallsTicks, MaskTicks;
+    public static double TicksToMs(long t) => t * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+
+    private (Texture2D? mask, Rectangle rect, string key) Mask(IReadOnlyCollection<CellCoord> cells, int feather, IReadOnlyList<CellStencil> stencils, IReadOnlyList<ClipZone>? clips, EdgeFade? fade)
+    {
+        long m0 = _bakeClock.ElapsedTicks;
+        try { return MaskCore(cells, feather, stencils, clips, fade); }
+        finally { MaskTicks += _bakeClock.ElapsedTicks - m0; }
+    }
+
+    private (Texture2D? mask, Rectangle rect, string key) MaskCore(IReadOnlyCollection<CellCoord> cells, int feather, IReadOnlyList<CellStencil> stencils, IReadOnlyList<ClipZone>? clips, EdgeFade? fade)
     {
         var sb = new StringBuilder();
         foreach (var c in cells.OrderBy(c => c.Q).ThenBy(c => c.R)) sb.Append(c.Q).Append(',').Append(c.R).Append(' ');
         sb.Append('|').Append(feather);
         foreach (var st in stencils) sb.Append("|s").Append(st.Cell.Q).Append(',').Append(st.Cell.R).Append(':').Append(st.Stencil).Append(st.FlipX ? "x" : "").Append(st.FlipY ? "y" : "");
+        string shapeKey = sb.ToString();   // cells + soft edge: the expensive part
         if (clips is not null) foreach (var c in clips) sb.Append("|c").Append(c.Key);
-        string baseKey = sb.ToString();
+        string baseKey = sb.ToString();    // + cut lines (corners, trims, caps): cheap to redo
         string slot = baseKey + "|" + (fade is { } f0 ? $"{f0.Lower}/{f0.Angle}" : "none");
         string fadeKey = fade?.ToString() ?? "none";
         _tick++;
-        if (_masks.TryGetValue(slot, out var hit) && _maskFade.TryGetValue(slot, out var had) && had == fadeKey)
+        if (_masks.TryGetValue(slot, out var hit) && _maskFade.TryGetValue(slot, out var had) && had == fadeKey && _maskArea.TryGetValue(slot, out var hitArea))
         {
             _masks[slot] = (hit.mask, _tick);
-            return hit.mask;
+            return (hit.mask, ToScreen(hitArea), slot + "|" + fadeKey);
         }
 
-        // Base shape (expensive: cells, carving, blur) - reused while only the fade changes.
+        // Base shape (cells, carving, blur, clips) - reused while only the fade changes. The blurred
+        // shape before the cut lines is cached on its own, so corner / cap sliders only redo the cuts.
         if (!_maskBases.TryGetValue(baseKey, out var b))
         {
-            var (inside, shape) = RegionMask.BuildBase(cells, feather, stencils, LoadStencil, clips);
-            b = (inside, shape, _tick);
+            if (!_maskShapes.TryGetValue(shapeKey, out var shaped))
+            {
+                var area = RegionMask.AreaFor(cells, feather);
+                if (area.IsEmpty) return (null, Rectangle.Empty, "");
+                var (ins, blurred) = RegionMask.BuildBaseIn(area, cells, feather, stencils, LoadStencil, null);
+                shaped = (area, ins, blurred);
+                if (_maskShapes.Count >= MaxBases) _maskShapes.Remove(_maskShapes.Keys.First());
+                _maskShapes[shapeKey] = shaped;
+            }
+            var shape = (float[])shaped.shape.Clone();
+            if (clips is { Count: > 0 }) RegionMask.ApplyClipsIn(shaped.area, shape, clips);
+            b = (shaped.area, shaped.inside, shape, _tick);
             if (_maskBases.Count >= MaxBases)
                 foreach (var old in _maskBases.OrderBy(kv => kv.Value.used).Take(_maskBases.Count - MaxBases + 1).ToList())
                 {
@@ -344,35 +422,40 @@ public sealed class TileVisuals : IDisposable
                     foreach (var k in _edges.Keys.Where(k => k.StartsWith(old.Key + "|", StringComparison.Ordinal)).ToList()) _edges.Remove(k);
                 }
         }
-        _maskBases[baseKey] = (b.inside, b.shape, _tick);
+        _maskBases[baseKey] = (b.area, b.inside, b.shape, _tick);
 
-        var a = _maskWork ??= new float[RegionMask.Width * RegionMask.Height];
-        Array.Copy(b.shape, a, a.Length);
+        var a = (float[])b.shape.Clone();
         if (fade is { } f)
         {
-            string edgeKey = slot;
-            if (!_edges.TryGetValue(edgeKey, out var edge)) _edges[edgeKey] = edge = RegionMask.Edge(b.inside, f);
-            RegionMask.ApplyFade(a, edge, f);
+            // The fade's edge only depends on the cells and direction, not on the cut lines.
+            string edgeKey = shapeKey + "|" + f.Lower + "/" + f.Angle;
+            if (!_edges.TryGetValue(edgeKey, out var edge)) _edges[edgeKey] = edge = RegionMask.EdgeIn(b.area, b.inside, f);
+            RegionMask.ApplyFadeIn(b.area, a, edge, f);
         }
-        var colors = _maskColors ??= new Color[a.Length];
+        var colors = new Color[a.Length];
         for (int i = 0; i < a.Length; i++)
         {
             byte v = (byte)Math.Clamp((int)(a[i] * 255f + 0.5f), 0, 255);
             colors[i] = new Color(v, v, v, v);
         }
-        // Refill the existing texture for this shape + direction instead of making a new one.
-        if (!_masks.TryGetValue(slot, out var existing))
+        // Refill the texture for this shape + direction (same size) instead of making a new one.
+        if (!_masks.TryGetValue(slot, out var existing) || existing.mask.Width != b.area.W || existing.mask.Height != b.area.H)
         {
-            existing = (new Texture2D(_device, RegionMask.Width, RegionMask.Height, false, SurfaceFormat.Color), _tick);
+            existing.mask?.Dispose();
+            existing = (new Texture2D(_device, b.area.W, b.area.H, false, SurfaceFormat.Color), _tick);
             if (_masks.Count >= MaxMasks)
                 foreach (var old in _masks.OrderBy(kv => kv.Value.used).Take(_masks.Count - MaxMasks + 1).ToList())
-                { old.Value.mask.Dispose(); _masks.Remove(old.Key); _maskFade.Remove(old.Key); }
+                { old.Value.mask.Dispose(); _masks.Remove(old.Key); _maskFade.Remove(old.Key); _maskArea.Remove(old.Key); }
         }
         existing.mask.SetData(colors);
         _masks[slot] = (existing.mask, _tick);
         _maskFade[slot] = fadeKey;
-        return existing.mask;
+        _maskArea[slot] = b.area;
+        return (existing.mask, ToScreen(b.area), slot + "|" + fadeKey);
     }
+
+    /// <summary>A half-resolution mask area as a full-resolution screen rectangle.</summary>
+    private static Rectangle ToScreen(MaskArea a) => new(a.X * 2, a.Y * 2, a.W * 2, a.H * 2);
 
     /// <summary>Region mask as texture data (alpha in every channel: white * alpha).</summary>
     public static Color[] BuildMask(IReadOnlyCollection<CellCoord> cells, int featherPx, EdgeFade? fade,
@@ -415,7 +498,7 @@ public sealed class TileVisuals : IDisposable
     {
         foreach (var (_, b) in _bakes) b.Dispose();
         foreach (var (m, _) in _masks.Values) m.Dispose();
-        _scratch?.Dispose();
+        foreach (var (rt, _, _) in _pieces.Values) rt.Dispose();
         _warpEffect?.Dispose();
         _batch.Dispose();
     }

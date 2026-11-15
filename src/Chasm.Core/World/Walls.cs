@@ -386,9 +386,11 @@ public static class AutoWalls
                         float x = point.X, bw = v.Style == CornerStyle.Bevel ? v.BevelWidth : 0;
                         piece.Cells.AddRange(col);
                         // Left face keeps the left side (drawn first, hard); right face fades in.
+                        // Along the whole line (not just inside the corner column): the cells either side
+                        // interlock like teeth, and cutting only one column left a zig-zag down the corner.
                         piece.Clips.Add(isLeft
-                            ? new ClipZone(col, x - bw / 2, KeepLeft: true, Ramp: false, v.Blend, v.Lean, point.Y)
-                            : new ClipZone(col, x + bw / 2, KeepLeft: false, Ramp: true, v.Blend, v.Lean, point.Y));
+                            ? new ClipZone(null, x - bw / 2, KeepLeft: true, Ramp: false, v.Blend, v.Lean, point.Y)
+                            : new ClipZone(null, x + bw / 2, KeepLeft: false, Ramp: true, v.Blend, v.Lean, point.Y));
                         // The point is on the left face's right-hand end and the right face's left-hand end.
                         if (isLeft) cornerAtMax = true; else cornerAtMin = true;
                         if (isLeft) AddOuterCornerExtras(wall, v, col, point, fade, w);
@@ -404,14 +406,14 @@ public static class AutoWalls
                         var point = IsoGrid.CellCenter(notch) - new Vector2(0, s * IsoGrid.HalfH);
                         // The right face (from the up-left walkway) keeps the left half and fades in;
                         // the left face (from the up-right walkway, drawn first) keeps the right half.
-                        piece.Clips.Add(new ClipZone(col, point.X, KeepLeft: !isLeft, Ramp: !isLeft, v.Blend, v.Lean, point.Y));
+                        piece.Clips.Add(new ClipZone(null, point.X, KeepLeft: !isLeft, Ramp: !isLeft, v.Blend, v.Lean, point.Y));
                         if (isLeft) cornerAtMin = true; else cornerAtMax = true;
                         if (reportedInner.Add(notch))
                         {
                             junctions?.Add(new WallJunction(WallPart.InnerCorner, notch, point, wall, VariantAt(WallPart.InnerCorner, notch), up));
                             if (v.Shadow > 0)
                             {
-                                var shadow = Strip(wall, WallPieceKind.Shadow, col, point, v.ShadowWidth, v.Lean, fade);
+                                var shadow = Strip(wall, WallPieceKind.Shadow, Around(point, wall.Depth), point, v.ShadowWidth, v.Lean, fade);
                                 shadow.Opacity = v.Shadow;
                                 overlays.Add(shadow);
                             }
@@ -432,7 +434,7 @@ public static class AutoWalls
                 bool endOnRight = cx >= piece.Lip.X;
                 junctions?.Add(new WallJunction(WallPart.EndCap, col[0], IsoGrid.CellCenter(col[0]), wall, VariantAt(WallPart.EndCap, col[0]), up));
                 if (cap.Style == EndCapStyle.Soft)
-                    piece.Clips.Add(new ClipZone(col, cx, KeepLeft: endOnRight, Ramp: true, cap.Softness));
+                    piece.Clips.Add(new ClipZone(null, cx, KeepLeft: endOnRight, Ramp: true, cap.Softness));
                 else if (cap.Style == EndCapStyle.Stencil && !string.IsNullOrEmpty(cap.Stencil))
                     foreach (var c in col) piece.Stencils.Add(new CellStencil { Cell = c, Stencil = cap.Stencil, FlipX = !endOnRight });
             }
@@ -462,7 +464,7 @@ public static class AutoWalls
                     Wall = wall, Kind = WallPieceKind.Bevel, Up = up, Lip = point, Skew = 0, Mirror = false, Fade = fade,
                     Shade = v.BevelShade ?? (wall.LeftShade + wall.RightShade) / 2f,
                 };
-                bevel.Cells.AddRange(col);
+                bevel.Cells.AddRange(Around(point, wall.Depth));
                 bevel.Clips.Add(new ClipZone(null, x - v.BevelWidth / 2, KeepLeft: false, Ramp: true, v.Blend, v.Lean, point.Y));
                 bevel.Clips.Add(new ClipZone(null, x + v.BevelWidth / 2, KeepLeft: true, Ramp: false, v.Blend, v.Lean, point.Y));
                 bevels.Add(bevel);
@@ -470,10 +472,24 @@ public static class AutoWalls
             }
             if (v.Highlight > 0)
             {
-                var hl = Strip(wall, WallPieceKind.Highlight, col, new Vector2(edge, point.Y), v.HighlightWidth, v.Lean, fade);
+                var hl = Strip(wall, WallPieceKind.Highlight, Around(point, wall.Depth), new Vector2(edge, point.Y), v.HighlightWidth, v.Lean, fade);
                 hl.Opacity = v.Highlight;
                 overlays.Add(hl);
             }
+        }
+
+        // The empty cells under (or over) a corner point, one column either side included: a band down
+        // the corner line crosses the tips of the neighbouring columns too.
+        List<CellCoord> Around(Vector2 point, int depth)
+        {
+            float reach = depth * IsoGrid.CellHeight + IsoGrid.CellHeight;
+            return IsoGrid.AllCells.Where(c =>
+            {
+                if (!Void(c)) return false;
+                var p = IsoGrid.CellCenter(c);
+                float dy = (p.Y - point.Y) * s;
+                return Math.Abs(p.X - point.X) <= IsoGrid.HalfW + 1 && dy > -IsoGrid.HalfH && dy <= reach;
+            }).ToList();
         }
 
         // A soft vertical (or leaning) band, e.g. a corner highlight or a notch shadow.

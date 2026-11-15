@@ -184,13 +184,18 @@ public class TileArtTests
         Assert.Contains(corner, left.Cells); Assert.Contains(corner, right.Cells);
         // Left face, bevel and right face together cover the corner cell exactly once.
         var masks = pieces.Where(p => !p.IsOverlay).Select(p => RegionMask.BuildBase(p.Cells, 0, clips: p.Clips).shape).ToList();
+        var wallArea = RegionMask.Inside(pieces.Where(p => p.Kind == WallPieceKind.Face).SelectMany(p => p.Cells).ToHashSet());
         var c = IsoGrid.CellCenter(corner);
-        foreach (float dx in new[] { -40f, -12f, -4f, 0f, 4f, 12f, 40f })
-        {
-            float cover = 0;
-            foreach (var m in masks) { float a = At(m, c.X + dx, c.Y); cover = a + cover * (1 - a); } // 'over', in draw order
-            Assert.InRange(cover, 0.99f, 1.01f);
-        }
+        // Including near the neighbouring cells' tips, which interlock with the corner column
+        // (where the zig-zag down the corner used to come from).
+        foreach (float dy in new[] { 0f, 26f, 58f, 90f })
+            foreach (float dx in new[] { -40f, -12f, -6f, -2f, 0f, 2f, 6f, 12f, 40f })
+            {
+                if (At(wallArea, c.X + dx, c.Y + dy) < 1) continue; // only where there is wall (inside its depth)
+                float cover = 0;
+                foreach (var m in masks) { float a = At(m, c.X + dx, c.Y + dy); cover = a + cover * (1 - a); } // 'over', in draw order
+                Assert.InRange(cover, 0.99f, 1.01f);
+            }
         Assert.Contains(pieces, p => p.Kind == WallPieceKind.Bevel);
         Assert.Contains(pieces, p => p.Kind == WallPieceKind.Highlight);
         // A straight seam instead: two pieces only, left keeps the left, right the right.
