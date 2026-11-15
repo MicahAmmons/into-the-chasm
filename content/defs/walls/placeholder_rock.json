@@ -52,7 +52,25 @@
       "Name": "End",
       "Style": "Soft",
       "Softness": 48,
-      "Stencil": "stencils/notch_right.png"
+      "Rows": [
+        {
+          "Mode": "Stencil",
+          "Stencil": "stencils/notch_right.png",
+          "Rotation": 0,
+          "OffsetX": 0,
+          "OffsetY": 0,
+          "Scale": 1,
+          "FlipY": false
+        }
+      ],
+      "Combo": ""
+    },
+    {
+      "Name": "Taper",
+      "Style": "Stencil",
+      "Softness": 48,
+      "Rows": [],
+      "Combo": "taper_3_cells"
     }
   ],
   "Rim": false,

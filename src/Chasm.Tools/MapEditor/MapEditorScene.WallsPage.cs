@@ -87,6 +87,7 @@ public sealed partial class MapEditorScene
             {
                 ImGui.Indent();
                 WallEntryFade(e);
+                WallEntryBottom(e);
                 ImGui.Unindent();
                 ImGui.Spacing();
             }
@@ -116,6 +117,12 @@ public sealed partial class MapEditorScene
         if (Ui.ToggleButton(_swapMode ? "Done swapping (Esc)" : "Swap corners & ends", _swapMode, new Num.Vector2(190, 0),
                 "Markers appear on corners and wall ends that have more than one variant.\nClick one to switch to its next variant; right-click to go back to the first."))
         { bool on = !_swapMode; ClearMapModes(); _swapMode = on; }
+        if (_swapMode)
+        {
+            ImGui.Checkbox("Corners & ends", ref _swapCorners);
+            ImGui.SameLine();
+            ImGui.Checkbox("Bottom edges", ref _swapBottoms);
+        }
         int swapped = _tile.WallVariants.Count(v => v.Side == WallSide);
         if (swapped > 0)
         {
@@ -131,14 +138,14 @@ public sealed partial class MapEditorScene
 
     // ------------------------------------------------------------------ swapping variants on this tile
 
-    private bool _swapMode;
+    private bool _swapMode, _swapCorners = true, _swapBottoms = true;
 
     private List<WallJunction> TileJunctions()
     {
         var list = new List<WallJunction>();
         if (_tile is null || _floor is null) return list;
         Services.TileVisuals.WallsFor(_tile, _floor, list);
-        return list.Where(j => j.Up == _wallsUp && j.Count > 1).ToList();
+        return list.Where(j => j.Up == _wallsUp && j.Count > 1 && (j.Part == WallPart.BottomEdge ? _swapBottoms : _swapCorners)).ToList();
     }
 
     /// <summary>Click a marker: next variant. Right-click: back to the first.</summary>
@@ -156,13 +163,9 @@ public sealed partial class MapEditorScene
         int next = input.LeftClicked ? (hit.Index + 1) % hit.Count : 0;
         if (next != 0) t.WallVariants.Add(new TileWallVariant { Side = side, Part = hit.Part, Cell = hit.Cell, Index = next });
         Edited();
-        string partName = hit.Part switch { WallPart.OuterCorner => "Outer corner", WallPart.InnerCorner => "Inner corner", _ => "Wall end" };
-        string varName = hit.Part switch
-        {
-            WallPart.OuterCorner => hit.Wall.Outer(next).Name,
-            WallPart.InnerCorner => hit.Wall.Inner(next).Name,
-            _ => hit.Wall.Cap(next).Name,
-        };
+        string partName = hit.Part switch { WallPart.OuterCorner => "Outer corner", WallPart.InnerCorner => "Inner corner", WallPart.EndCap => "Wall end", _ => "Bottom edge" };
+        var entry = WallList.FirstOrDefault(e => e.Wall == hit.Wall.Id);
+        string varName = (hit with { Index = next }).VariantName(entry);
         Status($"{partName}: variant {next + 1} of {hit.Count} ({varName}).");
         return true;
     }
@@ -187,6 +190,89 @@ public sealed partial class MapEditorScene
         ClearMapModes();
         _wallBrush = brush;
         if (brush is not null) Status(brush == TileWallPaint.NoWall ? "Painting 'no wall' cells. Esc when done." : $"Painting {WallOf(brush)?.DisplayName ?? brush} onto cells. Esc when done.");
+    }
+
+    private int _bottomTab;
+
+    /// <summary>The floor's bottom-edge shapes for one wall: where it fades into the clouds.</summary>
+    private void WallEntryBottom(FloorWall e)
+    {
+        ImGui.PushID("bottoms");
+        Ui.Section("Bottom edge");
+        Ui.Hint("A shape for the bottom where the wall fades away (rock tips, crumbling...). It sits at the fade, so it moves with the cloud level. The first is used everywhere; swap single cells with 'Swap corners & ends'.");
+        bool changed = false;
+        if (e.BottomEdges.Count == 0)
+        {
+            if (ImGui.Button("+ Add a bottom edge")) { e.BottomEdges.Add(new BottomEdgeVariant { Name = "Bottom 1", Stencil = "stencils/bottom edges/jagged_rocks.png" }); _bottomTab = 0; changed = true; }
+            ImGui.SameLine(); ImGui.TextDisabled("(none: a smooth fade)");
+        }
+        else
+        {
+            _bottomTab = Math.Clamp(_bottomTab, 0, e.BottomEdges.Count - 1);
+            for (int i = 0; i < e.BottomEdges.Count; i++)
+            {
+                if (i > 0) ImGui.SameLine(0, 4);
+                if (Ui.ToggleButton($"{i + 1}. {e.BottomEdges[i].Name}##bt{i}", _bottomTab == i, new Num.Vector2(0, 0), i == 0 ? "The default" : "Swap in on cells")) _bottomTab = i;
+                if (ImGui.GetContentRegionAvail().X < 120) ImGui.NewLine();
+            }
+            ImGui.SameLine(0, 8);
+            if (ImGui.Button("+##addbottom")) { e.BottomEdges.Add(new BottomEdgeVariant { Name = $"Bottom {e.BottomEdges.Count + 1}", Stencil = e.BottomEdges[^1].Stencil }); _bottomTab = e.BottomEdges.Count - 1; changed = true; }
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Add a variant");
+            var b = e.BottomEdges[_bottomTab];
+            const float label = 110;
+            changed |= NameRow(b.Name, n => b.Name = n);
+            string st = b.Stencil;
+            if (StencilGrid("stencils/bottom edges", ref st, 96, 24)) { b.Stencil = st; changed = true; }
+            changed |= SliderRow("Position", label, () => b.Offset, x => b.Offset = x, -4, 4, "%.2f cells");
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Up (-) or down (+) from the middle of the fade.");
+            changed |= SliderRow("Height", label, () => b.Height, x => b.Height = x, 8, 256, "%.0f px");
+            changed |= SliderRow("Repeat width", label, () => b.Repeat, x => b.Repeat = x, 32, 1024, "%.0f px");
+            bool fx = b.FlipX;
+            if (ImGui.Checkbox("Flip X##bfx", ref fx)) { b.FlipX = fx; changed = true; }
+            if (_bottomTab > 0) { ImGui.SameLine(); if (ImGui.Button("Make default")) { e.BottomEdges.RemoveAt(_bottomTab); e.BottomEdges.Insert(0, b); _bottomTab = 0; changed = true; } }
+            ImGui.SameLine();
+            if (ImGui.Button("Delete##bdel")) { e.BottomEdges.RemoveAt(_bottomTab); _bottomTab = Math.Max(0, _bottomTab - 1); changed = true; }
+        }
+        if (changed) { Edited(); Services.TileVisuals.InvalidateAll(); }
+        ImGui.PopID();
+    }
+
+    // ------------------------------------------------------------------ stencil thumbnail grid
+
+    private (uint field, string key)? _gridPicked;
+
+    /// <summary>
+    /// Every mask in a folder of art/stencils as clickable thumbnails (no scrolling through all the
+    /// art), plus '...' (art library) and '+' (add a new one from your computer, into this folder).
+    /// </summary>
+    private bool StencilGrid(string folder, ref string key, float w, float h)
+    {
+        bool changed = false;
+        uint id = ImGui.GetID("##grid" + folder);
+        if (_gridPicked is { } done && done.field == id) { key = done.key; _gridPicked = null; changed = true; }
+        var keys = Services.Textures.AllKeys().Where(k => k.StartsWith(folder + "/", StringComparison.OrdinalIgnoreCase)).ToList();
+        float cell = w + ImGui.GetStyle().FramePadding.X * 2 + 4;
+        int perRow = Math.Max(1, (int)((ImGui.GetContentRegionAvail().X + 4) / cell));
+        for (int i = 0; i < keys.Count; i++)
+        {
+            if (i % perRow != 0) ImGui.SameLine(0, 4);
+            var k = keys[i];
+            bool sel = string.Equals(k, key, StringComparison.OrdinalIgnoreCase);
+            ImGui.PushStyleColor(ImGuiCol.Button, sel ? Ui.AccentDark : new Num.Vector4(0.16f, 0.18f, 0.24f, 1));
+            if (ImGui.ImageButton($"g{folder}{i}", ImGuiExtension.Instance!.Renderer.BindTexture(Services.Textures.Get(k)), new Num.Vector2(w, h))) { key = k; changed = true; }
+            ImGui.PopStyleColor();
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip(Path.GetFileNameWithoutExtension(k));
+        }
+        if (keys.Count > 0) ImGui.SameLine(0, 4);
+        string seed = keys.FirstOrDefault() ?? folder + "/_";
+        string current = key;
+        if (ImGui.Button($"...##lib{folder}", new Num.Vector2(30, h + 6))) Art.ArtBrowser.OpenPick(string.IsNullOrEmpty(current) ? seed : current, k => _gridPicked = (id, k));
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Art library");
+        ImGui.SameLine(0, 4);
+        if (ImGui.Button($"+##add{folder}", new Num.Vector2(30, h + 6))) Art.ArtBrowser.OpenPick(seed, k => _gridPicked = (id, k), addNew: true);
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Add a mask from your computer (into {folder})");
+        if (keys.Count == 0) Ui.Hint($"No masks in {folder} yet: '+' adds one.");
+        return changed;
     }
 
     private void WallEntryFade(FloorWall e)
@@ -394,7 +480,15 @@ public sealed partial class MapEditorScene
         var f = _floor is null ? new FloorDef { Id = "__builder_floor" } : ChasmJson.Clone(_floor);
         f.Id = "__builder_floor";
         f.WallsDown = new(); f.WallsUp = new();
-        (up ? f.WallsUp : f.WallsDown).Add(new FloorWall { Wall = "__builder_wall" });
+        var builderEntry = new FloorWall { Wall = "__builder_wall" };
+        // Preview with this floor's fade and bottom edges for the wall, if it's on the floor.
+        if (_floor is not null && (up ? _floor.WallsUp : _floor.WallsDown).FirstOrDefault(x => x.Wall == w.Id) is { } real)
+        {
+            builderEntry.FadeMode = real.FadeMode;
+            builderEntry.Fade = ChasmJson.Clone(real.Fade);
+            builderEntry.BottomEdges = real.BottomEdges.Select(ChasmJson.Clone).ToList();
+        }
+        (up ? f.WallsUp : f.WallsDown).Add(builderEntry);
         _previewTile = t;
         _previewFloor = f;
         PreviewChanged();
@@ -511,6 +605,7 @@ public sealed partial class MapEditorScene
     {
         _wallStep = step;
         _variantTab = 0;
+        _rowTab = 0;
         PreviewChanged();
     }
 
@@ -660,25 +755,110 @@ public sealed partial class MapEditorScene
         return changed;
     }
 
+    private int _rowTab;
+    private string _newComboName = "";
+    private bool _openSaveCombo;
+    private EndCapVariant? _comboTarget;
+
     private bool EndCapFields(EndCapVariant v)
     {
         const float label = 120;
         bool changed = NameRow(v.Name, n => v.Name = n);
         ImGui.TextUnformatted("Style"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
-        string[] caps = { "None (hard cut)", "Soft (fades out)", "Stencil (carved shape)" };
+        string[] caps = { "None (hard cut)", "Soft (fades out)", "Masks, cell by cell" };
         int cap = (int)v.Style;
         if (ImGui.Combo("##ecstyle", ref cap, caps, caps.Length)) { v.Style = (EndCapStyle)cap; changed = true; }
         if (v.Style == EndCapStyle.Soft) changed |= SliderRow("Softness", label, () => v.Softness, x => v.Softness = x, 4, 128, "%.0f px");
-        if (v.Style == EndCapStyle.Stencil)
+        if (v.Style != EndCapStyle.Stencil) return changed;
+
+        // Combo: a saved, reusable column of rows (linked) - or this variant's own rows.
+        var combos = Services.Defs.All<EndCapComboDef>().OrderBy(c => c.DisplayName).ToList();
+        var linked = string.IsNullOrEmpty(v.Combo) ? null : combos.FirstOrDefault(c => c.Id == v.Combo);
+        ImGui.TextUnformatted("Combo"); ImGui.SameLine(label); ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - 120);
+        if (ImGui.BeginCombo("##combo", linked?.DisplayName ?? "(this wall's own rows)"))
         {
-            ImGui.TextUnformatted("Stencil"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
-            string st = v.Stencil;
-            ImGui.PushID("ecst");
-            if (ToolContext.Wizards.Inspector.TexturePicker(ref st)) { v.Stencil = st; changed = true; }
-            ImGui.PopID();
-            Ui.Hint("Draw your own from art/stencils/_template_cell.png (opaque keeps, transparent cuts).");
+            if (ImGui.Selectable("(this wall's own rows)", linked is null)) { v.Combo = ""; changed = true; }
+            foreach (var c in combos)
+                if (ImGui.Selectable($"{c.DisplayName}  ({c.Rows.Count} rows)##{c.Id}", c == linked)) { v.Combo = c.Id; changed = true; }
+            ImGui.EndCombo();
         }
-        return changed;
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Use a saved combo (stays linked: improving it improves every wall using it).");
+        ImGui.SameLine(0, 4);
+        if (linked is null)
+        {
+            if (ImGui.Button("Save as combo", new Num.Vector2(116, 0))) { _comboTarget = v; _newComboName = v.Name; _openSaveCombo = true; }
+        }
+        else if (ImGui.Button("Unlink", new Num.Vector2(116, 0)))
+        {
+            v.Rows = linked.Rows.Select(ChasmJson.Clone).ToList();
+            v.Combo = "";
+            changed = true;
+        }
+        if (linked is not null) Ui.ColoredWrapped(Ui.Blue, $"Linked to '{linked.DisplayName}': edits below change the combo for every wall using it (saved with Save wall).");
+        SaveComboPopup();
+
+        // Rows: one per cell down the end's column.
+        var rows = linked?.Rows ?? v.Rows;
+        int depth = Math.Max(1, _wall?.Depth ?? 4);
+        while (rows.Count < depth) rows.Add(new EndCapRow());
+        _rowTab = Math.Clamp(_rowTab, 0, rows.Count - 1);
+        Ui.Hint("Cell 1 is the top of the end (under the walkway). Masks are drawn for a wall ending on the right; left ends mirror them.");
+        for (int i = 0; i < rows.Count; i++)
+        {
+            if (i > 0) ImGui.SameLine(0, 4);
+            string tag = rows[i].Mode switch { EndCapRowMode.Stencil => "mask", EndCapRowMode.Hide => "hide", _ => "keep" };
+            if (Ui.ToggleButton($"Cell {i + 1}: {tag}##row{i}", _rowTab == i, new Num.Vector2(0, 0), null)) _rowTab = i;
+            if (ImGui.GetContentRegionAvail().X < 110) ImGui.NewLine();
+        }
+        var row = rows[_rowTab];
+        bool rc = false;
+        int mode = (int)row.Mode;
+        if (ImGui.RadioButton("Keep", mode == 0)) { row.Mode = EndCapRowMode.Keep; rc = true; }
+        ImGui.SameLine();
+        if (ImGui.RadioButton("Mask", mode == 1)) { row.Mode = EndCapRowMode.Stencil; if (string.IsNullOrEmpty(row.Stencil)) row.Stencil = "stencils/end caps/taper_1.png"; rc = true; }
+        ImGui.SameLine();
+        if (ImGui.RadioButton("Hide (draw nothing)", mode == 2)) { row.Mode = EndCapRowMode.Hide; rc = true; }
+        if (row.Mode == EndCapRowMode.Stencil)
+        {
+            string st = row.Stencil;
+            if (StencilGrid("stencils/end caps", ref st, 64, 32)) { row.Stencil = st; rc = true; }
+            rc |= SliderRow("Turn", label, () => row.Rotation, x => row.Rotation = x, -180, 180, "%.0f deg");
+            rc |= SliderRow("Move X", label, () => row.OffsetX, x => row.OffsetX = x, -64, 64, "%.0f px");
+            rc |= SliderRow("Move Y", label, () => row.OffsetY, x => row.OffsetY = x, -32, 32, "%.0f px");
+            rc |= SliderRow("Size", label, () => row.Scale, x => row.Scale = x, 0.25f, 3f, "%.2fx");
+            bool fy = row.FlipY;
+            if (ImGui.Checkbox("Flip Y##rfy", ref fy)) { row.FlipY = fy; rc = true; }
+            ImGui.SameLine();
+            if (ImGui.Button("Reset placement")) { row.Rotation = 0; row.OffsetX = 0; row.OffsetY = 0; row.Scale = 1; row.FlipY = false; rc = true; }
+        }
+        if (rc && linked is not null) _dirtyCombos.Add(linked.Id);
+        return changed | rc;
+    }
+
+    private readonly HashSet<string> _dirtyCombos = new();
+
+    private void SaveComboPopup()
+    {
+        if (_openSaveCombo) { ImGui.OpenPopup("Save end-cap combo"); _openSaveCombo = false; }
+        CenterNextWindow();
+        if (!ImGui.BeginPopupModal("Save end-cap combo", ImGuiWindowFlags.AlwaysAutoResize)) return;
+        Ui.Hint("Saves these rows as a combo any wall can use (and stay linked to).");
+        ImGui.SetNextItemWidth(300);
+        if (ImGui.IsWindowAppearing()) ImGui.SetKeyboardFocusHere();
+        bool enter = ImGui.InputTextWithHint("##cname", "e.g. Taper, 4 cells", ref _newComboName, 60, ImGuiInputTextFlags.EnterReturnsTrue);
+        if ((Ui.AccentButton("Save", new Num.Vector2(120, 0)) || enter) && _newComboName.Trim().Length > 0 && _comboTarget is { } v)
+        {
+            var c = new EndCapComboDef { Name = _newComboName.Trim(), Rows = v.Rows.Select(ChasmJson.Clone).ToList() };
+            c.Id = Services.Defs.SuggestId(typeof(EndCapComboDef), c.Name);
+            Services.Defs.Save(c);
+            v.Combo = c.Id;
+            Status($"Saved combo '{c.Name}'. This end now uses it (linked).");
+            PreviewChanged();
+            ImGui.CloseCurrentPopup();
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Cancel", new Num.Vector2(100, 0))) ImGui.CloseCurrentPopup();
+        ImGui.EndPopup();
     }
 
     private bool StepsStep()
@@ -747,6 +927,9 @@ public sealed partial class MapEditorScene
         var w = _wall!;
         if (string.IsNullOrWhiteSpace(w.Id)) w.Id = Services.Defs.SuggestId(typeof(WallDef), w.Name);
         Services.Defs.Save(ChasmJson.Clone(w));
+        foreach (var id in _dirtyCombos)
+            if (Services.Defs.TryGet<EndCapComboDef>(id, out var combo)) Services.Defs.Save(combo);
+        _dirtyCombos.Clear();
         if (_wallIsNew && _floor is not null)
         {
             var list = w.Kind == MaterialKind.WallUp ? _floor.WallsUp : _floor.WallsDown;

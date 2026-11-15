@@ -1,0 +1,34 @@
+{
+  "Id": "taper_3_cells",
+  "Name": "Taper, 3 cells",
+  "Rows": [
+    {
+      "Mode": "Stencil",
+      "Stencil": "stencils/end caps/taper_1.png",
+      "Rotation": 0,
+      "OffsetX": 0,
+      "OffsetY": 0,
+      "Scale": 1,
+      "FlipY": false
+    },
+    {
+      "Mode": "Stencil",
+      "Stencil": "stencils/end caps/taper_2.png",
+      "Rotation": 0,
+      "OffsetX": 0,
+      "OffsetY": 0,
+      "Scale": 1,
+      "FlipY": false
+    },
+    {
+      "Mode": "Hide",
+      "Stencil": "",
+      "Rotation": 0,
+      "OffsetX": 0,
+      "OffsetY": 0,
+      "Scale": 1,
+      "FlipY": false
+    }
+  ],
+  "Notes": "Starter combo: a gentle taper, a deeper one, then nothing."
+}

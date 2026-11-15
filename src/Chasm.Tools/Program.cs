@@ -37,6 +37,8 @@ if (args.Contains("--generate-stencils"))
 {
     var stPaths = Chasm.Game.Assets.ContentPaths.Resolve();
     foreach (var f in Chasm.Tools.Art.StencilArt.Generate(stPaths.Art)) Console.WriteLine($"  {Path.GetRelativePath(stPaths.Root, f)}");
+    foreach (var f in Chasm.Tools.Art.StencilArt.GenerateBottomEdges(stPaths.Art)) Console.WriteLine($"  {Path.GetRelativePath(stPaths.Root, f)}");
+    foreach (var f in Chasm.Tools.Art.StencilArt.GenerateEndCaps(stPaths.Art)) Console.WriteLine($"  {Path.GetRelativePath(stPaths.Root, f)}");
     return;
 }
 

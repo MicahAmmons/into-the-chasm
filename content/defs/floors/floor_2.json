@@ -91,7 +91,25 @@
         "Start": 1,
         "Length": 1.5,
         "Angle": "Auto"
-      }
+      },
+      "BottomEdges": [
+        {
+          "Name": "Jagged rocks",
+          "Stencil": "stencils/bottom edges/jagged_rocks.png",
+          "Offset": 0,
+          "Height": 64,
+          "Repeat": 256,
+          "FlipX": false
+        },
+        {
+          "Name": "Stalactites",
+          "Stencil": "stencils/bottom edges/stalactites.png",
+          "Offset": 0.25,
+          "Height": 96,
+          "Repeat": 256,
+          "FlipX": false
+        }
+      ]
     }
   ],
   "WallsUp": [],

@@ -162,16 +162,56 @@ public static class RegionMask
         var set = cells as HashSet<CellCoord> ?? cells.ToHashSet();
         foreach (var s in stencils)
         {
-            if (!set.Contains(s.Cell) || loadStencil(s.Stencil) is not { } img) continue;
+            if (!set.Contains(s.Cell)) continue;
+            if (s.Hide) { ForEachPixelOf(area, s.Cell, (i, _, _) => a[i] = 0f); continue; }
+            if (loadStencil(s.Stencil) is not { } img) continue;
             var centre = IsoGrid.CellCenter(s.Cell);
-            float left = centre.X - IsoGrid.HalfW, top = centre.Y - IsoGrid.HalfH;
+            float rad = -s.Rotation * MathF.PI / 180f, cos = MathF.Cos(rad), sin = MathF.Sin(rad);
+            float scale = Math.Max(0.05f, s.Scale);
             ForEachPixelOf(area, s.Cell, (i, px, py) =>
             {
-                float u = (px - left) / IsoGrid.CellWidth, v = (py - top) / IsoGrid.CellHeight;
-                if (s.FlipX) u = 1 - u;
+                // Into the cell's own frame (mirrored first, so offsets and turns mirror too),
+                // then undo the mask's move / turn / size to find where to read it.
+                float lx = px - centre.X, ly = py - centre.Y;
+                if (s.FlipX) lx = -lx;
+                lx -= s.OffsetX; ly -= s.OffsetY;
+                float rx = (lx * cos - ly * sin) / scale, ry = (lx * sin + ly * cos) / scale;
+                float u = rx / IsoGrid.CellWidth + 0.5f, v = ry / IsoGrid.CellHeight + 0.5f;
                 if (s.FlipY) v = 1 - v;
+                if (u < 0 || u > 1 || v < 0 || v > 1) return; // outside the mask: keep
                 a[i] *= img.Sample(u, v);
             });
+        }
+    }
+
+    /// <summary>
+    /// Bottom edges: along the wall, a strip mask replaces the smooth end of the fade with a shape
+    /// (rock tips, crumbling...). The strip sits at the fade, so it moves with the cloud level.
+    /// Above the strip: kept. In it: the strip's own picture (opaque keeps). Below it: cut.
+    /// </summary>
+    public static void ApplyBottomIn(MaskArea area, float[] a, float[] edge, EdgeFade f, IReadOnlyList<BottomSegment> segments, Func<string, StencilImage?> loadStencil)
+    {
+        for (int x = 0; x < area.W; x++)
+        {
+            float e = edge[x];
+            if (float.IsNaN(e)) continue;
+            float sx = (area.X + x) * 2 + 1;
+            BottomSegment? seg = null;
+            foreach (var sg in segments) if (sx >= sg.MinX && sx <= sg.MaxX) { seg = sg; break; }
+            if (seg is null || loadStencil(seg.Stencil) is not { } img) continue;
+            // Where the strip's bottom sits, measured from the wall's edge (half-res px).
+            float bottom = (f.StartCells + f.LengthCells * 0.5f + seg.Offset) * EdgeFade.CellPx / 2;
+            float h = Math.Max(1, seg.Height / 2);
+            float u = sx / Math.Max(8, seg.Repeat);
+            u -= MathF.Floor(u);
+            if (seg.FlipX) u = 1 - u;
+            for (int y = 0; y < area.H; y++)
+            {
+                float gy = area.Y + y + 0.5f;
+                float depth = f.Lower ? gy - e : e - gy;
+                if (depth <= bottom - h) continue;
+                a[y * area.W + x] *= depth >= bottom ? 0f : img.Sample(u, (depth - (bottom - h)) / h);
+            }
         }
     }
 
