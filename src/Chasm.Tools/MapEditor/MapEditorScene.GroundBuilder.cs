@@ -76,6 +76,7 @@ public sealed partial class MapEditorScene
     /// <summary>The preview: a walkway block with a notch and a step, on this floor's cliffs and clouds.</summary>
     private void BuildGroundPreview()
     {
+        if (_previewOnTile && _tile is not null && _floor is not null) { BuildGroundPreviewOnTile(); return; }
         var t = new TileDef { Id = "__ground_builder", Name = "Ground builder" };
         foreach (var c in IsoGrid.AllCells) t.SetWalkable(c, false);
         var walk = new List<CellCoord>();
@@ -94,6 +95,28 @@ public sealed partial class MapEditorScene
             t.GroundPaint.Add(new TileGroundPaint { Side = "walk", Ground = "__builder_ground", Cells = walk.Where(c => c.Q >= 12).ToList() });
         }
         else f.GroundWalkable = new() { new FloorGround { Prefab = "__builder_ground" } };
+        t.InvalidateCaches();
+        _previewTile = t;
+        _previewFloor = f;
+        GroundPreviewChanged();
+    }
+
+    /// <summary>
+    /// The preview on the tile being edited: a copy of it and its floor, with this ground standing in
+    /// for itself wherever it's used (or, if the floor doesn't use it yet, as the first ground of the
+    /// list you came from - the automatic one on the Walkable tab). Nothing real changes.
+    /// </summary>
+    private void BuildGroundPreviewOnTile()
+    {
+        var g = _ground!;
+        var t = ChasmJson.Clone(_tile!);
+        t.Id = "__ground_builder_tile";
+        var f = ChasmJson.Clone(_floor!);
+        f.Id = "__builder_floor";
+        bool used = false;
+        foreach (var e in f.GroundWalkable.Concat(f.GroundUnwalkable).Where(e => e.Prefab == g.Id && !string.IsNullOrEmpty(g.Id))) { e.Prefab = "__builder_ground"; used = true; }
+        if (!used) (_groundVoid ? f.GroundUnwalkable : f.GroundWalkable).Insert(0, new FloorGround { Prefab = "__builder_ground" });
+        foreach (var p in t.GroundPaint.Where(p => p.Ground == g.Id && !string.IsNullOrEmpty(g.Id))) p.Ground = "__builder_ground";
         t.InvalidateCaches();
         _previewTile = t;
         _previewFloor = f;
@@ -131,6 +154,13 @@ public sealed partial class MapEditorScene
         Ui.Title($"{idx + 1}. {title}");
         Ui.Hint(help);
         if (Ui.ToggleButton("Grid & captions", _previewHelpers, new Num.Vector2(0, 0), "Show the grid on the preview (H).")) _previewHelpers = !_previewHelpers;
+        ImGui.SameLine(0, 12);
+        if (ImGui.Checkbox("Preview on this tile", ref _previewOnTile)) BuildGroundPreview();
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("On: the ground as it would look on the tile you're editing (nothing real changes until you save).\nOff: a fixed test shape (with a strip of another ground from step 4).");
+        if (_previewOnTile && _tile is { PaintRegions.Count: > 0 } && !_groundVoid)
+            Ui.Colored(Ui.Muted, "Painted textures on this tile draw over the ground.");
+        if (_previewOnTile && _groundVoid && !(_previewTile?.GroundPaint.Any(p => p.Ground == "__builder_ground") ?? false))
+            Ui.Colored(Ui.Warn, "No unwalkable cells use this ground on this tile yet: paint some (Assign), or untick to see the test shape.");
 
         ImGui.BeginChild("gstepbody", new Num.Vector2(0, -78));
         bool changed = step switch
@@ -171,7 +201,7 @@ public sealed partial class MapEditorScene
     {
         bool wasMeeting = _groundStep is GroundStep.Meeting or GroundStep.Review;
         _groundStep = step;
-        if (wasMeeting != (step is GroundStep.Meeting or GroundStep.Review)) BuildGroundPreview();
+        if (!_previewOnTile && wasMeeting != (step is GroundStep.Meeting or GroundStep.Review)) BuildGroundPreview();
     }
 
     // ---- steps

@@ -511,9 +511,16 @@ public sealed partial class MapEditorScene
     /// The builder's preset: one walkway shape with every situation in it - long left and right
     /// faces, outer corners, a notch (inner corner), a step, and a gap painted 'no wall' (two ends).
     /// </summary>
+    /// <summary>Builders preview on the tile being edited (true) or on a fixed test shape (false).</summary>
+    private bool _previewOnTile = true;
+    /// <summary>The preview tile's own corner / end swaps (the builder adds its own on top).</summary>
+    private List<TileWallVariant> _previewBaseVariants = new();
+
     private void BuildPreview()
     {
         if (_capDraft is not null) { BuildCapDraftPreview(); return; }
+        if (_previewOnTile && _tile is not null && _floor is not null) { BuildWallPreviewOnTile(); return; }
+        _previewBaseVariants = new();
         var w = _wall!;
         bool up = w.Kind == MaterialKind.WallUp;
         int o = up ? 3 : 0; // walls up rise above the walkway, so sit it lower on screen
@@ -529,6 +536,32 @@ public sealed partial class MapEditorScene
         t.WallPaint.Add(new TileWallPaint { Side = up ? "up" : "down", Wall = TileWallPaint.NoWall,
             Cells = { up ? new CellCoord(10 + o, -3 + o) : new CellCoord(10 + o, 3 + o) } });
         FinishPreview(t, walk.Where(IsoGrid.InTile).ToList());
+    }
+
+    /// <summary>
+    /// The preview on the tile being edited: a copy of it and its floor, with this wall standing in
+    /// for itself wherever the floor or tile uses it (or, if it isn't on the floor yet, as the
+    /// automatic wall). Nothing real changes.
+    /// </summary>
+    private void BuildWallPreviewOnTile()
+    {
+        var w = _wall!;
+        bool up = w.Kind == MaterialKind.WallUp;
+        var t = ChasmJson.Clone(_tile!);
+        t.Id = "__wall_builder_tile";
+        var f = ChasmJson.Clone(_floor!);
+        f.Id = "__builder_floor";
+        var list = up ? f.WallsUp : f.WallsDown;
+        var entry = string.IsNullOrEmpty(w.Id) ? null : list.FirstOrDefault(e => e.Wall == w.Id);
+        if (entry is null) list.Insert(0, entry = new FloorWall());
+        entry.Wall = "__builder_wall";
+        if (!_showFloorFade) entry.FadeMode = WallFadeMode.None;
+        foreach (var p in t.WallPaint.Where(p => p.Wall == w.Id && !string.IsNullOrEmpty(w.Id))) p.Wall = "__builder_wall";
+        t.InvalidateCaches();
+        _previewBaseVariants = t.WallVariants.Select(ChasmJson.Clone).ToList();
+        _previewTile = t;
+        _previewFloor = f;
+        PreviewChanged();
     }
 
     /// <summary>The preview tile's ground, and a floor with just this wall on it (with the floor's fade and bottom edges for it).</summary>
@@ -561,8 +594,9 @@ public sealed partial class MapEditorScene
         if (_previewTile is null || _wall is null) return;
         var w = _wall;
         Services.TileVisuals.WallOverride = x => x == "__builder_wall" ? w : null;
-        // Show the variant being edited everywhere it applies.
+        // Show the variant being edited everywhere this wall has that part (other swaps stay).
         _previewTile.WallVariants.Clear();
+        _previewTile.WallVariants.AddRange(_previewBaseVariants.Select(ChasmJson.Clone));
         var part = _wallStep switch
         {
             WallStep.OuterCorners => (WallPart?)WallPart.OuterCorner,
@@ -576,9 +610,10 @@ public sealed partial class MapEditorScene
         {
             // Left to right across the preview: all the variant being edited, or 1, 2, 3... to compare.
             int k = 0;
-            foreach (var j in _previewJunctions.Where(j => j.Part == pt).OrderBy(j => j.Point.X))
+            foreach (var j in _previewJunctions.Where(j => j.Part == pt && j.Wall == w).OrderBy(j => j.Point.X))
             {
                 int index = _compareVariants && j.Count > 0 ? k++ % j.Count : _variantTab;
+                _previewTile.WallVariants.RemoveAll(v => v.Side == (j.Up ? "up" : "down") && v.Part == pt && v.Cell.Equals(j.Cell));
                 _previewTile.WallVariants.Add(new TileWallVariant { Side = j.Up ? "up" : "down", Part = pt, Cell = j.Cell, Index = index });
             }
         }
@@ -614,6 +649,11 @@ public sealed partial class MapEditorScene
         ImGui.SameLine(0, 12);
         string floorName = _floor?.DisplayName ?? "the floor";
         if (ImGui.Checkbox($"Show {floorName}'s fade & bottom edge", ref _showFloorFade)) BuildPreview();
+        if (ImGui.Checkbox("Preview on this tile", ref _previewOnTile)) BuildPreview();
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("On: the wall as it would look on the tile you're editing (nothing real changes until you save).\nOff: a fixed test shape with every situation in it (corners, a notch, a step, a gap).");
+        if (_previewOnTile && _wallStep is WallStep.OuterCorners or WallStep.InnerCorners or WallStep.EndCaps
+            && !_previewJunctions.Any(j => j.Wall == _wall && j.Part == (_wallStep == WallStep.OuterCorners ? WallPart.OuterCorner : _wallStep == WallStep.InnerCorners ? WallPart.InnerCorner : WallPart.EndCap)))
+            Ui.Colored(Ui.Warn, "This tile has none of these: untick 'Preview on this tile' to see the test shape.");
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("The fade into the clouds and the bottom edge belong to each floor, not the wall:\nset them on the Walls page (this wall's entry on the floor).\nOff: the wall at its full depth, no fade.");
 
