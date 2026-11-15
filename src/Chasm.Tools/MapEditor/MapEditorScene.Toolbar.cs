@@ -180,6 +180,7 @@ public sealed partial class MapEditorScene
                 var chosen = f;
                 if (FloorDirty) Guard(() => SetFloor(chosen)); else SetFloor(chosen);
             }
+        if (_floor is not null && ImGui.Selectable($"Delete floor {_floor.Number}...")) _openDeleteFloor = true;
         if (ImGui.Selectable("+ New floor..."))
         {
             _newFloorNumber = floors.Count == 0 ? 1 : floors.Max(f => f.Number) + 1;

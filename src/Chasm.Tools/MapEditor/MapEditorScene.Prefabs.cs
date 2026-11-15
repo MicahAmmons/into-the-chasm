@@ -84,7 +84,7 @@ public sealed partial class MapEditorScene
             if (ImGui.Button("Edit", new Num.Vector2(56, 0))) OpenPrefabEditor(p, isNew: false);
             ImGui.SameLine(0, 4);
             if (ImGui.Button("x", new Num.Vector2(28, 0))) removeId = p.Id;
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Remove from this floor's list (the prefab stays in the library).");
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Remove from this floor's list (the prefab stays in the library; delete it there).");
             ImGui.PopID();
         }
         if (removeId is not null) { _floor.Prefabs.Remove(removeId); Edited(); }
@@ -92,6 +92,9 @@ public sealed partial class MapEditorScene
         ImGui.SameLine();
         if (ImGui.Button("+ New prefab")) OpenPrefabEditor(new PrefabDef { Kind = kind, LipLine = kind == MaterialKind.WallUp ? 1f : 0f, Category = "Cliff walls" }, isNew: true);
         AddPrefabPopup(kind);
+
+        // ---- auto cliffs
+        AutoCliffsSection(kind);
 
         // ---- placements on this tile
         Ui.Section("Placed on this tile  (lower = drawn on top)");
@@ -125,12 +128,18 @@ public sealed partial class MapEditorScene
             ImGui.SameLine();
             if (p is not null) { Thumb(p.Texture, 24); ImGui.SameLine(); }
             bool open = _openPlacement == r.Id;
-            string label = p is null ? $"missing prefab '{r.Prefab}'" : $"{p.DisplayName}  [{r.Id}]  {r.Cells.Count} cells{(r.Layer == PaintLayer.InFrontOfCharacters ? "  [front]" : "")}";
+            string label = p is null ? $"missing prefab '{r.Prefab}'" : $"{p.DisplayName}  [{r.Id}]  {r.Cells.Count} cells{(r.Layer == PaintLayer.InFrontOfCharacters ? "  [front]" : "")}{(r.Auto is not null ? "  [auto]" : "")}";
             if (ImGui.Selectable(label, open, ImGuiSelectableFlags.None, new Num.Vector2(0, 24))) _openPlacement = open ? null : r.Id;
             if (open && p is not null)
             {
                 ImGui.Indent();
                 PlacementFields(r, p);
+                if (r.Auto is not null)
+                {
+                    if (ImGui.Button("Keep (stop regenerating)")) { r.Auto = null; Edited(); }
+                    if (ImGui.IsItemHovered()) ImGui.SetTooltip("Auto pieces are replaced when you Regenerate. Keep makes this one a normal placement.");
+                    ImGui.SameLine();
+                }
                 if (ImGui.Button("Remove from tile")) delete = r;
                 ImGui.Unindent();
                 ImGui.Spacing();
@@ -270,13 +279,16 @@ public sealed partial class MapEditorScene
                 ImGui.PushID(p.Id);
                 Thumb(p.Texture, 40);
                 ImGui.SameLine();
-                if (ImGui.Selectable($"{p.DisplayName}  [{p.Id}]", false, ImGuiSelectableFlags.None, new Num.Vector2(0, 40)))
+                if (ImGui.Selectable($"{p.DisplayName}  [{p.Id}]", false, ImGuiSelectableFlags.None, new Num.Vector2(ImGui.GetContentRegionAvail().X - 76, 40)))
                 {
                     _floor.Prefabs.Add(p.Id);
                     Edited();
                     ImGui.CloseCurrentPopup();
                 }
                 if (ImGui.IsItemHovered()) PrefabTooltip(p);
+                ImGui.SameLine();
+                if (ImGui.Button("Delete", new Num.Vector2(70, 0))) { ImGui.CloseCurrentPopup(); AskDeletePrefab(p); }
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Delete this prefab from the library (asks first).");
                 ImGui.PopID();
             }
         }
@@ -419,10 +431,9 @@ public sealed partial class MapEditorScene
         ImGui.SameLine();
         if (!_prefabIsNew && ImGui.Button("Duplicate")) DuplicatePrefab();
         if (!_prefabIsNew) ImGui.SameLine();
-        if (!_prefabIsNew && ImGui.Button("Delete...")) _openDeletePrefab = true;
+        if (!_prefabIsNew && ImGui.Button("Delete...") && Services.Defs.TryGet<PrefabDef>(p.Id, out var savedP)) AskDeletePrefab(savedP);
         ImGui.SameLine();
         if (ImGui.Button("Close")) { _prefab = null; _panel = _prefabReturn == Panel.Prefab ? Panel.Walls : _prefabReturn; }
-        DeletePrefabPopup();
     }
 
     private void SavePrefab()
@@ -447,34 +458,6 @@ public sealed partial class MapEditorScene
         _prefab = copy;
         _prefabIsNew = true;
         Status("Duplicated (flipped left/right). Change Kind to move it to the other side; Save to keep it.");
-    }
-
-    private void DeletePrefabPopup()
-    {
-        if (_openDeletePrefab) { ImGui.OpenPopup("Delete prefab?"); _openDeletePrefab = false; }
-        CenterNextWindow();
-        if (!ImGui.BeginPopupModal("Delete prefab?", ImGuiWindowFlags.AlwaysAutoResize)) return;
-        var p = _prefab!;
-        var uses = FindReferences(p.Id);
-        Ui.Title($"Delete \"{p.DisplayName}\"?");
-        if (uses.Count == 0) Ui.Colored(Ui.Good, "Nothing uses it.");
-        else
-        {
-            Ui.Colored(Ui.Warn, $"Used by {uses.Count} thing(s); their placements will show as missing:");
-            foreach (var u in uses.Take(10)) ImGui.BulletText(u);
-        }
-        if (ImGui.Button("Delete", new Num.Vector2(120, 0)))
-        {
-            Services.Defs.Delete(typeof(PrefabDef), p.Id);
-            _floor?.Prefabs.Remove(p.Id);
-            _prefab = null;
-            _panel = Panel.Walls;
-            Edited();
-            ImGui.CloseCurrentPopup();
-        }
-        ImGui.SameLine();
-        if (ImGui.Button("Cancel", new Num.Vector2(120, 0))) ImGui.CloseCurrentPopup();
-        ImGui.EndPopup();
     }
 
     // ------------------------------------------------------------------ map: picking, moving, preview

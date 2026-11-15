@@ -193,6 +193,10 @@ public sealed class PaintRegion
     [Hidden] public float NudgeY { get; set; }
     /// <summary>Prefab placement: mirror left/right on this tile.</summary>
     [Hidden] public bool MirrorX { get; set; }
+    /// <summary>Prefab placement: vertical slant (y += Skew * x) so a face follows a cell edge while its verticals stay vertical.</summary>
+    [Hidden] public float Skew { get; set; }
+    /// <summary>Made by auto cliffs ("down" / "up"); regenerating replaces these. Null = placed by hand.</summary>
+    [Hidden] public string? Auto { get; set; }
     /// <summary>Fade on/off for this region (null = the usual: walls fade, general textures don't).</summary>
     [Hidden] public bool? FadeEnabled { get; set; }
 

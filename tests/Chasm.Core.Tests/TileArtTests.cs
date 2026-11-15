@@ -138,6 +138,58 @@ public class TileArtTests
         Assert.False(PrefabPlacement.FadeFor(region, prefab, floor)!.Value.Lower);
     }
 
+    private static TileDef WalkableTile(params CellCoord[] walk)
+    {
+        var t = new TileDef { Id = "auto" };
+        foreach (var c in IsoGrid.AllCells) t.SetWalkable(c, false);
+        foreach (var c in walk) t.SetWalkable(c, true);
+        return t;
+    }
+
+    [Fact]
+    public void Auto_cliffs_hang_faces_and_corners_under_open_edges()
+    {
+        // A short diagonal walkway: (10,2) (11,2) (12,2) runs down-right.
+        var t = WalkableTile(new(10, 2), new(11, 2), new(12, 2));
+        var face = new PrefabDef { Id = "face", Kind = MaterialKind.WallDown };
+        var corner = new PrefabDef { Id = "corner", Kind = MaterialKind.WallDown };
+        var kit = new CliffKit { LeftFace = "face", OuterCorner = "corner", Depth = 2, MaxRun = 10 };
+        int n = 0;
+        var pieces = AutoCliffs.Generate(t, kit, up: false, id => id == "face" ? face : id == "corner" ? corner : null, _ => "a" + n++);
+        Assert.All(pieces, p => Assert.Equal(AutoCliffs.TagDown, p.Auto));
+        // Left faces: one run of 3 cells along r = 2; their columns start at (q, 3).
+        var leftFace = pieces.Single(p => p.Prefab == "face" && !p.MirrorX);
+        Assert.Contains(new CellCoord(10, 3), leftFace.Cells);
+        Assert.Contains(new CellCoord(11, 4), leftFace.Cells);   // straight below (10,3)
+        Assert.Equal(0.5f, leftFace.Skew);
+        // Right faces: only (12,2) is open down-right; no right prefab, so the left face mirrored.
+        Assert.Single(pieces, p => p.Prefab == "face" && p.MirrorX);
+        // Outer corner only under the end cell (12,2): the others have a walkway neighbour down-right.
+        Assert.Single(pieces, p => p.Prefab == "corner");
+        Assert.Contains(new CellCoord(13, 3), pieces.Single(p => p.Prefab == "corner").Cells);
+        // No piece covers a walkable cell, and the lip lands on the open edge.
+        Assert.All(pieces, p => Assert.DoesNotContain(p.Cells, c => t.IsWalkable(c)));
+        var anchor = PrefabPlacement.Anchor(leftFace, face);
+        var expected = (IsoGrid.CellCenter(new(11, 2)) + new System.Numerics.Vector2(-IsoGrid.HalfW / 2, IsoGrid.HalfH / 2));
+        Assert.True((anchor - expected).Length() < 0.2f);
+    }
+
+    [Fact]
+    public void Auto_cliffs_split_long_runs_and_need_a_left_face()
+    {
+        var t = WalkableTile(Enumerable.Range(4, 8).Select(q => new CellCoord(q, 3)).ToArray());
+        var face = new PrefabDef { Id = "face" };
+        int n = 0;
+        var kit = new CliffKit { LeftFace = "face", MaxRun = 3, Depth = 1 };
+        var pieces = AutoCliffs.Generate(t, kit, false, id => id == "face" ? face : null, _ => "a" + n++);
+        Assert.Equal(3, pieces.Count(p => !p.MirrorX && p.Cells.All(c => c.R == 4))); // 8 cells -> 3 + 3 + 2
+        Assert.Empty(AutoCliffs.Generate(t, new CliffKit(), false, _ => null, _ => "x"));
+        // Without an outer corner prefab, the cell under the end point is still covered by the faces.
+        var single = WalkableTile(new CellCoord(10, 2));
+        var faces = AutoCliffs.Generate(single, new CliffKit { LeftFace = "face", Depth = 1 }, false, id => id == "face" ? face : null, _ => "b" + n++);
+        Assert.Contains(faces, p => p.Cells.Contains(new CellCoord(11, 3)));
+    }
+
     [Fact]
     public void Cloud_direction_sets_scroll_offset()
     {

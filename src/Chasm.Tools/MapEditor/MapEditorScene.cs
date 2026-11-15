@@ -68,7 +68,7 @@ public sealed partial class MapEditorScene : Scene
         ToolContext.Wizards.Inspector.CellPicker = cb => { _cellPick = cb; Status("Click a cell on the map (Esc cancels)."); };
         Art.ArtLibrary.KeysMoved += OnArtMoved;
         if (_openOnStart is not null && Services.Defs.TryGet<TileDef>(_openOnStart, out var t)) Open(t);
-        // Dev convenience for automated screenshots: CHASM_EDITOR=tool[:panel][:neighbours][:mat=<id>][:cut][:dup][:warp][:place=<prefab>][:prefab=<prefab>][:game]
+        // Dev convenience for automated screenshots: CHASM_EDITOR=tool[:panel][:neighbours][:mat=<id>][:cut][:dup][:warp][:place=<prefab>][:prefab=<prefab>][:autodemo][:game]
         if (_tile is not null && Environment.GetEnvironmentVariable("CHASM_EDITOR") is { } dev)
         {
             var parts = dev.Split(':');
@@ -98,6 +98,16 @@ public sealed partial class MapEditorScene : Scene
             }
             if (parts.FirstOrDefault(x => x.StartsWith("prefab=")) is { } pe && Services.Defs.TryGet<PrefabDef>(pe[7..], out var pfEdit))
                 OpenPrefabEditor(pfEdit, isNew: false);
+            if (parts.Contains("autodemo") && _floor is not null)
+            {
+                // Walkable = the cells painted with grass; kit = the starter prefab; generate.
+                foreach (var c in IsoGrid.AllCells) _tile.SetWalkable(c, false);
+                foreach (var r in _tile.PaintRegions.Where(r => r.Material is "ph_grass" or "grass_test")) foreach (var c in r.Cells) _tile.SetWalkable(c, true);
+                _tile.PaintRegions.RemoveAll(r => r.Material is "ph_cliff" or "ph_cliff_right" or "cliff_test");
+                _floor.CliffKitDown.LeftFace = "strata_cliff";
+                _floor.CliffKitDown.Depth = 3;
+                GenerateAutoCliffs(_floor.CliffKitDown, up: false);
+            }
             if (parts.Contains("selectall")) foreach (var c in IsoGrid.AllCells.Where(c => _tile.Walkable[c])) _selection.Add(c);
         }
     }
@@ -509,6 +519,8 @@ public sealed partial class MapEditorScene : Scene
         NewFloorPopup();
         DeletePopup();
         DuplicatePopup();
+        DeletePrefabPopup();
+        DeleteFloorPopup();
         if (_askUnsaved) { ImGui.OpenPopup("Unsaved changes"); _askUnsaved = false; }
         if (!ImGui.BeginPopupModal("Unsaved changes", ImGuiWindowFlags.AlwaysAutoResize)) return;
         ImGui.Text("This tile (or its floor) has unsaved changes.");

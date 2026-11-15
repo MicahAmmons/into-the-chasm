@@ -77,6 +77,8 @@ public static class PrefabPlacement
         var local = new[] { new Vector2(-w / 2, top), new Vector2(w / 2, top), new Vector2(w / 2, bottom), new Vector2(-w / 2, bottom) };
         if (prefab.Warp is { } warp)
             for (int i = 0; i < 4; i++) local[i] += warp.Get(i);
+        if (region.Skew != 0) // slant along a cell edge; verticals stay vertical
+            for (int i = 0; i < 4; i++) local[i] = new Vector2(local[i].X, local[i].Y + region.Skew * local[i].X);
         var anchor = Anchor(region, prefab);
         float r = prefab.Rotation * MathF.PI / 180f, cs = MathF.Cos(r), sn = MathF.Sin(r);
         var result = local.Select(p => anchor + new Vector2(p.X * cs - p.Y * sn, p.X * sn + p.Y * cs)).ToArray();

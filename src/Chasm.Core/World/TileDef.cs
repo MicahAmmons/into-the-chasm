@@ -246,4 +246,8 @@ public sealed class FloorDef : Def
     public WallFade WallDownFade { get; set; } = new();
     [Hidden, Tooltip("How walls going up fade into the top clouds on this floor (placements can override).")]
     public WallFade WallUpFade { get; set; } = new();
+    [Hidden, Tooltip("Prefabs auto cliffs use for walls going down on this floor.")]
+    public CliffKit CliffKitDown { get; set; } = new();
+    [Hidden, Tooltip("Prefabs auto walls use for walls going up on this floor.")]
+    public CliffKit CliffKitUp { get; set; } = new();
 }
