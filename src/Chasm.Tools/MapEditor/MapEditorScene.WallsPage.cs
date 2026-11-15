@@ -330,10 +330,11 @@ public sealed partial class MapEditorScene
     private WallStep _wallStep;
     private TileDef? _previewTile;
     private FloorDef? _previewFloor;
-    private bool _spotlight = true;
     /// <summary>Grid and captions in the wall / prefab previews. Off = as in game.</summary>
     private bool _previewHelpers;
     private int _variantTab;
+    /// <summary>Builder: each corner / end in the preview shows a different variant, side by side.</summary>
+    private bool _compareVariants;
     private (float taper, float squash) _wallTaper;
     private List<WallJunction> _previewJunctions = new();
 
@@ -416,8 +417,15 @@ public sealed partial class MapEditorScene
         _previewJunctions.Clear();
         Services.TileVisuals.WallsFor(_previewTile, _previewFloor, _previewJunctions);
         if (part is { } pt)
-            foreach (var j in _previewJunctions.Where(j => j.Part == pt))
-                _previewTile.WallVariants.Add(new TileWallVariant { Side = j.Up ? "up" : "down", Part = pt, Cell = j.Cell, Index = _variantTab });
+        {
+            // Left to right across the preview: all the variant being edited, or 1, 2, 3... to compare.
+            int k = 0;
+            foreach (var j in _previewJunctions.Where(j => j.Part == pt).OrderBy(j => j.Point.X))
+            {
+                int index = _compareVariants && j.Count > 0 ? k++ % j.Count : _variantTab;
+                _previewTile.WallVariants.Add(new TileWallVariant { Side = j.Up ? "up" : "down", Part = pt, Cell = j.Cell, Index = index });
+            }
+        }
         Services.TileVisuals.Invalidate(_previewTile);
     }
 
@@ -446,8 +454,6 @@ public sealed partial class MapEditorScene
 
         Ui.Title($"{idx + 1}. {title}");
         Ui.Hint(help);
-        if (Ui.ToggleButton("Spotlight", _spotlight, new Num.Vector2(0, 0), "Dim everything this step doesn't change.")) _spotlight = !_spotlight;
-        ImGui.SameLine();
         if (Ui.ToggleButton("Grid & captions", _previewHelpers, new Num.Vector2(0, 0), "Show the grid and labels on the preview (H).")) _previewHelpers = !_previewHelpers;
 
         ImGui.BeginChild("stepbody", new Num.Vector2(0, -78));
@@ -599,6 +605,11 @@ public sealed partial class MapEditorScene
         }
         ImGui.SameLine(0, 8);
         if (ImGui.Button("+ Add variant")) { list.Add(make()); _variantTab = list.Count - 1; changed = true; }
+        if (list.Count > 1)
+        {
+            if (ImGui.Checkbox("Compare variants side by side", ref _compareVariants)) changed = true;
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("On: the spots in the preview show variant 1, 2, 3... left to right.\nOff: every spot shows the variant you're editing.");
+        }
         ImGui.Separator();
         var v = list[_variantTab];
         changed |= fields(v);
@@ -765,49 +776,6 @@ public sealed partial class MapEditorScene
         return true;
     }
 
-    /// <summary>Cells this step is about (for the spotlight). Null = everything.</summary>
-    private HashSet<CellCoord>? StepCells()
-    {
-        if (_previewTile is null || _wall is null) return null;
-        bool up = _wall.Kind == MaterialKind.WallUp;
-        int s = up ? -1 : 1;
-        // Only as deep as the wall is still visible (the fade hides the rest).
-        var fade = _previewFloor is null ? null : (up ? _previewFloor.WallUpFade : _previewFloor.WallDownFade);
-        int visible = Math.Max(1, Math.Min(_wall.Depth, (int)MathF.Ceiling((fade?.Start ?? 1) + (fade?.Length ?? 1.5f))));
-        HashSet<CellCoord> ColumnsAt(IEnumerable<CellCoord> starts)
-        {
-            var set = new HashSet<CellCoord>();
-            foreach (var st in starts)
-            {
-                var c = st;
-                for (int i = 0; i < visible && IsoGrid.InTile(c) && !_previewTile.Walkable[c]; i++, c = new CellCoord(c.Q + s, c.R + s)) set.Add(c);
-            }
-            return set;
-        }
-        var pieces = Services.TileVisuals.WallsFor(_previewTile, _previewFloor);
-        switch (_wallStep)
-        {
-            case WallStep.LeftFace: return ColumnsAt(pieces.Where(p => p.Kind == WallPieceKind.Face && !p.RightFace).SelectMany(TopCells));
-            case WallStep.RightFace: return ColumnsAt(pieces.Where(p => p.Kind == WallPieceKind.Face && p.RightFace).SelectMany(TopCells));
-            case WallStep.OuterCorners:
-                return ColumnsAt(_previewJunctions.Where(j => j.Part == WallPart.OuterCorner).Select(j => new CellCoord(j.Cell.Q + s, j.Cell.R + s)));
-            case WallStep.InnerCorners: return ColumnsAt(_previewJunctions.Where(j => j.Part == WallPart.InnerCorner).Select(j => j.Cell));
-            case WallStep.EndCaps: return ColumnsAt(_previewJunctions.Where(j => j.Part == WallPart.EndCap).Select(j => j.Cell));
-            case WallStep.Steps:
-            {
-                int o = up ? 3 : 0;
-                var stepCells = up ? new[] { new CellCoord(15 + o, -3 + o), new CellCoord(16 + o, -3 + o) } : new[] { new CellCoord(16 + o, 3 + o), new CellCoord(17 + o, 3 + o) };
-                return ColumnsAt(pieces.Where(p => p.Kind == WallPieceKind.Face && p.Cells.Any(c => stepCells.Any(sc => Math.Abs(sc.Q - c.Q) + Math.Abs(sc.R - c.R) <= 1)))
-                    .SelectMany(TopCells)).Concat(stepCells).ToHashSet();
-            }
-            case WallStep.Rim: return pieces.Where(p => p.Kind == WallPieceKind.Rim).SelectMany(p => p.Cells).Concat(pieces.Where(p => p.Kind == WallPieceKind.Face).SelectMany(p => p.Cells.Take(2))).ToHashSet();
-            default: return null;
-        }
-        // The top cell of each column a piece covers (the cell right under its edge).
-        IEnumerable<CellCoord> TopCells(WallPiece p) =>
-            p.Cells.Where(c => !p.Cells.Contains(new CellCoord(c.Q - s, c.R - s)));
-    }
-
     /// <summary>The wall builder's preview, drawn instead of the tile.</summary>
     private void DrawWallPreview(SpriteBatch batch)
     {
@@ -816,17 +784,8 @@ public sealed partial class MapEditorScene
         TileRenderer.QueueLayers(_queue, s, t, _previewFloor, includeProps: false);
         _queue.Flush(batch);
         var d = s.Draw;
-        var focus = _spotlight ? StepCells() : null;
-        if (focus is null && !_previewHelpers) return;
+        if (!_previewHelpers) return;
         batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend);
-        if (focus is not null)
-            // A margin past the tile too, so the half cells along the screen edges are dimmed as well.
-            for (int q = IsoGrid.MinQ - 2; q <= IsoGrid.MaxQ + 2; q++)
-                for (int r = IsoGrid.MinR - 2; r <= IsoGrid.MaxR + 2; r++)
-                {
-                    var c = new CellCoord(q, r);
-                    if (!focus.Contains(c)) d.DiamondFill(batch, IsoGrid.CellCenter(c), IsoGrid.CellWidth, IsoGrid.CellHeight, new Color(8, 10, 18) * 0.62f);
-                }
         if (_previewHelpers)
         {
             foreach (var c in IsoGrid.AllCells) d.DiamondOutline(batch, IsoGrid.CellCenter(c), IsoGrid.CellWidth, IsoGrid.CellHeight, EditorPrefs.ToColor(_prefs.GridColor));
