@@ -106,6 +106,12 @@ public sealed partial class MapEditorScene : Scene
                 if (parts.FirstOrDefault(x => x.StartsWith("variant=")) is { } vd && int.TryParse(vd[8..], out int vi)) { _variantTab = vi; PreviewChanged(); }
                 if (parts.Contains("capdraft")) StartCapDraft(_wall!);
             }
+            // cloudprefab=<id>: add a cloud prefab to the floor's bottom clouds (unsaved) and open it.
+            if (parts.FirstOrDefault(x => x.StartsWith("cloudprefab=")) is { } cp && _floor is not null && Services.Defs.TryGet<CloudPrefabDef>(cp[12..], out var cpDev))
+            {
+                AddPrefabEntry(_floor, _floor.Clouds, cpDev);
+                _openPrefabLayer = cpDev.Id + "/layer_2";
+            }
             if (parts.Contains("swap")) _swapMode = true;
             if (parts.Contains("bench")) _bench = true;
             if (parts.Contains("slider")) { _bench = true; _benchSlider = true; }
@@ -175,7 +181,7 @@ public sealed partial class MapEditorScene : Scene
     }
 
     private bool HasUnsaved =>
-        _tile is not null && (_isNewTile ? _history.Count > 1 : TileJson() != _savedTileJson) || FloorDirty;
+        _tile is not null && (_isNewTile ? _history.Count > 1 : TileJson() != _savedTileJson) || FloorDirty || _dirtyCloudPrefabs.Count > 0;
 
     private bool FloorDirty => _floor is not null && ChasmJson.Serialize(_floor) != _savedFloorJson;
 
@@ -203,6 +209,7 @@ public sealed partial class MapEditorScene : Scene
             Services.Defs.Save(ChasmJson.Clone(_floor));
             _savedFloorJson = ChasmJson.Serialize(_floor);
         }
+        SaveCloudPrefabs();
         Services.DefReload.IgnoreNextChange(Services.Defs.PathFor(typeof(TileDef), id));
         Services.Defs.Save(ChasmJson.Clone(_tile));
         _savedTileJson = TileJson();

@@ -35,7 +35,7 @@ public static class TileRenderer
         if (opacity >= 1f) q.Add(RenderLayer.Background, 0, b => s.Draw.Rect(b, new Rectangle(0, 0, 1920, 1080), bg));
         if (floor is not null && opacity >= 1f)
         {
-            var clouds = CloudStack.Resolve(floor, tile);
+            var clouds = CloudStack.Resolve(floor, tile, id => s.Defs.TryGet<CloudPrefabDef>(id, out var p) ? p : null);
             if (clouds.Count > 0) q.Add(RenderLayer.Background, 0, b => CloudRenderer.DrawLayers(b, s, clouds));
         }
         QueueImageLayers(q, s, tile, TileLayerKind.Background, opacity);

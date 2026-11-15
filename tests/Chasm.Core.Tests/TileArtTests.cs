@@ -392,6 +392,32 @@ public class TileArtTests
     }
 
     [Fact]
+    public void Cloud_prefab_entries_expand_to_their_layers_and_tiles_can_swap_or_hide_them()
+    {
+        var storm = new CloudPrefabDef { Id = "storm", Layers =
+        {
+            new CloudLayer { Id = "layer_1", Texture = "a.png", Speed = 10, Opacity = 1f },
+            new CloudLayer { Id = "layer_2", Texture = "b.png", Speed = 50, Direction = 180, Opacity = 0.5f },
+            new CloudLayer { Id = "layer_3", Texture = "c.png", Enabled = false },
+        } };
+        var calm = new CloudPrefabDef { Id = "calm", Layers = { new CloudLayer { Id = "layer_1", Texture = "d.png" } } };
+        Func<string, CloudPrefabDef?> find = id => id == "storm" ? storm : id == "calm" ? calm : null;
+        var floor = new FloorDef { Id = "f", Clouds = new() { new CloudLayer { Id = "c1", Prefab = "storm", Opacity = 0.5f } } };
+        var r = CloudStack.Resolve(floor, new TileDef { Id = "t" }, find);
+        Assert.Equal(new[] { "c1/layer_1", "c1/layer_2" }, r.Select(c => c.Id));        // in order, hidden layer skipped
+        Assert.Equal(0.25f, r[1].Opacity, 3);                                             // entry opacity multiplies
+        Assert.Equal(180, r[1].Direction);
+        storm.Layers[0].Speed = 99;                                                       // linked
+        Assert.Equal(99, CloudStack.Resolve(floor, new TileDef { Id = "t" }, find)[0].Speed);
+        var swapped = new TileDef { Id = "s" };
+        swapped.CloudOverrides.Add(new TileCloudOverride { Layer = "c1", Settings = new CloudLayer { Id = "c1", Prefab = "calm" } });
+        Assert.Equal(new[] { "c1/layer_1" }, CloudStack.Resolve(floor, swapped, find).Select(c => c.Texture == "d.png" ? c.Id : "?"));
+        var hidden = new TileDef { Id = "h" };
+        hidden.CloudOverrides.Add(new TileCloudOverride { Layer = "c1", Settings = new CloudLayer { Id = "c1", Prefab = "storm", Enabled = false } });
+        Assert.Empty(CloudStack.Resolve(floor, hidden, find));
+    }
+
+    [Fact]
     public void Cloud_direction_sets_scroll_offset()
     {
         var c = new CloudLayer { Speed = 10, Direction = 90 };

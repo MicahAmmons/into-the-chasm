@@ -280,6 +280,12 @@ public sealed class CloudLayer
     [Order(-10), Tooltip("Stable id that tile overrides point at.")] public string Id { get; set; } = "";
     [Order(-9)] public string Name { get; set; } = "Clouds";
     public bool Enabled { get; set; } = true;
+    /// <summary>
+    /// A saved cloud prefab: this entry then shows all the prefab's layers (stays linked) and only
+    /// its Show / Opacity apply (opacity multiplies the prefab's).
+    /// </summary>
+    [Ref(typeof(CloudPrefabDef)), Tooltip("Use a saved cloud prefab (all its layers) instead of this layer's own settings.")]
+    public string Prefab { get; set; } = "";
     [Texture] public string Texture { get; set; } = "";
     [Tooltip("Multiplied over the clouds, #RRGGBB. White = unchanged.")] public string Tint { get; set; } = "#ffffff";
     [Range(0, 1), Tooltip("0 = invisible, 1 = solid.")] public float Opacity { get; set; } = 1f;
@@ -344,13 +350,32 @@ public sealed class TileCloudOverride
     public CloudLayer Settings { get; set; } = new();
 }
 
+/// <summary>
+/// A reusable stack of cloud layers (e.g. three at different speeds, directions and colours) that
+/// floors and tiles can use as one entry. Layers draw in list order: first = furthest back.
+/// </summary>
+[DefFolder("cloudprefabs", "Cloud prefabs")]
+[Tooltip("A reusable stack of cloud layers.")]
+public sealed class CloudPrefabDef : Def
+{
+    public string Category { get; set; } = "Clouds";
+    public List<CloudLayer> Layers { get; set; } = new();
+
+    /// <summary>A fresh layer id inside this prefab.</summary>
+    public string NewLayerId()
+    {
+        for (int n = 1; ; n++)
+            if (Layers.All(l => l.Id != "layer_" + n)) return "layer_" + n;
+    }
+}
+
 /// <summary>Works out the clouds a tile actually shows: the floor's layers with the tile's overrides applied.</summary>
 public static class CloudStack
 {
     public const string DefaultTexture = "Archive/Original Art/backgrounds/clouds/Cloud1.png";
 
     /// <summary>The tile's clouds, back to front: the bottom clouds, then the top clouds (each with overrides).</summary>
-    public static List<CloudLayer> Resolve(FloorDef? floor, TileDef tile)
+    public static List<CloudLayer> Resolve(FloorDef? floor, TileDef tile, Func<string, CloudPrefabDef?>? prefabs = null)
     {
         var result = new List<CloudLayer>();
         if (floor is null) return result;
@@ -358,7 +383,22 @@ public static class CloudStack
         {
             var o = tile.CloudOverrides.FirstOrDefault(x => x.Layer == layer.Id);
             var effective = o?.Settings ?? layer;
-            if (effective.Enabled && effective.Opacity > 0 && !string.IsNullOrEmpty(effective.Texture)) result.Add(effective);
+            if (!effective.Enabled || effective.Opacity <= 0) continue;
+            if (!string.IsNullOrEmpty(effective.Prefab))
+            {
+                // A prefab: all its layers, back to front, faded by this entry's opacity.
+                if (prefabs?.Invoke(effective.Prefab) is not { } prefab) continue;
+                foreach (var inner in prefab.Layers)
+                {
+                    if (!inner.Enabled || inner.Opacity <= 0 || string.IsNullOrEmpty(inner.Texture) || !string.IsNullOrEmpty(inner.Prefab)) continue;
+                    var c = inner.Copy();
+                    c.Id = effective.Id + "/" + inner.Id;
+                    c.Opacity *= effective.Opacity;
+                    result.Add(c);
+                }
+                continue;
+            }
+            if (!string.IsNullOrEmpty(effective.Texture)) result.Add(effective);
         }
         return result;
     }
