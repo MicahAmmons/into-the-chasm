@@ -89,7 +89,7 @@ public sealed class TileVisuals : IDisposable
             }
             InvalidateAll();
         };
-        _defs.Changed += d => { if (d is FloorDef or PrefabDef or WallDef) InvalidateAll(); else if (d is TileDef t) Invalidate(t); };
+        _defs.Changed += d => { if (d is FloorDef or PrefabDef or WallDef or GroundPrefabDef) InvalidateAll(); else if (d is TileDef t) Invalidate(t); };
     }
 
     private static string Key(TileDef t) => $"{t.Id}#{RuntimeHelpers.GetHashCode(t)}";
@@ -109,7 +109,7 @@ public sealed class TileVisuals : IDisposable
     public TileBake? Get(TileDef tile, FloorDef? floor = null)
     {
         floor ??= FloorOf(tile);
-        if (tile.PaintRegions.Count == 0 && (floor is null || floor.WallsDown.Count + floor.WallsUp.Count == 0)) return null;
+        if (tile.PaintRegions.Count == 0 && (floor is null || floor.WallsDown.Count + floor.WallsUp.Count + floor.GroundWalkable.Count + floor.GroundUnwalkable.Count == 0)) return null;
         string key = Key(tile);
         var node = _bakes.First;
         while (node is not null && node.Value.key != key) node = node.Next;
@@ -177,7 +177,11 @@ public sealed class TileVisuals : IDisposable
         var walls = layer == PaintLayer.BehindCharacters ? WallsFor(tile, floor) : new List<WallPiece>();
         WallsTicks += _bakeClock.ElapsedTicks - w0;
         int feather = floor?.DefaultFeather ?? 6;
+        // Ground on unwalkable cells sits under the cliffs; walkable ground over the cliff tops,
+        // under painted textures.
+        if (layer == PaintLayer.BehindCharacters) any |= DrawGround(tile, floor, walkable: false, target);
         foreach (var piece in walls.Where(p => !p.Rim)) { DrawWallPiece(piece, feather, target); any = true; }
+        if (layer == PaintLayer.BehindCharacters) any |= DrawGround(tile, floor, walkable: true, target);
         foreach (var region in tile.PaintRegions.Where(r => r.Layer == layer && r.Cells.Count > 0))
         {
             // A prefab placement draws its prefab once at its anchor; otherwise the region's material.
@@ -242,6 +246,201 @@ public sealed class TileVisuals : IDisposable
         int bar = maskKey.LastIndexOf("|f:", StringComparison.Ordinal);
         string slot = bar < 0 ? maskKey : maskKey[..bar];
         return _hazes.TryGetValue(slot, out var t) ? t : null;
+    }
+
+    // ------------------------------------------------------------------ ground
+
+    /// <summary>Ground prefabs; editors can slip in an unsaved one.</summary>
+    public Func<string, GroundPrefabDef?>? GroundOverride { get; set; }
+    private GroundPrefabDef? FindGround(string id) =>
+        GroundOverride?.Invoke(id) ?? (_defs.TryGet<GroundPrefabDef>(id, out var g) ? g : null);
+
+    private readonly Dictionary<string, (float[] shape, long used)> _groundShapes = new();
+    private readonly Dictionary<string, (Texture2D tex, MaskArea area, long used)> _groundMasks = new();
+
+    private static string CellsKey(IEnumerable<CellCoord> cells)
+    {
+        var sb = new StringBuilder();
+        foreach (var c in cells.OrderBy(c => c.Q).ThenBy(c => c.R)) sb.Append(c.Q).Append(',').Append(c.R).Append(' ');
+        return sb.Length + ":" + sb.ToString().GetHashCode();
+    }
+
+    /// <summary>Cells as a soft-edged shape over the whole screen (half resolution), cached.</summary>
+    private float[] GroundShape(IReadOnlyCollection<CellCoord> cells, int feather)
+    {
+        string key = CellsKey(cells) + "|" + feather;
+        if (_groundShapes.TryGetValue(key, out var hit)) { _groundShapes[key] = (hit.shape, ++_tick); return hit.shape; }
+        var (_, shape) = RegionMask.BuildBaseIn(MaskArea.Full, cells, feather);
+        if (_groundShapes.Count >= 32) _groundShapes.Remove(_groundShapes.OrderBy(kv => kv.Value.used).First().Key);
+        _groundShapes[key] = (shape, ++_tick);
+        return shape;
+    }
+
+    /// <summary>A full-screen mask made by <paramref name="build"/>, cropped to where it shows, as a texture (cached by key).</summary>
+    private (Texture2D? tex, Rectangle rect) GroundMask(string key, Func<float[]> build)
+    {
+        if (_groundMasks.TryGetValue(key, out var hit)) { _groundMasks[key] = (hit.tex, hit.area, ++_tick); return (hit.tex, ToScreen(hit.area)); }
+        var a = build();
+        int W = RegionMask.Width, H = RegionMask.Height, x0 = W, y0 = H, x1 = -1, y1 = -1;
+        for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++)
+                if (a[y * W + x] > 0.002f) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+        if (x1 < 0) return (null, Rectangle.Empty);
+        var area = new MaskArea(x0, y0, x1 - x0 + 1, y1 - y0 + 1);
+        var colors = new Color[area.W * area.H];
+        for (int y = 0; y < area.H; y++)
+            for (int x = 0; x < area.W; x++)
+            {
+                byte v = (byte)Math.Clamp((int)(a[(y + y0) * W + x + x0] * 255f + 0.5f), 0, 255);
+                colors[y * area.W + x] = new Color(v, v, v, v);
+            }
+        var tex = new Texture2D(_device, area.W, area.H, false, SurfaceFormat.Color);
+        tex.SetData(colors);
+        if (_groundMasks.Count >= 96)
+            foreach (var old in _groundMasks.OrderBy(kv => kv.Value.used).Take(16).ToList()) { old.Value.tex.Dispose(); _groundMasks.Remove(old.Key); }
+        _groundMasks[key] = (tex, area, ++_tick);
+        return (tex, ToScreen(area));
+    }
+
+    private RenderTarget2D? _groundScratch;
+
+    /// <summary>A full-screen mask (not cropped) as a texture, cached by key.</summary>
+    private Texture2D FullMask(string key, Func<float[]> build)
+    {
+        if (_groundMasks.TryGetValue(key, out var hit)) { _groundMasks[key] = (hit.tex, hit.area, ++_tick); return hit.tex; }
+        var a = build();
+        var colors = new Color[a.Length];
+        for (int i = 0; i < a.Length; i++) { byte v = (byte)Math.Clamp((int)(a[i] * 255f + 0.5f), 0, 255); colors[i] = new Color(v, v, v, v); }
+        var tex = new Texture2D(_device, RegionMask.Width, RegionMask.Height, false, SurfaceFormat.Color);
+        tex.SetData(colors);
+        _groundMasks[key] = (tex, MaskArea.Full, ++_tick);
+        return tex;
+    }
+
+    /// <summary>
+    /// The tile's ground. Unwalkable: each painted region, layers back to front, soft at its edge.
+    /// Walkable: every region is put together first (the automatic ground everywhere, painted grounds
+    /// blended over it), then the whole lot is cut to the walkable cells with one soft edge, so no
+    /// ground shows through another at the cliff edge. Then the darkened rim.
+    /// </summary>
+    private bool DrawGround(TileDef tile, FloorDef? floor, bool walkable, RenderTarget2D target)
+    {
+        var regions = GroundMap.Build(tile, floor).Where(r => r.Walkable == walkable).ToList();
+        if (regions.Count == 0) return false;
+        var allWalk = walkable ? IsoGrid.AllCells.Where(tile.IsWalkable).ToList() : new List<CellCoord>();
+        string walkKey = walkable ? CellsKey(allWalk) : "";
+        var baseGround = walkable ? FindGround(regions.FirstOrDefault(r => r.Base)?.Prefab ?? "") : null;
+        int edgeSoft = baseGround?.EdgeSoftness ?? 6;
+        float[] WalkEdge() => GroundShape(allWalk, edgeSoft);
+
+        var into = target;
+        if (walkable)
+        {
+            _groundScratch ??= NewTarget();
+            into = _groundScratch;
+            _device.SetRenderTarget(into);
+            _device.Clear(Color.Transparent);
+        }
+        bool any = false;
+        foreach (var region in regions)
+        {
+            if (FindGround(region.Prefab) is not { } g) continue;
+            string cellsKey = CellsKey(region.Cells);
+            // Where this ground goes before any edge: walkable base = everywhere; painted walkable =
+            // its cells blended across its transition (spilling into the void beside them, which the
+            // walkable edge cuts later); unwalkable = its cells, soft at the edge.
+            string regionKey = !walkable ? $"v|{cellsKey}|e{g.EdgeSoftness}" : region.Base ? "base" : $"w|{cellsKey}|t{g.Transition}|{walkKey}";
+            float[]? regionMask = null;
+            float[] Region()
+            {
+                if (regionMask is not null) return regionMask;
+                if (!walkable) return regionMask = GroundShape(region.Cells, g.EdgeSoftness);
+                if (region.Base) { var ones = new float[RegionMask.Width * RegionMask.Height]; Array.Fill(ones, 1f); return regionMask = ones; }
+                var mine = region.Cells.ToHashSet();
+                var withVoid = region.Cells.Concat(region.Cells.SelectMany(Neighbours).Where(c => IsoGrid.InTile(c) && !tile.IsWalkable(c))).Distinct().ToList();
+                return regionMask = GroundShape(withVoid, g.Transition);
+            }
+            for (int li = 0; li < g.Layers.Count; li++)
+            {
+                var layer = g.Layers[li];
+                if (!layer.Enabled || layer.Opacity <= 0 || string.IsNullOrEmpty(layer.Texture)) continue;
+                var (tex, rect) = GroundMask($"g|{regionKey}|{layer.PatchKey}", () =>
+                {
+                    var a = (float[])Region().Clone();
+                    if (layer.Patches)
+                        for (int y = 0; y < RegionMask.Height; y++)
+                            for (int x = 0; x < RegionMask.Width; x++)
+                            {
+                                int i = y * RegionMask.Width + x;
+                                if (a[i] > 0) a[i] *= GroundNoise.Patch(x * 2 + 1, y * 2 + 1, layer.PatchSize, layer.PatchAmount, layer.PatchSoftness, layer.PatchSeed);
+                            }
+                    return a;
+                });
+                if (tex is null) continue;
+                var mat = layer.AsMaterial();
+                float op = layer.Opacity;
+                Piece($"ground:{walkable}:{region.Prefab}:{region.Base}:{li}", $"{regionKey}|{layer.PatchKey}#{LookKey(mat)}|o{op:0.###}", tex, rect, into, r =>
+                {
+                    _batch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.LinearWrap, null, null, null, Matrix.CreateTranslation(-r.X, -r.Y, 0));
+                    DrawMaterial(_batch, mat, op);
+                    _batch.End();
+                });
+                any = true;
+            }
+        }
+        if (walkable && any)
+        {
+            // One soft edge for all the walkable ground, then onto the tile.
+            var edge = FullMask($"we|{walkKey}|{edgeSoft}", () => (float[])WalkEdge().Clone());
+            _device.SetRenderTarget(into);
+            _batch.Begin(SpriteSortMode.Immediate, MultiplyByAlpha, SamplerState.LinearClamp);
+            _batch.Draw(edge, new Rectangle(0, 0, 1920, 1080), Color.White);
+            _batch.End();
+            _device.SetRenderTarget(target);
+            _batch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp);
+            _batch.Draw(into, Vector2.Zero, Color.White);
+            _batch.End();
+        }
+        // Darker toward the edge where the ground ends (the walkable edge, for walkable ground).
+        foreach (var region in regions)
+        {
+            if (FindGround(region.Prefab) is not { EdgeShade: > 0 } g) continue;
+            var cells = walkable ? allWalk : region.Cells.ToList();
+            int width = (int)Math.Clamp(g.EdgeShadeWidth, 4, 160);
+            string cellsKey = CellsKey(region.Cells);
+            string key = $"gs|{walkable}|{region.Base}|{cellsKey}|{walkKey}|{width}|{g.EdgeShade:0.###}|{g.EdgeSoftness}|{g.Transition}|{edgeSoft}";
+            var (tex, rect) = GroundMask(key, () =>
+            {
+                var inner = GroundShape(cells, width * 2);
+                var a = walkable
+                    ? (region.Base ? (float[])WalkEdge().Clone() : Mul(GroundShape(region.Cells.Concat(region.Cells.SelectMany(Neighbours).Where(c => IsoGrid.InTile(c) && !tile.IsWalkable(c))).Distinct().ToList(), g.Transition), WalkEdge()))
+                    : (float[])GroundShape(region.Cells, g.EdgeSoftness).Clone();
+                for (int i = 0; i < a.Length; i++) a[i] *= g.EdgeShade * Math.Clamp((1f - inner[i]) * 2f, 0f, 1f);
+                return a;
+            });
+            if (tex is null) continue;
+            Piece($"groundshade:{walkable}:{region.Prefab}:{region.Base}", key, tex, rect, target, r =>
+            {
+                _batch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend);
+                _batch.Draw(_textures.Pixel, new Rectangle(0, 0, r.Width, r.Height), Color.Black);
+                _batch.End();
+            });
+        }
+        return any;
+    }
+
+    private static float[] Mul(float[] a, float[] b)
+    {
+        var m = new float[a.Length];
+        for (int i = 0; i < m.Length; i++) m[i] = a[i] * b[i];
+        return m;
+    }
+
+    private static IEnumerable<CellCoord> Neighbours(CellCoord c)
+    {
+        for (int dq = -1; dq <= 1; dq++)
+            for (int dr = -1; dr <= 1; dr++)
+                if (dq != 0 || dr != 0) yield return new CellCoord(c.Q + dq, c.R + dr);
     }
 
     // ------------------------------------------------------------------ piece cache

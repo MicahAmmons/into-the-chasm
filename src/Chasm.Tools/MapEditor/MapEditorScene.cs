@@ -113,6 +113,10 @@ public sealed partial class MapEditorScene : Scene
                 _openPrefabLayer = "layer_2";
                 if (parts.Contains("cloudedit")) { var en = _floor.Clouds[^1]; en.Layers = cpDev.Layers.Select(l => l.Copy()).ToList(); en.Layers[1].Speed = 80; }
             }
+            // noregions: hide the tile's painted textures (in memory only, never saved) to see the ground.
+            if (parts.Contains("noregions")) { _tile.PaintRegions.Clear(); Services.TileVisuals.Invalidate(_tile); }
+            if (parts.FirstOrDefault(x => x.StartsWith("groundpaint=")) is { } gp)
+                foreach (var c in IsoGrid.AllCells.Where(c => _tile.Walkable[c] && IsoGrid.CellCenter(c).X > 1000)) { var e = _tile.GroundPaint.FirstOrDefault(p => p.Ground == gp[12..]) ?? new TileGroundPaint { Side = "walk", Ground = gp[12..] }; if (!_tile.GroundPaint.Contains(e)) _tile.GroundPaint.Add(e); e.Cells.Add(c); }
             if (parts.Contains("swap")) _swapMode = true;
             if (parts.Contains("bench")) _bench = true;
             if (parts.Contains("slider")) { _bench = true; _benchSlider = true; }

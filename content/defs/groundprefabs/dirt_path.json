@@ -1,0 +1,48 @@
+{
+  "Id": "dirt_path",
+  "Name": "Dirt path",
+  "Category": "Ground",
+  "Layers": [
+    {
+      "Id": "layer_1",
+      "Name": "Dirt",
+      "Enabled": true,
+      "Texture": "placeholder/textures/dirt.png",
+      "Tint": "#ffffff",
+      "Opacity": 1,
+      "Scale": 1,
+      "Rotation": 0,
+      "OffsetX": 0,
+      "OffsetY": 0,
+      "FlipX": false,
+      "Patches": false,
+      "PatchSize": 180,
+      "PatchAmount": 0.4,
+      "PatchSoftness": 0.35,
+      "PatchSeed": 1
+    },
+    {
+      "Id": "layer_2",
+      "Name": "Stones",
+      "Enabled": true,
+      "Texture": "placeholder/textures/stone_wall.png",
+      "Tint": "#ffffff",
+      "Opacity": 0.7,
+      "Scale": 0.5,
+      "Rotation": 0,
+      "OffsetX": 0,
+      "OffsetY": 0,
+      "FlipX": false,
+      "Patches": true,
+      "PatchSize": 60,
+      "PatchAmount": 0.18,
+      "PatchSoftness": 0.2,
+      "PatchSeed": 5
+    }
+  ],
+  "EdgeSoftness": 6,
+  "EdgeShade": 0.25,
+  "EdgeShadeWidth": 24,
+  "Transition": 32,
+  "Approved": []
+}

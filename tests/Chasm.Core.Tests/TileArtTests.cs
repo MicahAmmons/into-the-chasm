@@ -474,6 +474,29 @@ public class TileArtTests
     }
 
     [Fact]
+    public void Ground_fills_walkable_cells_automatically_and_painted_cells_override()
+    {
+        var t = WalkableTile(Enumerable.Range(4, 6).Select(q => new CellCoord(q, 3)).ToArray());
+        var floor = new FloorDef { Id = "f" };
+        Assert.Empty(GroundMap.Build(t, floor));                                       // no grounds yet
+        floor.GroundWalkable.Add(new FloorGround { Prefab = "grass" });
+        floor.GroundWalkable.Add(new FloorGround { Prefab = "dirt" });
+        floor.GroundUnwalkable.Add(new FloorGround { Prefab = "rubble" });
+        var auto = GroundMap.Build(t, floor);
+        Assert.Single(auto);
+        Assert.Equal(("grass", 6, true), (auto[0].Prefab, auto[0].Cells.Count, auto[0].Base));   // every walkable cell
+        t.GroundPaint.Add(new TileGroundPaint { Side = "walk", Ground = "dirt", Cells = { new(5, 3), new(6, 3) } });
+        t.GroundPaint.Add(new TileGroundPaint { Side = "walk", Ground = TileGroundPaint.NoGround, Cells = { new(9, 3) } });
+        t.GroundPaint.Add(new TileGroundPaint { Side = "void", Ground = "rubble", Cells = { new(5, 5), new(6, 3) } });
+        var r = GroundMap.Build(t, floor);
+        Assert.Equal(new[] { "rubble", "grass", "dirt" }, r.Select(x => x.Prefab));      // back to front
+        Assert.Equal(new[] { new CellCoord(5, 5) }, r[0].Cells);                         // unwalkable: painted, unwalkable cells only
+        Assert.Equal(5, r[1].Cells.Count);                                                // base minus the 'no ground' cell
+        Assert.Equal(2, r[2].Cells.Count);                                                // dirt over grass
+        Assert.InRange(GroundNoise.Patch(100, 200, 180, 0.4f, 0.3f, 1), 0f, 1f);
+    }
+
+    [Fact]
     public void Cloud_direction_sets_scroll_offset()
     {
         var c = new CloudLayer { Speed = 10, Direction = 90 };

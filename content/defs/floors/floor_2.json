@@ -133,5 +133,14 @@
   ],
   "WallsUp": [],
   "Archived": false,
-  "Notes": ""
+  "Notes": "",
+  "GroundWalkable": [
+    {
+      "Prefab": "mossy_grass"
+    },
+    {
+      "Prefab": "dirt_path"
+    }
+  ],
+  "GroundUnwalkable": []
 }

@@ -64,6 +64,8 @@ public sealed class TileDef : Def
     public List<TileCloudOverride> CloudOverrides { get; set; } = new();
     [Hidden, Tooltip("Cells painted with a wall other than the floor's default (or with no wall).")]
     public List<TileWallPaint> WallPaint { get; set; } = new();
+    [Hidden, Tooltip("Cells painted with a ground other than the automatic one (walkable), or with a ground on unwalkable cells.")]
+    public List<TileGroundPaint> GroundPaint { get; set; } = new();
     [Hidden, Tooltip("Corners / ends on this tile swapped to another variant of their wall.")]
     public List<TileWallVariant> WallVariants { get; set; } = new();
     [Hidden, Tooltip("Kept in the Archive section of lists (the original game's content).")]
@@ -277,6 +279,10 @@ public sealed class FloorDef : Def, System.Text.Json.Serialization.IJsonOnDeseri
     public List<FloorWall> WallsDown { get; set; } = new();
     [Hidden, Tooltip("Walls going up on this floor. The first is drawn automatically; the others are painted onto cells.")]
     public List<FloorWall> WallsUp { get; set; } = new();
+    [Hidden, Tooltip("Ground on walkable cells: the first covers every walkable cell automatically; others are painted onto cells.")]
+    public List<FloorGround> GroundWalkable { get; set; } = new();
+    [Hidden, Tooltip("Ground on unwalkable cells: only where painted.")]
+    public List<FloorGround> GroundUnwalkable { get; set; } = new();
     [Hidden, Tooltip("Kept in the Archive section of lists (the original game's content).")]
     public bool Archived { get; set; }
 }
