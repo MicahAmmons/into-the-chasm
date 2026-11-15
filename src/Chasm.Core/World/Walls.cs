@@ -432,7 +432,14 @@ public static class AutoWalls
                 Lip = run.Select(w => EdgeMid(w, isLeft, up)).Aggregate(Vector2.Zero, (a, b) => a + b) / run.Count,
                 Fade = fade,
             };
-            foreach (var w in run) piece.Cells.AddRange(Column(isLeft ? LeftN(w) : RightN(w), wall.Depth));
+            // The columns under both ends of each edge: one column alone stops in a zig-zag of half
+            // diamonds where the wall ends, so the picture wouldn't reach the end. The trims below
+            // then cut the face straight.
+            foreach (var w in run)
+            {
+                piece.Cells.AddRange(Column(isLeft ? LeftN(w) : RightN(w), wall.Depth));
+                piece.Cells.AddRange(Column(Down(w), wall.Depth));
+            }
 
             // The face's own width: from its edges' leftmost to rightmost point (trimmed below,
             // except on a side that meets a corner, which its seam handles).
@@ -502,8 +509,11 @@ public static class AutoWalls
                 var col = Column(isLeft ? LeftN(w) : RightN(w), wall.Depth);
                 if (col.Count == 0) continue;
                 var cap = wall.Cap(VariantAt(WallPart.EndCap, col[0]));
-                float cx = IsoGrid.CellCenter(col[0]).X;
-                bool endOnRight = cx >= piece.Lip.X;
+                // Where the wall stops: the end of this cell's edge that touches the gap. Along a
+                // line, later cells sit further right, except for down-right faces.
+                float xdir = !up && !isLeft ? -1 : 1;
+                float cx = EdgeMid(w, isLeft, up).X + (isStart ? -xdir : xdir) * IsoGrid.HalfW / 2;
+                bool endOnRight = isStart ? xdir < 0 : xdir > 0;
                 junctions?.Add(new WallJunction(WallPart.EndCap, col[0], IsoGrid.CellCenter(col[0]), wall, VariantAt(WallPart.EndCap, col[0]), up, wall.EndCapVariants.Count));
                 if (cap.Style == EndCapStyle.Soft)
                     piece.Clips.Add(new ClipZone(null, cx, KeepLeft: endOnRight, Ramp: true, cap.Softness));

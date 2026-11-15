@@ -346,7 +346,10 @@ public class TileArtTests
         var lefts = AutoWalls.Build(t, floor, false, walls).Where(p => p.Kind == WallPieceKind.Face && !p.RightFace).ToList();
         Assert.Contains(lefts, p => p.Wall == red && p.Cells.Contains(new(6, 4)));
         Assert.Contains(lefts, p => p.Wall == grey && p.Cells.Contains(new(4, 4)));
-        Assert.DoesNotContain(lefts, p => p.Cells.Contains(new(9, 4)));
+        // No face hangs from the gap's edge (the face beside it may reach in, then trims straight).
+        float gapEdge = AutoWalls.EdgeMid(new(9, 3), true, false).X;
+        Assert.All(lefts, p => Assert.True(p.Lip.X < gapEdge - 1));
+        Assert.Contains(lefts, p => p.Clips.Any(c => c.Cells is null && !c.Ramp && MathF.Abs(c.X - (gapEdge - IsoGrid.HalfW / 2 + 0.5f)) < 1));
         Assert.Equal(3f, lefts.First(p => p.Wall == red).Fade!.Value.StartCells);   // its own fade
         Assert.Equal(floor.WallDownFade.Start, lefts.First(p => p.Wall == grey).Fade!.Value.StartCells); // floor default
     }
