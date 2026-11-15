@@ -164,6 +164,7 @@ public class TileArtTests
     {
         var grey = new WallDef { Id = "grey", Texture = "g.png", Depth = 2, MaxRun = 10 };
         var red = new WallDef { Id = "red", Texture = "r.png", Depth = 2, MaxRun = 10 };
+        grey.EndCapVariants[0].Style = red.EndCapVariants[0].Style = EndCapStyle.Soft;
         var floor = new FloorDef { Id = "f" };
         floor.WallsDown.Add(new FloorWall { Wall = "grey" });
         floor.WallsDown.Add(new FloorWall { Wall = "red", FadeMode = WallFadeMode.Own, Fade = new WallFade { Start = 3 } });

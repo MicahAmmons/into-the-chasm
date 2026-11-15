@@ -104,6 +104,7 @@ public sealed partial class MapEditorScene : Scene
                 OpenWallEditor(wallDev, isNew: false);
                 if (parts.FirstOrDefault(x => x.StartsWith("step=")) is { } sd && int.TryParse(sd[5..], out int si)) GoToStep((WallStep)si);
                 if (parts.FirstOrDefault(x => x.StartsWith("variant=")) is { } vd && int.TryParse(vd[8..], out int vi)) _variantTab = vi;
+                if (parts.Contains("capdraft")) StartCapDraft(_wall!);
             }
             if (parts.Contains("swap")) _swapMode = true;
             if (parts.Contains("bench")) _bench = true;

@@ -49,20 +49,17 @@
   ],
   "EndCapVariants": [
     {
-      "Name": "End",
+      "Name": "Straight edge",
+      "Style": "None",
+      "Softness": 48,
+      "Rows": [],
+      "Combo": ""
+    },
+    {
+      "Name": "Soft end",
       "Style": "Soft",
       "Softness": 48,
-      "Rows": [
-        {
-          "Mode": "Stencil",
-          "Stencil": "stencils/notch_right.png",
-          "Rotation": 0,
-          "OffsetX": 0,
-          "OffsetY": 0,
-          "Scale": 1,
-          "FlipY": false
-        }
-      ],
+      "Rows": [],
       "Combo": ""
     },
     {
