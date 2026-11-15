@@ -85,6 +85,7 @@ public sealed partial class MapEditorScene
         DrawFadeLines(b);
         DrawSheetHandles(b);
         DrawWallPaint(b);
+        DrawSwapMarkers(b);
         DrawPlacementOverlays(b);
         // Carved cells of the region being stencilled (or the selected region).
         var stRegion = _stencilRegionId is { } stId ? t.PaintRegions.FirstOrDefault(r => r.Id == stId) : _selectedRegion;

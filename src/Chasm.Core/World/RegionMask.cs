@@ -58,13 +58,20 @@ public static class RegionMask
         {
             if (clip.Cells is null)
             {
-                // Whole mask: one factor per pixel column.
-                for (int x = 0; x < Width; x++)
+                if (clip.Lean == 0)
                 {
-                    float f = clip.Factor(x * 2 + 1);
-                    if (f >= 1f) continue;
-                    for (int y = 0; y < Height; y++) a[y * Width + x] *= f;
+                    // Whole mask, straight line: one factor per pixel column.
+                    for (int x = 0; x < Width; x++)
+                    {
+                        float f = clip.Factor(x * 2 + 1);
+                        if (f >= 1f) continue;
+                        for (int y = 0; y < Height; y++) a[y * Width + x] *= f;
+                    }
                 }
+                else
+                    for (int y = 0; y < Height; y++)
+                        for (int x = 0; x < Width; x++)
+                            a[y * Width + x] *= clip.Factor(x * 2 + 1, y * 2 + 1);
                 continue;
             }
             foreach (var c in clip.Cells)
@@ -77,7 +84,7 @@ public static class RegionMask
                     {
                         var p = new System.Numerics.Vector2(x * 2 + 1, y * 2 + 1);
                         if (IsoGrid.CellAt(p) != c) continue;
-                        a[y * Width + x] *= clip.Factor(p.X);
+                        a[y * Width + x] *= clip.Factor(p.X, p.Y);
                     }
             }
         }

@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Text.Json.Serialization;
 using Chasm.Core.Content;
 using Chasm.Core.Grid;
 
@@ -11,11 +12,50 @@ public enum EndCapStyle
     [Label("Stencil (carved shape)")] Stencil,
 }
 
+public enum CornerStyle
+{
+    [Label("Seam (the faces meet on a line)")] Seam,
+    [Label("Bevel (a narrow cut face across the corner)")] Bevel,
+}
+
+/// <summary>One look for the outer corners (where a wall sticks out to a point).</summary>
+public sealed class OuterCornerVariant
+{
+    public string Name { get; set; } = "Corner";
+    public CornerStyle Style { get; set; } = CornerStyle.Bevel;
+    [Range(-60, 60), Tooltip("Tilts the corner line (degrees). 0 = straight down.")] public float Lean { get; set; }
+    [Range(0, 80), Tooltip("Softness where the pieces meet (pixels).")] public float Blend { get; set; } = 6f;
+    [Range(2, 60), Tooltip("Bevel: width of the cut face (pixels).")] public float BevelWidth { get; set; } = 14f;
+    [Range(0.2f, 1.5f), Tooltip("Bevel: brightness of the cut face. Empty = halfway between the left and right shades.")]
+    public float? BevelShade { get; set; }
+    [Range(0, 1), Tooltip("A thin light line down the corner edge.")] public float Highlight { get; set; } = 0.25f;
+    [Range(1, 20)] public float HighlightWidth { get; set; } = 4f;
+}
+
+/// <summary>One look for the inner corners (a notch where two walls meet going in).</summary>
+public sealed class InnerCornerVariant
+{
+    public string Name { get; set; } = "Notch";
+    [Range(-60, 60)] public float Lean { get; set; }
+    [Range(0, 80)] public float Blend { get; set; } = 8f;
+    [Range(0, 1), Tooltip("Darkening in the notch, which reads as depth.")] public float Shadow { get; set; } = 0.3f;
+    [Range(2, 80)] public float ShadowWidth { get; set; } = 26f;
+}
+
+/// <summary>One look for where a wall ends (next to cells painted 'no wall').</summary>
+public sealed class EndCapVariant
+{
+    public string Name { get; set; } = "End";
+    public EndCapStyle Style { get; set; } = EndCapStyle.Soft;
+    [Range(4, 128)] public float Softness { get; set; } = 48f;
+    [Texture] public string Stencil { get; set; } = "stencils/notch_right.png";
+}
+
 /// <summary>
 /// One wall / cliff look ("Grey wall"), made from a single left-facing picture. Every variation is
-/// worked out when a tile is drawn: right face (mirrored, or your own art), corners (the two faces
-/// meet along a soft seam), end caps and an optional rim along the walkway edge.
-/// Floors list walls (Walls down / Walls up); the first in a list draws automatically.
+/// worked out when a tile is drawn: right face (mirrored, or your own art), outer and inner corners,
+/// end caps and an optional rim. Corners and caps can have several variants: tiles use the first
+/// unless a specific spot is swapped to another.
 /// </summary>
 [DefFolder("walls", "Walls")]
 [Tooltip("A wall / cliff look made from one left-facing picture.")]
@@ -25,6 +65,7 @@ public sealed class WallDef : Def
     [Tooltip("Wall down = cliffs under walkway edges. Wall up = walls rising above them.")]
     public MaterialKind Kind { get; set; } = MaterialKind.WallDown;
 
+    // ---- the picture (global: every part uses these)
     [Texture, Required, Tooltip("The left face: a long strip of wall, facing down-left. Seamless left-right is best.")]
     public string Texture { get; set; } = "";
     [Range(0.1f, 4)] public float Scale { get; set; } = 1f;
@@ -33,26 +74,41 @@ public sealed class WallDef : Def
     public string Tint { get; set; } = "#ffffff";
     public bool FlipX { get; set; }
     public bool FlipY { get; set; }
-    /// <summary>Perspective warp of the left face, in the picture's own frame (the right face gets it mirrored).</summary>
     public MaterialWarp? Warp { get; set; }
+    [Range(1, 10)] public int Depth { get; set; } = 4;
+    [Range(1, 24)] public int MaxRun { get; set; } = 12;
 
-    [Range(0.2f, 1.5f), Tooltip("Brightness of the left faces (1 = as painted).")] public float LeftShade { get; set; } = 1f;
-    [Range(0.2f, 1.5f), Tooltip("Brightness of the right faces. Lower = in shadow, which reads as 3D.")] public float RightShade { get; set; } = 0.72f;
-    [Texture, Tooltip("Optional: your own right-face art. Empty = the left face, mirrored.")] public string RightTexture { get; set; } = "";
+    // ---- faces
+    [Range(0.2f, 1.5f)] public float LeftShade { get; set; } = 1f;
+    [Range(0.2f, 1.5f)] public float RightShade { get; set; } = 0.72f;
+    [Texture] public string RightTexture { get; set; } = "";
+    public bool SkewFaces { get; set; } = true;
 
-    [Range(1, 10), Tooltip("How many cells each face reaches (the fade usually hides the end).")] public int Depth { get; set; } = 4;
-    [Range(1, 24), Tooltip("A straight edge longer than this becomes several pieces (so the picture never runs out).")]
-    public int MaxRun { get; set; } = 12;
-    [Tooltip("Slant faces along the cell edges so vertical lines stay vertical (isometric look).")] public bool SkewFaces { get; set; } = true;
+    // ---- parts with variants (the first is the default everywhere)
+    public List<OuterCornerVariant> OuterCorners { get; set; } = new() { new() };
+    public List<InnerCornerVariant> InnerCorners { get; set; } = new() { new() };
+    public List<EndCapVariant> EndCapVariants { get; set; } = new() { new() };
 
-    [Range(0, 80), Tooltip("Width of the soft seam where a left and right face meet at a corner (pixels).")]
-    public float CornerBlend { get; set; } = 12f;
-    [Tooltip("How a wall ends where it stops partway along an edge.")] public EndCapStyle EndCaps { get; set; } = EndCapStyle.Soft;
-    [Range(4, 128), Tooltip("Soft end caps: how wide the fade-out is (pixels).")] public float EndCapSoftness { get; set; } = 48f;
-    [Texture, Tooltip("Stencil end caps: the carve shape for the last cell (art/stencils).")] public string EndCapStencil { get; set; } = "stencils/notch_right.png";
+    // ---- rim
+    public bool Rim { get; set; }
+    [Range(2, 64)] public float RimHeight { get; set; } = 14f;
 
-    [Tooltip("Draw a thin strip of the picture's top over the walkway edge, hiding the seam.")] public bool Rim { get; set; }
-    [Range(2, 64), Tooltip("Rim height in pixels.")] public float RimHeight { get; set; } = 14f;
+    /// <summary>Steps of the wall builder that have been approved.</summary>
+    [Hidden] public List<string> Approved { get; set; } = new();
+
+    // ---- older files (one corner / cap setting): folded into the first variant when loaded
+    [Hidden, JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public float? CornerBlend { get => null; set { if (value is { } v) { OuterCorners[0].Blend = v; InnerCorners[0].Blend = v; } } }
+    [Hidden, JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public EndCapStyle? EndCaps { get => null; set { if (value is { } v) EndCapVariants[0].Style = v; } }
+    [Hidden, JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public float? EndCapSoftness { get => null; set { if (value is { } v) EndCapVariants[0].Softness = v; } }
+    [Hidden, JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? EndCapStencil { get => null; set { if (value is { } v) EndCapVariants[0].Stencil = v; } }
+
+    public OuterCornerVariant Outer(int i) => OuterCorners.Count == 0 ? new() : OuterCorners[Math.Clamp(i, 0, OuterCorners.Count - 1)];
+    public InnerCornerVariant Inner(int i) => InnerCorners.Count == 0 ? new() : InnerCorners[Math.Clamp(i, 0, InnerCorners.Count - 1)];
+    public EndCapVariant Cap(int i) => EndCapVariants.Count == 0 ? new() : EndCapVariants[Math.Clamp(i, 0, EndCapVariants.Count - 1)];
 }
 
 /// <summary>How a wall on a floor fades into the clouds.</summary>
@@ -80,16 +136,43 @@ public sealed class TileWallPaint
     public List<CellCoord> Cells { get; set; } = new();
 }
 
-/// <summary>
-/// Part of a mask that's only kept on one side of a vertical line, inside some cells: how two
-/// faces share a corner cell. The piece drawn first keeps a hard edge just past the line; the
-/// piece drawn second fades in across it, so together they cover the cell exactly once.
-/// </summary>
-/// <remarks>Cells = null: applies to the whole mask (used to trim a face to its edge's width).</remarks>
-public sealed record ClipZone(IReadOnlyCollection<CellCoord>? Cells, float X, bool KeepLeft, bool Ramp, float Blend)
+/// <summary>Which part of a wall a variant choice is for.</summary>
+public enum WallPart { OuterCorner, InnerCorner, EndCap }
+
+/// <summary>A tile's choice of variant for one specific corner / end (default = the first).</summary>
+public sealed class TileWallVariant
 {
-    public float Factor(float x)
+    public string Side { get; set; } = "down";
+    public WallPart Part { get; set; }
+    [Tooltip("The cell that identifies the spot: the walkway cell above an outer corner, the notch cell, or the end's top cell.")]
+    public CellCoord Cell { get; set; }
+    public int Index { get; set; }
+}
+
+/// <summary>A spot on a tile where a variant applies (for the editor's swap markers).</summary>
+public sealed record WallJunction(WallPart Part, CellCoord Cell, Vector2 Point, WallDef Wall, int Index, bool Up)
+{
+    public int Count => Part switch
     {
+        WallPart.OuterCorner => Wall.OuterCorners.Count,
+        WallPart.InnerCorner => Wall.InnerCorners.Count,
+        _ => Wall.EndCapVariants.Count,
+    };
+}
+
+/// <summary>
+/// Part of a mask kept on one side of a line, inside some cells (or the whole mask when Cells is
+/// null). The line goes through (X, Y0) and leans by Lean degrees. The piece drawn first keeps a
+/// hard edge just past the line; the piece drawn second fades in across it, so together they cover
+/// shared cells exactly once.
+/// </summary>
+public sealed record ClipZone(IReadOnlyCollection<CellCoord>? Cells, float X, bool KeepLeft, bool Ramp, float Blend, float Lean = 0, float Y0 = 0)
+{
+    private float Tan => MathF.Tan(Lean * MathF.PI / 180f);
+
+    public float Factor(float x, float y = 0)
+    {
+        if (Lean != 0) x -= Tan * (y - Y0);
         float half = Blend / 2f;
         if (!Ramp) return KeepLeft ? (x <= X + half ? 1f : 0f) : (x >= X - half ? 1f : 0f);
         float t = Blend <= 0.5f ? (x >= X ? 1f : 0f) : Math.Clamp((x - (X - half)) / Blend, 0f, 1f);
@@ -97,28 +180,41 @@ public sealed record ClipZone(IReadOnlyCollection<CellCoord>? Cells, float X, bo
         return KeepLeft ? 1f - t : t;
     }
 
-    public string Key => $"{X:0.#}{(KeepLeft ? "L" : "R")}{(Ramp ? "r" : "h")}{Blend:0.#}:{(Cells is null ? "all" : string.Join(' ', Cells.OrderBy(c => c.Q).ThenBy(c => c.R)))}";
+    public string Key => $"{X:0.#}{(KeepLeft ? "L" : "R")}{(Ramp ? "r" : "h")}{Blend:0.#}/{Lean:0.#}@{Y0:0.#}:{(Cells is null ? "all" : string.Join(' ', Cells.OrderBy(c => c.Q).ThenBy(c => c.R)))}";
 }
 
-/// <summary>One drawn piece of a wall on a tile: a face run (with its corners and caps) or a rim strip.</summary>
+public enum WallPieceKind { Face, Bevel, Highlight, Shadow, Rim }
+
+/// <summary>One drawn piece of a wall on a tile.</summary>
 public sealed class WallPiece
 {
     public required WallDef Wall { get; init; }
+    public WallPieceKind Kind { get; init; } = WallPieceKind.Face;
     public bool RightFace { get; init; }
     public bool Up { get; init; }
     public List<CellCoord> Cells { get; } = new();
-    /// <summary>Middle of the run's open edge: the picture's lip sits here.</summary>
+    /// <summary>Where the picture's lip sits.</summary>
     public Vector2 Lip { get; set; }
     public float Skew { get; set; }
     public bool Mirror { get; set; }
     public List<ClipZone> Clips { get; } = new();
     public List<CellStencil> Stencils { get; } = new();
     public EdgeFade? Fade { get; set; }
-    /// <summary>A rim strip (drawn over the walkway) rather than a face.</summary>
-    public bool Rim { get; init; }
+    /// <summary>Bevel faces: their own brightness.</summary>
+    public float Shade { get; set; } = 1f;
+    /// <summary>Highlight / shadow strips: how strong.</summary>
+    public float Opacity { get; set; } = 1f;
 
+    public bool Rim => Kind == WallPieceKind.Rim;
+    public bool IsOverlay => Kind is WallPieceKind.Highlight or WallPieceKind.Shadow;
     public string Texture => RightFace && !string.IsNullOrEmpty(Wall.RightTexture) ? Wall.RightTexture : Wall.Texture;
-    public string Tint => ArtMath.Shaded(Wall.Tint, RightFace ? Wall.RightShade : Wall.LeftShade);
+    public string Tint => Kind switch
+    {
+        WallPieceKind.Highlight => "#ffffff",
+        WallPieceKind.Shadow => "#000000",
+        WallPieceKind.Bevel => ArtMath.Shaded(Wall.Tint, Shade),
+        _ => ArtMath.Shaded(Wall.Tint, RightFace ? Wall.RightShade : Wall.LeftShade),
+    };
 
     /// <summary>Screen corners (TL, TR, BR, BL) of the piece's picture.</summary>
     public Vector2[] Corners(int texW, int texH)
@@ -140,33 +236,37 @@ public sealed class WallPiece
 }
 
 /// <summary>
-/// Works out a tile's walls from its walkable cells, live (nothing is stored but the floor's wall
-/// lists and the tile's painted exceptions).
+/// Works out a tile's walls from its walkable cells, live.
 ///
 /// Iso directions: (q+1, r) is down-right, (q, r+1) down-left, (q+1, r+1) straight down. A walkable
 /// cell whose down-left neighbour isn't walkable has an open lower-left edge: a left face hangs from
-/// it, over the empty cells straight below. Same on the right. Corners: where a left and right face
-/// meet (a point sticking out, or a notch going in) both faces continue into the shared cells and
-/// split down the middle with a soft seam. Where a face stops partway it gets an end cap. Walls up
-/// mirror all of this upward.
+/// it. Same on the right. Each face is trimmed to the width of its edges. Outer corners: the faces
+/// continue into the cells under the point and meet along a (possibly leaning) line, or a narrow
+/// bevel face, with an optional highlight. Inner corners (notches) split the same way, with an
+/// optional shadow. Faces next to 'no wall' cells get end caps. Walls up mirror all of this upward.
+/// Draw order: left faces, bevels, right faces, highlights / shadows, rims.
 /// </summary>
 public static class AutoWalls
 {
     private const float Slope = 0.5f;
 
-    private sealed record Edge(CellCoord Walk, bool Left, WallDef Wall, FloorWall Entry);
-
-    public static List<WallPiece> Build(TileDef tile, FloorDef? floor, bool up, Func<string, WallDef?> walls)
+    public static List<WallPiece> Build(TileDef tile, FloorDef? floor, bool up, Func<string, WallDef?> walls, List<WallJunction>? junctions = null)
     {
-        var pieces = new List<WallPiece>();
+        var lefts = new List<WallPiece>();
+        var bevels = new List<WallPiece>();
+        var rights = new List<WallPiece>();
+        var overlays = new List<WallPiece>();
+        var rims = new List<WallPiece>();
         var entries = floor is null ? new List<FloorWall>() : up ? floor.WallsUp : floor.WallsDown;
         var resolved = entries.Select(e => (e, w: walls(e.Wall))).Where(x => x.w is not null).ToList();
-        if (resolved.Count == 0) return pieces;
+        if (resolved.Count == 0) return new();
         var (defEntry, defWall) = (resolved[0].e, resolved[0].w!);
         string side = up ? "up" : "down";
         var paint = new Dictionary<CellCoord, string>();
         foreach (var p in tile.WallPaint.Where(p => p.Side == side))
             foreach (var c in p.Cells) paint[c] = p.Wall;
+        var chosen = tile.WallVariants.Where(v => v.Side == side).GroupBy(v => (v.Part, v.Cell)).ToDictionary(g => g.Key, g => g.Last().Index);
+        int VariantAt(WallPart part, CellCoord cell) => chosen.TryGetValue((part, cell), out var i) ? i : 0;
 
         int s = up ? -1 : 1;
         bool Walk(CellCoord c) => tile.IsWalkable(c);
@@ -181,7 +281,6 @@ public static class AutoWalls
             for (int i = 0; i < depth && Void(c); i++, c = Down(c)) cells.Add(c);
             return cells;
         }
-        // Which wall an edge uses: a painted cell in its column wins, else the default.
         (WallDef wall, FloorWall entry)? WallFor(CellCoord columnTop)
         {
             var c = columnTop;
@@ -198,18 +297,19 @@ public static class AutoWalls
         var walk = IsoGrid.AllCells.Where(Walk).ToList();
         var leftOpen = walk.Where(c => Void(LeftN(c))).ToHashSet();
         var rightOpen = walk.Where(c => Void(RightN(c))).ToHashSet();
-
-        // Corner cells: outer = under a cell open on both sides; inner = a notch between two walkways.
         var outer = walk.Where(c => leftOpen.Contains(c) && rightOpen.Contains(c)).ToHashSet();
-        var innerTop = new Dictionary<CellCoord, CellCoord>(); // walkable cell -> notch cell it shares
+        // Notches: the walkway up-left of a notch gives it a right face, the one up-right a left face.
+        var notchRight = new Dictionary<CellCoord, CellCoord>(); // walkable cell -> notch its RIGHT face meets
+        var notchLeft = new Dictionary<CellCoord, CellCoord>();  // walkable cell -> notch its LEFT face meets
         foreach (var v in IsoGrid.AllCells.Where(Void))
         {
             var a = up ? new CellCoord(v.Q, v.R + 1) : new CellCoord(v.Q - 1, v.R);   // right face comes from here
             var b = up ? new CellCoord(v.Q + 1, v.R) : new CellCoord(v.Q, v.R - 1);   // left face comes from here
-            if (Walk(a) && Walk(b) && rightOpen.Contains(a) && leftOpen.Contains(b)) { innerTop[a] = v; innerTop[b] = v; }
+            if (Walk(a) && Walk(b) && rightOpen.Contains(a) && leftOpen.Contains(b)) { notchRight[a] = v; notchLeft[b] = v; }
         }
+        var reportedInner = new HashSet<CellCoord>();
 
-        foreach (bool isLeft in new[] { true, false }) // left faces first: corner seams rely on this order
+        foreach (bool isLeft in new[] { true, false })
         {
             var open = isLeft ? leftOpen : rightOpen;
             // Cells whose open edges lie on one straight line, and their order along it:
@@ -222,35 +322,21 @@ public static class AutoWalls
                 var sorted = line.OrderBy(pos).ToList();
                 var run = new List<CellCoord>();
                 (WallDef wall, FloorWall entry)? runWall = null;
-                // End caps only where a wall really stops: next to cells painted 'no wall'. Steps,
-                // turns and corners carry on into the neighbouring face, and splits (piece length,
-                // a different wall) continue straight on, so none of those get a cap.
+                // End caps only where a wall really stops: next to cells painted 'no wall'.
                 bool startCap = false;
                 void Flush(bool endCap)
                 {
-                    if (run.Count > 0 && runWall is { } rw)
-                    {
-                        var piece = MakeFace(rw.wall, rw.entry, run, isLeft, startCap, endCap);
-                        if (piece is not null) pieces.Add(piece);
-                        if (piece is not null && rw.wall.Rim) pieces.Add(MakeRim(rw.wall, run, isLeft, piece));
-                    }
+                    if (run.Count > 0 && runWall is { } rw) MakeFace(rw.wall, rw.entry, run.ToList(), isLeft, startCap, endCap);
                     run.Clear();
                     startCap = false;
                 }
                 CellCoord? prev = null;
                 foreach (var w in sorted)
                 {
-                    var top = isLeft ? LeftN(w) : RightN(w);
-                    var choice = WallFor(top);
+                    var choice = WallFor(isLeft ? LeftN(w) : RightN(w));
                     bool adjacent = prev is { } p && pos(w) == pos(p) + 1;
                     if (!adjacent) { Flush(false); startCap = false; }
-                    if (choice is null)
-                    {
-                        Flush(true);        // the face before this cell stops here
-                        startCap = true;    // and the next one starts here
-                        prev = w;
-                        continue;
-                    }
+                    if (choice is null) { Flush(true); startCap = true; prev = w; continue; }
                     if (run.Count > 0 && (choice.Value.wall != runWall?.wall || run.Count >= runWall!.Value.wall.MaxRun)) Flush(false);
                     if (run.Count == 0) runWall = choice;
                     run.Add(w);
@@ -259,96 +345,159 @@ public static class AutoWalls
                 Flush(false);
             }
         }
-        return pieces;
+        return lefts.Concat(bevels).Concat(rights).Concat(overlays).Concat(rims).ToList();
 
-        WallPiece? MakeFace(WallDef wall, FloorWall entry, List<CellCoord> run, bool isLeft, bool capStart, bool capEnd)
+        void MakeFace(WallDef wall, FloorWall entry, List<CellCoord> run, bool isLeft, bool capStart, bool capEnd)
         {
             bool customRight = !isLeft && !string.IsNullOrEmpty(wall.RightTexture);
             bool mirror = !isLeft && !customRight;
             float desired = !wall.SkewFaces ? 0 : (isLeft ^ up ? Slope : -Slope);
+            var fade = FadeFor(entry);
             var piece = new WallPiece
             {
                 Wall = wall, RightFace = !isLeft, Up = up,
                 Skew = mirror ? -desired : desired, Mirror = mirror,
                 Lip = run.Select(w => EdgeMid(w, isLeft, up)).Aggregate(Vector2.Zero, (a, b) => a + b) / run.Count,
-                Fade = FadeFor(entry, wall),
+                Fade = fade,
             };
             foreach (var w in run) piece.Cells.AddRange(Column(isLeft ? LeftN(w) : RightN(w), wall.Depth));
 
-            // Corners: continue into the shared column and split it down the middle.
-            foreach (var w in run)
-            {
-                if (outer.Contains(w))
-                {
-                    var col = Column(Down(w), wall.Depth);
-                    if (col.Count == 0) continue;
-                    piece.Cells.AddRange(col);
-                    float x = IsoGrid.CellCenter(w).X;
-                    // Left face keeps the left half (drawn first, hard); right face fades in.
-                    piece.Clips.Add(new ClipZone(col, x, KeepLeft: isLeft, Ramp: !isLeft, wall.CornerBlend));
-                }
-                if (innerTop.TryGetValue(w, out var notch))
-                {
-                    var col = Column(notch, wall.Depth);
-                    if (col.Count == 0) continue;
-                    float x = IsoGrid.CellCenter(notch).X;
-                    // Notch: the right face (from the up-left walkway) keeps the left half and fades;
-                    // the left face (from the up-right walkway, drawn first) keeps the right half, hard.
-                    piece.Clips.Add(new ClipZone(col, x, KeepLeft: !isLeft, Ramp: !isLeft, wall.CornerBlend));
-                }
-            }
-
-            // End caps where the wall stops (next to 'no wall' cells).
-            if (wall.EndCaps != EndCapStyle.None)
-            {
-                foreach (var (w, isStart) in new[] { (run[0], true), (run[^1], false) })
-                {
-                    if (!(isStart ? capStart : capEnd)) continue;
-                    if (outer.Contains(w) || innerTop.ContainsKey(w)) continue;
-                    var col = Column(isLeft ? LeftN(w) : RightN(w), wall.Depth);
-                    if (col.Count == 0) continue;
-                    // Which side of the piece is this end? Compare with the run's middle.
-                    float cx = IsoGrid.CellCenter(col[0]).X;
-                    bool endOnRight = cx >= piece.Lip.X;
-                    if (wall.EndCaps == EndCapStyle.Soft)
-                        piece.Clips.Add(new ClipZone(col, cx, KeepLeft: endOnRight, Ramp: true, wall.EndCapSoftness));
-                    else if (!string.IsNullOrEmpty(wall.EndCapStencil))
-                        foreach (var c in col) piece.Stencils.Add(new CellStencil { Cell = c, Stencil = wall.EndCapStencil, FlipX = !endOnRight });
-                }
-            }
-            // A face only reaches as wide as the edges it hangs from (half a cell per edge on screen).
-            // Whole diamond cells stick out half a cell past the ends, which showed wherever no
-            // neighbouring face covered it (lone cells, cells touching only at a corner point).
-            // At corners the trim leaves room for the soft seam.
+            // The face's own width: from its edges' leftmost to rightmost point (trimmed below,
+            // except on a side that meets a corner, which its seam handles).
             float minX = float.MaxValue, maxX = float.MinValue;
-            foreach (var w in run)
+                foreach (var w in run)
             {
                 float cx = IsoGrid.CellCenter(w).X;
                 float a = isLeft ? cx - IsoGrid.HalfW : cx, b = isLeft ? cx : cx + IsoGrid.HalfW;
                 minX = Math.Min(minX, a); maxX = Math.Max(maxX, b);
             }
-            float seam = wall.CornerBlend / 2f + 0.5f;
-            // Whole mask, not just inside the cells: the soft edge (feather) spills past cell borders.
-            piece.Clips.Add(new ClipZone(null, maxX + seam, KeepLeft: true, Ramp: false, 0));
-            piece.Clips.Add(new ClipZone(null, minX - seam, KeepLeft: false, Ramp: false, 0));
+            bool cornerAtMin = false, cornerAtMax = false;
+
+            foreach (var w in run)
+            {
+                // Outer corner under this cell's point.
+                if (outer.Contains(w))
+                {
+                    var col = Column(Down(w), wall.Depth);
+                    if (col.Count > 0)
+                    {
+                        var v = wall.Outer(VariantAt(WallPart.OuterCorner, w));
+                        var point = IsoGrid.CellCenter(w) + new Vector2(0, s * IsoGrid.HalfH);
+                        float x = point.X, bw = v.Style == CornerStyle.Bevel ? v.BevelWidth : 0;
+                        piece.Cells.AddRange(col);
+                        // Left face keeps the left side (drawn first, hard); right face fades in.
+                        piece.Clips.Add(isLeft
+                            ? new ClipZone(col, x - bw / 2, KeepLeft: true, Ramp: false, v.Blend, v.Lean, point.Y)
+                            : new ClipZone(col, x + bw / 2, KeepLeft: false, Ramp: true, v.Blend, v.Lean, point.Y));
+                        // The point is on the left face's right-hand end and the right face's left-hand end.
+                        if (isLeft) cornerAtMax = true; else cornerAtMin = true;
+                        if (isLeft) AddOuterCornerExtras(wall, v, col, point, fade, w);
+                    }
+                }
+                // Inner corner (notch) this cell shares.
+                if ((isLeft ? notchLeft : notchRight).TryGetValue(w, out var notch))
+                {
+                    var col = Column(notch, wall.Depth);
+                    if (col.Count > 0)
+                    {
+                        var v = wall.Inner(VariantAt(WallPart.InnerCorner, notch));
+                        var point = IsoGrid.CellCenter(notch) - new Vector2(0, s * IsoGrid.HalfH);
+                        // The right face (from the up-left walkway) keeps the left half and fades in;
+                        // the left face (from the up-right walkway, drawn first) keeps the right half.
+                        piece.Clips.Add(new ClipZone(col, point.X, KeepLeft: !isLeft, Ramp: !isLeft, v.Blend, v.Lean, point.Y));
+                        if (isLeft) cornerAtMin = true; else cornerAtMax = true;
+                        if (reportedInner.Add(notch))
+                        {
+                            junctions?.Add(new WallJunction(WallPart.InnerCorner, notch, point, wall, VariantAt(WallPart.InnerCorner, notch), up));
+                            if (v.Shadow > 0)
+                            {
+                                var shadow = Strip(wall, WallPieceKind.Shadow, col, point, v.ShadowWidth, v.Lean, fade);
+                                shadow.Opacity = v.Shadow;
+                                overlays.Add(shadow);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // End caps where the wall stops (next to 'no wall' cells).
+            foreach (var (w, isStart) in new[] { (run[0], true), (run[^1], false) })
+            {
+                if (!(isStart ? capStart : capEnd)) continue;
+                if (outer.Contains(w) || (isLeft ? notchLeft : notchRight).ContainsKey(w)) continue;
+                var col = Column(isLeft ? LeftN(w) : RightN(w), wall.Depth);
+                if (col.Count == 0) continue;
+                var cap = wall.Cap(VariantAt(WallPart.EndCap, col[0]));
+                float cx = IsoGrid.CellCenter(col[0]).X;
+                bool endOnRight = cx >= piece.Lip.X;
+                junctions?.Add(new WallJunction(WallPart.EndCap, col[0], IsoGrid.CellCenter(col[0]), wall, VariantAt(WallPart.EndCap, col[0]), up));
+                if (cap.Style == EndCapStyle.Soft)
+                    piece.Clips.Add(new ClipZone(col, cx, KeepLeft: endOnRight, Ramp: true, cap.Softness));
+                else if (cap.Style == EndCapStyle.Stencil && !string.IsNullOrEmpty(cap.Stencil))
+                    foreach (var c in col) piece.Stencils.Add(new CellStencil { Cell = c, Stencil = cap.Stencil, FlipX = !endOnRight });
+            }
+
+            // Trim to the edges' width (whole mask: the soft edge spills past cell borders).
+            if (!cornerAtMax) piece.Clips.Add(new ClipZone(null, maxX + 0.5f, KeepLeft: true, Ramp: false, 0));
+            if (!cornerAtMin) piece.Clips.Add(new ClipZone(null, minX - 0.5f, KeepLeft: false, Ramp: false, 0));
             var distinct = piece.Cells.Distinct().ToList();
             piece.Cells.Clear();
             piece.Cells.AddRange(distinct);
-            return piece.Cells.Count == 0 ? null : piece;
+            if (piece.Cells.Count == 0) return;
+            (isLeft ? lefts : rights).Add(piece);
+            if (wall.Rim) rims.Add(MakeRim(wall, run, isLeft, piece));
+        }
+
+        // Bevel face + highlight for an outer corner (added once, with the left face).
+        void AddOuterCornerExtras(WallDef wall, OuterCornerVariant v, List<CellCoord> col, Vector2 point, EdgeFade? fade, CellCoord w)
+        {
+            junctions?.Add(new WallJunction(WallPart.OuterCorner, w, point, wall, VariantAt(WallPart.OuterCorner, w), up));
+            float x = point.X;
+            float edge = x;
+            if (v.Style == CornerStyle.Bevel && v.BevelWidth > 0)
+            {
+                // A narrow face looking straight out of the corner, between the left and right faces.
+                var bevel = new WallPiece
+                {
+                    Wall = wall, Kind = WallPieceKind.Bevel, Up = up, Lip = point, Skew = 0, Mirror = false, Fade = fade,
+                    Shade = v.BevelShade ?? (wall.LeftShade + wall.RightShade) / 2f,
+                };
+                bevel.Cells.AddRange(col);
+                bevel.Clips.Add(new ClipZone(null, x - v.BevelWidth / 2, KeepLeft: false, Ramp: true, v.Blend, v.Lean, point.Y));
+                bevel.Clips.Add(new ClipZone(null, x + v.BevelWidth / 2, KeepLeft: true, Ramp: false, v.Blend, v.Lean, point.Y));
+                bevels.Add(bevel);
+                edge = x - v.BevelWidth / 2; // the lit edge: where the left face turns onto the bevel
+            }
+            if (v.Highlight > 0)
+            {
+                var hl = Strip(wall, WallPieceKind.Highlight, col, new Vector2(edge, point.Y), v.HighlightWidth, v.Lean, fade);
+                hl.Opacity = v.Highlight;
+                overlays.Add(hl);
+            }
+        }
+
+        // A soft vertical (or leaning) band, e.g. a corner highlight or a notch shadow.
+        WallPiece Strip(WallDef wall, WallPieceKind kind, List<CellCoord> col, Vector2 at, float width, float lean, EdgeFade? fade)
+        {
+            var strip = new WallPiece { Wall = wall, Kind = kind, Up = up, Lip = at, Fade = fade };
+            strip.Cells.AddRange(col);
+            float half = Math.Max(1f, width / 2f);
+            strip.Clips.Add(new ClipZone(null, at.X - half / 2, KeepLeft: false, Ramp: true, half, lean, at.Y));
+            strip.Clips.Add(new ClipZone(null, at.X + half / 2, KeepLeft: true, Ramp: true, half, lean, at.Y));
+            return strip;
         }
 
         WallPiece MakeRim(WallDef wall, List<CellCoord> run, bool isLeft, WallPiece face)
         {
-            var rim = new WallPiece { Wall = wall, RightFace = face.RightFace, Up = up, Skew = face.Skew, Mirror = face.Mirror, Lip = face.Lip, Rim = true };
-            rim.Cells.AddRange(run); // over the walkway cells along the edge
-            // Solid at the edge, fading out over RimHeight into the walkway.
+            var rim = new WallPiece { Wall = wall, Kind = WallPieceKind.Rim, RightFace = face.RightFace, Up = up, Skew = face.Skew, Mirror = face.Mirror, Lip = face.Lip };
+            rim.Cells.AddRange(run);
             float cells = Math.Max(0.05f, wall.RimHeight / EdgeFade.CellPx);
             var angle = !wall.SkewFaces ? FadeAngle.Level : (isLeft ^ up ? FadeAngle.DownRight : FadeAngle.DownLeft);
             rim.Fade = new EdgeFade(Lower: up, 0, cells, angle);
             return rim;
         }
 
-        EdgeFade? FadeFor(FloorWall entry, WallDef wall)
+        EdgeFade? FadeFor(FloorWall entry)
         {
             WallFade? f = entry.FadeMode switch
             {

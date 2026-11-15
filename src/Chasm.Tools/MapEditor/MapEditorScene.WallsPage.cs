@@ -113,11 +113,73 @@ public sealed partial class MapEditorScene
         if (ImGui.Button("Clear painted cells")) { _tile.WallPaint.RemoveAll(p => p.Side == WallSide); Edited(); }
         ImGui.EndDisabled();
         Ui.Colored(Ui.Muted, painted == 0 ? "Every edge uses the automatic wall." : $"{painted} cell(s) painted with another wall or 'no wall'.");
+        if (Ui.ToggleButton(_swapMode ? "Done swapping (Esc)" : "Swap corners & ends", _swapMode, new Num.Vector2(190, 0),
+                "Markers appear on corners and wall ends that have more than one variant.\nClick one to switch to its next variant; right-click to go back to the first."))
+        { bool on = !_swapMode; ClearMapModes(); _swapMode = on; }
+        int swapped = _tile.WallVariants.Count(v => v.Side == WallSide);
+        if (swapped > 0)
+        {
+            ImGui.SameLine();
+            if (ImGui.Button($"Reset {swapped} swap(s)")) { _tile.WallVariants.RemoveAll(v => v.Side == WallSide); Edited(); }
+        }
 
         // ---- one-off pieces
         ImGui.Spacing();
         if (ImGui.CollapsingHeader("One-off pieces (prefabs)")) OneOffPiecesSection(kind);
         ImGui.EndChild();
+    }
+
+    // ------------------------------------------------------------------ swapping variants on this tile
+
+    private bool _swapMode;
+
+    private List<WallJunction> TileJunctions()
+    {
+        var list = new List<WallJunction>();
+        if (_tile is null || _floor is null) return list;
+        Services.TileVisuals.WallsFor(_tile, _floor, list);
+        return list.Where(j => j.Up == _wallsUp && j.Count > 1).ToList();
+    }
+
+    /// <summary>Click a marker: next variant. Right-click: back to the first.</summary>
+    private bool UpdateWallSwap(InputState input)
+    {
+        if (!_swapMode) return false;
+        if (input.Pressed(InputAction.Cancel) && !input.KeyboardCapturedByUi) { _swapMode = false; Status("Done swapping."); return true; }
+        if (input.MouseCapturedByUi || !(input.LeftClicked || input.RightClicked)) return true;
+        float pick = 20f / CanvasScale();
+        var hit = TileJunctions().OrderBy(j => Num.Vector2.Distance(j.Point, _hoverPx)).FirstOrDefault();
+        if (hit is null || Num.Vector2.Distance(hit.Point, _hoverPx) > pick) return true;
+        var t = _tile!;
+        string side = hit.Up ? "up" : "down";
+        t.WallVariants.RemoveAll(v => v.Side == side && v.Part == hit.Part && v.Cell.Equals(hit.Cell));
+        int next = input.LeftClicked ? (hit.Index + 1) % hit.Count : 0;
+        if (next != 0) t.WallVariants.Add(new TileWallVariant { Side = side, Part = hit.Part, Cell = hit.Cell, Index = next });
+        Edited();
+        string partName = hit.Part switch { WallPart.OuterCorner => "Outer corner", WallPart.InnerCorner => "Inner corner", _ => "Wall end" };
+        string varName = hit.Part switch
+        {
+            WallPart.OuterCorner => hit.Wall.Outer(next).Name,
+            WallPart.InnerCorner => hit.Wall.Inner(next).Name,
+            _ => hit.Wall.Cap(next).Name,
+        };
+        Status($"{partName}: variant {next + 1} of {hit.Count} ({varName}).");
+        return true;
+    }
+
+    private void DrawSwapMarkers(SpriteBatch b)
+    {
+        if (!_swapMode || _tile is null) return;
+        var d = Services.Draw;
+        float px = 1f / CanvasScale();
+        foreach (var j in TileJunctions())
+        {
+            var p = new Vector2(j.Point.X, j.Point.Y);
+            var col = j.Index == 0 ? new Color(120, 200, 255) : new Color(255, 190, 70);
+            d.DiamondFill(b, p, 34 * px, 34 * px, Color.Black * 0.55f);
+            d.DiamondOutline(b, p, 38 * px, 38 * px, col, 2 * px);
+            d.TextCentered(b, $"{j.Index + 1}/{j.Count}", p, col, 15 * px, bold: true);
+        }
     }
 
     private void ToggleBrush(string? brush)
@@ -245,26 +307,40 @@ public sealed partial class MapEditorScene
         return new Color(90 + rnd.Next(160), 90 + rnd.Next(160), 90 + rnd.Next(160));
     }
 
-    // ------------------------------------------------------------------ wall editor + live preview
+    // ------------------------------------------------------------------ wall builder (step by step)
 
-    private enum Backdrop { Blank, Grid, ThisTile, Sample }
+    private enum WallStep { Picture, LeftFace, RightFace, OuterCorners, InnerCorners, EndCaps, Steps, Rim, DepthFade, Review }
+
+    private static readonly (WallStep step, string title, string help)[] WallSteps =
+    {
+        (WallStep.Picture, "Picture", "The look every part shares: picture, zoom, tint, lip line, perspective."),
+        (WallStep.LeftFace, "Left faces", "Walls facing down-left: brightness and slant."),
+        (WallStep.RightFace, "Right faces", "Walls facing down-right: usually the left face mirrored and darker."),
+        (WallStep.OuterCorners, "Outer corners", "Where a wall turns outward to a point. Bevel or seam, lean, highlight. Add variants to swap on tiles."),
+        (WallStep.InnerCorners, "Inner corners", "Notches where a wall turns inward: seam lean and shadow. Variants allowed."),
+        (WallStep.EndCaps, "Wall ends", "Where a wall stops next to a 'no wall' cell: soft fade or a stencil. Variants allowed."),
+        (WallStep.Steps, "Steps", "Staircase edges: check the faces carry on cleanly from step to step."),
+        (WallStep.Rim, "Rim", "Optional strip of the picture's top laid over the walkway edge."),
+        (WallStep.DepthFade, "Depth & fade", "How deep faces reach and how long a piece is; the fade comes from each floor."),
+        (WallStep.Review, "Review & save", "Everything together. Save to use it on floors."),
+    };
 
     private WallDef? _wall;
     private bool _wallIsNew;
-    private Backdrop _backdrop = Backdrop.Sample;
+    private WallStep _wallStep;
     private TileDef? _previewTile;
     private FloorDef? _previewFloor;
-    private int _sampleSeed = 1;
-    private bool _openBackdrop, _previewPaint = true;
-    /// <summary>Grid, walkable outlines, outlines and captions in the wall / prefab previews. Off = as in game.</summary>
+    private bool _spotlight = true;
+    /// <summary>Grid and captions in the wall / prefab previews. Off = as in game.</summary>
     private bool _previewHelpers;
+    private int _variantTab;
     private (float taper, float squash) _wallTaper;
+    private List<WallJunction> _previewJunctions = new();
 
     private void StartNewWall(MaterialKind kind)
     {
         var w = new WallDef { Kind = kind, LipLine = kind == MaterialKind.WallUp ? 1f : 0f, Category = kind == MaterialKind.WallUp ? "Walls" : "Cliffs" };
         OpenWallEditor(w, isNew: true);
-        _openBackdrop = true; // ask which preview to use
         Art.ArtBrowser.OpenPick(null, k =>
         {
             if (_wall is null) return;
@@ -279,206 +355,136 @@ public sealed partial class MapEditorScene
         _wall = isNew ? w : ChasmJson.Clone(w);
         _wallIsNew = isNew;
         _wallTaper = (0, 0);
+        _variantTab = 0;
         ClearMapModes();
         _wallBrush = null;
         _panel = Panel.WallEdit;
+        // Carry on from the first step not yet approved.
+        _wallStep = WallSteps.Select(x => x.step).FirstOrDefault(st => !w.Approved.Contains(st.ToString()), WallStep.Review);
         BuildPreview();
     }
 
     private bool WallDirty => _wall is not null && (_wallIsNew
         || !Services.Defs.TryGet<WallDef>(_wall.Id, out var saved) || ChasmJson.Serialize(saved) != ChasmJson.Serialize(_wall));
 
-    /// <summary>(Re)builds the preview tile + floor for the chosen backdrop.</summary>
+    /// <summary>
+    /// The builder's preset: one walkway shape with every situation in it - long left and right
+    /// faces, outer corners, a notch (inner corner), a step, and a gap painted 'no wall' (two ends).
+    /// </summary>
     private void BuildPreview()
     {
         var w = _wall!;
         bool up = w.Kind == MaterialKind.WallUp;
-        TileDef t;
-        if (_backdrop == Backdrop.ThisTile && _tile is not null)
-        {
-            t = ChasmJson.Clone(_tile);
-            t.Id = "__wall_preview";
-            t.WallPaint.Clear();
-        }
-        else
-        {
-            t = new TileDef { Id = "__wall_preview", Name = "Wall preview" };
-            foreach (var c in IsoGrid.AllCells) t.SetWalkable(c, false);
-            if (_backdrop == Backdrop.Sample) foreach (var c in SampleWalkway(_sampleSeed)) t.SetWalkable(c, true);
-            else foreach (var c in SampleWalkway(0, small: true)) t.SetWalkable(c, true);
-            t.LocalMaterials.Add(new MaterialDef { Id = "ground", Name = "Preview ground", Texture = "placeholder/textures/grass.png" });
-            t.PaintRegions.Add(new PaintRegion { Id = "ground", Material = "local:ground" });
-        }
+        int o = up ? 3 : 0; // walls up rise above the walkway, so sit it lower on screen
+        var t = new TileDef { Id = "__wall_builder", Name = "Wall builder" };
+        foreach (var c in IsoGrid.AllCells) t.SetWalkable(c, false);
+        var walk = new List<CellCoord>();
+        for (int q = 9; q <= 18; q++) for (int r = -2; r <= 2; r++) walk.Add(new(q + o, r + o));   // the block
+        walk.Remove(new(13 + o, 2 + o));                                                       // a notch
+        walk.Add(new(16 + o, 3 + o)); walk.Add(new(17 + o, 3 + o));                            // a step
+        if (up) { walk.Remove(new(13 + o, -2 + o)); walk.Add(new(15 + o, -3 + o)); walk.Add(new(16 + o, -3 + o)); }
+        foreach (var c in walk.Where(IsoGrid.InTile)) t.SetWalkable(c, true);
+        // A gap with no wall: the faces either side of it end there.
+        t.WallPaint.Add(new TileWallPaint { Side = up ? "up" : "down", Wall = TileWallPaint.NoWall,
+            Cells = { up ? new CellCoord(10 + o, -3 + o) : new CellCoord(10 + o, 3 + o) } });
+        t.LocalMaterials.Add(new MaterialDef { Id = "ground", Name = "Preview ground", Texture = "placeholder/textures/grass.png" });
+        t.PaintRegions.Add(new PaintRegion { Id = "ground", Material = "local:ground", Cells = walk.Where(IsoGrid.InTile).ToList() });
         t.InvalidateCaches();
-        var f = _floor is null ? new FloorDef { Id = "__preview_floor" } : ChasmJson.Clone(_floor);
-        f.Id = "__preview_floor";
+        var f = _floor is null ? new FloorDef { Id = "__builder_floor" } : ChasmJson.Clone(_floor);
+        f.Id = "__builder_floor";
         f.WallsDown = new(); f.WallsUp = new();
-        (up ? f.WallsUp : f.WallsDown).Add(new FloorWall { Wall = w.Id.Length > 0 ? w.Id : "__new_wall" });
-        if (_backdrop is Backdrop.Blank or Backdrop.Grid) { f.Clouds = new(); f.TopClouds.Clear(); f.BackgroundColor = "#14161f"; }
+        (up ? f.WallsUp : f.WallsDown).Add(new FloorWall { Wall = "__builder_wall" });
         _previewTile = t;
         _previewFloor = f;
-        SyncPreviewGround();
         PreviewChanged();
-    }
-
-    /// <summary>Keeps the preview's ground texture on exactly its walkable cells (generated backdrops only).</summary>
-    private void SyncPreviewGround()
-    {
-        if (_previewTile is null || _backdrop == Backdrop.ThisTile) return;
-        var ground = _previewTile.PaintRegions.FirstOrDefault(r => r.Id == "ground");
-        if (ground is null) return;
-        ground.Cells = IsoGrid.AllCells.Where(c => _previewTile.Walkable[c]).ToList();
-        ground.Opacity = _backdrop == Backdrop.Sample ? 1f : 0.35f;
     }
 
     private void PreviewChanged()
     {
         if (_previewTile is null || _wall is null) return;
         var w = _wall;
-        string id = w.Id.Length > 0 ? w.Id : "__new_wall";
-        foreach (var e in _previewFloor!.WallsDown.Concat(_previewFloor.WallsUp)) e.Wall = id;
-        Services.TileVisuals.WallOverride = x => x == id ? w : null;
-        Services.TileVisuals.Invalidate(_previewTile);
-    }
-
-    /// <summary>A random-looking walkway: a plateau, a couple of paths and a notch (seed 0 + small = a simple shape).</summary>
-    private static List<CellCoord> SampleWalkway(int seed, bool small = false)
-    {
-        var centre = new CellCoord(16, 1);
-        var cells = new HashSet<CellCoord>();
-        void Blob(CellCoord c, int r) { foreach (var x in IsoGrid.AllCells) if (Math.Abs(x.Q - c.Q) + Math.Abs(x.R - c.R) <= r) cells.Add(x); }
-        if (small) { Blob(centre, 2); cells.Remove(new CellCoord(17, 2)); return cells.ToList(); }
-        var rnd = new Random(seed * 7919 + 13);
-        Blob(centre, 2 + rnd.Next(2));
-        // Paths wandering out along the two diagonals.
-        foreach (var (dq, dr) in new[] { (1, 0), (0, -1), (-1, 0), (0, 1) }.OrderBy(_ => rnd.Next()).Take(2 + rnd.Next(2)))
+        Services.TileVisuals.WallOverride = x => x == "__builder_wall" ? w : null;
+        // Show the variant being edited everywhere it applies.
+        _previewTile.WallVariants.Clear();
+        var part = _wallStep switch
         {
-            var c = centre;
-            int len = 4 + rnd.Next(6);
-            for (int i = 0; i < len; i++)
-            {
-                c = new CellCoord(c.Q + dq, c.R + dr);
-                if (rnd.Next(4) == 0) c = new CellCoord(c.Q + (dr != 0 ? rnd.Next(3) - 1 : 0), c.R + (dq != 0 ? rnd.Next(3) - 1 : 0));
-                if (!IsoGrid.InTile(c)) break;
-                cells.Add(c);
-                if (rnd.Next(3) == 0) cells.Add(new CellCoord(c.Q + dr, c.R + dq)); // widen a little
-            }
-            if (rnd.Next(2) == 0) Blob(c, 1);
-        }
-        // A notch for an inner corner.
-        cells.Remove(new CellCoord(centre.Q + 1, centre.R + 1));
-        return cells.Where(IsoGrid.InTile).ToList();
+            WallStep.OuterCorners => (WallPart?)WallPart.OuterCorner,
+            WallStep.InnerCorners => WallPart.InnerCorner,
+            WallStep.EndCaps => WallPart.EndCap,
+            _ => null,
+        };
+        _previewJunctions.Clear();
+        Services.TileVisuals.WallsFor(_previewTile, _previewFloor, _previewJunctions);
+        if (part is { } pt)
+            foreach (var j in _previewJunctions.Where(j => j.Part == pt))
+                _previewTile.WallVariants.Add(new TileWallVariant { Side = j.Up ? "up" : "down", Part = pt, Cell = j.Cell, Index = _variantTab });
+        Services.TileVisuals.Invalidate(_previewTile);
     }
 
     private void WallEditPanel()
     {
         if (_wall is not { } w) { _panel = Panel.Walls; return; }
-        const float label = 130;
-        bool changed = false;
+        int idx = Array.FindIndex(WallSteps, x => x.step == _wallStep);
+        var (step, title, help) = WallSteps[idx];
         Ui.Colored(_wallIsNew ? Ui.Warn : Ui.Muted, _wallIsNew ? "New wall (not saved yet)" : $"content/defs/walls/{w.Id}.json");
 
-        // Preview controls
-        ImGui.TextUnformatted("Preview on"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
-        string[] backs = { "Blank", "Grid only", "This tile (a copy)", "Basic sample" };
-        int bk = (int)_backdrop;
-        if (ImGui.Combo("##backdrop", ref bk, backs, backs.Length)) { _backdrop = (Backdrop)bk; BuildPreview(); }
-        if (_backdrop == Backdrop.Sample) { if (ImGui.Button("Reshuffle sample")) { _sampleSeed++; BuildPreview(); } ImGui.SameLine(); }
-        if (Ui.ToggleButton(_previewPaint ? "Painting walkable" : "Paint walkable", _previewPaint, new Num.Vector2(170, 0),
-                "Click / drag on the map to add or remove walkable cells in the preview. The wall builds itself around them.")) _previewPaint = !_previewPaint;
+        // Progress: every step, approved ones ticked; click to jump.
+        int done = WallSteps.Count(x => w.Approved.Contains(x.step.ToString()));
+        ImGui.ProgressBar(done / (float)WallSteps.Length, new Num.Vector2(-1, 6), "");
+        ImGui.BeginChild("steps", new Num.Vector2(0, 5 * ImGui.GetTextLineHeightWithSpacing() + 18), ImGuiChildFlags.Borders);
+        for (int i = 0; i < WallSteps.Length; i++)
+        {
+            var s = WallSteps[i];
+            bool ok = w.Approved.Contains(s.step.ToString());
+            if (i % 2 == 1) ImGui.SameLine(ImGui.GetContentRegionAvail().X / 2 + 8);
+            ImGui.PushStyleColor(ImGuiCol.Text, ok ? Ui.Good : s.step == step ? Ui.Accent : Ui.Muted);
+            if (ImGui.Selectable($"{(ok ? "v" : " ")} {i + 1}. {s.title}##st{i}", s.step == step, ImGuiSelectableFlags.None, new Num.Vector2(ImGui.GetContentRegionAvail().X / (i % 2 == 0 ? 2 : 1) - 8, 0)))
+                GoToStep(s.step);
+            ImGui.PopStyleColor();
+        }
+        ImGui.EndChild();
+
+        Ui.Title($"{idx + 1}. {title}");
+        Ui.Hint(help);
+        if (Ui.ToggleButton("Spotlight", _spotlight, new Num.Vector2(0, 0), "Dim everything this step doesn't change.")) _spotlight = !_spotlight;
         ImGui.SameLine();
-        if (Ui.ToggleButton("Grid & highlights", _previewHelpers, new Num.Vector2(0, 0), "Show the grid, walkable outlines and captions (H).\nOff = the preview looks as it will in the game.")) _previewHelpers = !_previewHelpers;
-        Ui.Hint("The preview is a copy: painting here never changes your real tile.");
-        ImGui.BeginChild("walled", new Num.Vector2(0, -40));
+        if (Ui.ToggleButton("Grid & captions", _previewHelpers, new Num.Vector2(0, 0), "Show the grid and labels on the preview (H).")) _previewHelpers = !_previewHelpers;
 
-        ImGui.TextUnformatted("Name"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
-        string name = w.Name;
-        if (ImGui.InputText("##wname", ref name, 80)) w.Name = name;
-        ImGui.TextUnformatted("Category"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
-        string cat = w.Category;
-        if (ImGui.InputTextWithHint("##wcat", "e.g. Cliffs", ref cat, 60)) w.Category = cat;
-        ImGui.TextUnformatted("Kind"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
-        string[] kinds = { "Wall down (cliff)", "Wall up" };
-        int k = w.Kind == MaterialKind.WallUp ? 1 : 0;
-        if (ImGui.Combo("##wkind", ref k, kinds, kinds.Length)) { w.Kind = k == 1 ? MaterialKind.WallUp : MaterialKind.WallDown; BuildPreview(); }
-
-        Ui.Section("Picture (the left face)");
-        ImGui.TextUnformatted("Texture"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
-        string tex = w.Texture;
-        ImGui.PushID("wtex");
-        if (ToolContext.Wizards.Inspector.TexturePicker(ref tex)) { w.Texture = tex; changed = true; }
-        ImGui.PopID();
-        changed |= SliderRow("Zoom", label, () => w.Scale, v => w.Scale = v, 0.1f, 4f, "%.2fx", log: true);
-        changed |= SliderRow(w.Kind == MaterialKind.WallUp ? "Foot line" : "Lip line", label, () => w.LipLine, v => w.LipLine = v, 0, 1, "%.2f");
-        ImGui.TextUnformatted("Tint"); ImGui.SameLine(label);
-        var col = HexToColor(w.Tint);
-        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - 64);
-        if (ImGui.ColorEdit3("##wtint", ref col, ImGuiColorEditFlags.PickerHueWheel | ImGuiColorEditFlags.DisplayHex)) { w.Tint = ColorToHex(col); changed = true; }
-        ImGui.SameLine(0, 4);
-        if (ImGui.Button("Reset##wt")) { w.Tint = "#ffffff"; changed = true; }
-        ImGui.TextUnformatted("Flip"); ImGui.SameLine(label);
-        bool fx = w.FlipX, fy = w.FlipY;
-        if (ImGui.Checkbox("Flip X##w", ref fx)) { w.FlipX = fx; changed = true; }
-        ImGui.SameLine(0, 20);
-        if (ImGui.Checkbox("Flip Y##w", ref fy)) { w.FlipY = fy; changed = true; }
-
-        Ui.Section("Sides");
-        changed |= SliderRow("Left shade", label, () => w.LeftShade, v => w.LeftShade = v, 0.2f, 1.5f, "%.2f");
-        changed |= SliderRow("Right shade", label, () => w.RightShade, v => w.RightShade = v, 0.2f, 1.5f, "%.2f");
-        ImGui.TextUnformatted("Right face art"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
-        string rtex = w.RightTexture;
-        ImGui.PushID("wrtex");
-        if (ToolContext.Wizards.Inspector.TexturePicker(ref rtex)) { w.RightTexture = rtex; changed = true; }
-        ImGui.PopID();
-        if (string.IsNullOrEmpty(w.RightTexture)) Ui.Hint("Empty = the left face, mirrored (usually all you need).");
-
-        Ui.Section("Shape");
-        int depth = w.Depth, run = w.MaxRun;
-        ImGui.TextUnformatted("Depth"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
-        if (ImGui.SliderInt("##wdepth", ref depth, 1, 10, "%d cells")) { w.Depth = depth; changed = true; }
-        ImGui.TextUnformatted("Piece length"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
-        if (ImGui.SliderInt("##wrun", ref run, 1, 24, "up to %d cells")) { w.MaxRun = run; changed = true; }
-        if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Rule of thumb for this picture: about {Math.Max(1, (int)(Services.Textures.Get(w.Texture).Width * w.Scale / 64) - 1)} cells before it runs out.");
-        bool skew = w.SkewFaces;
-        if (ImGui.Checkbox("Slant faces along the cell edges", ref skew)) { w.SkewFaces = skew; changed = true; }
-        changed |= SliderRow("Corner seam", label, () => w.CornerBlend, v => w.CornerBlend = v, 0, 80, "%.0f px");
-        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Where a left and right face meet: 0 = crisp edge, higher = softer blend.");
-        ImGui.TextUnformatted("End caps"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
-        string[] caps = { "None (hard cut)", "Soft (fades out)", "Stencil (carved shape)" };
-        int cap = (int)w.EndCaps;
-        if (ImGui.Combo("##wcap", ref cap, caps, caps.Length)) { w.EndCaps = (EndCapStyle)cap; changed = true; }
-        if (w.EndCaps == EndCapStyle.Soft) changed |= SliderRow("Cap softness", label, () => w.EndCapSoftness, v => w.EndCapSoftness = v, 4, 128, "%.0f px");
-        if (w.EndCaps == EndCapStyle.Stencil)
+        ImGui.BeginChild("stepbody", new Num.Vector2(0, -78));
+        bool changed = step switch
         {
-            ImGui.TextUnformatted("Cap stencil"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
-            string st = w.EndCapStencil;
-            ImGui.PushID("wcapst");
-            if (ToolContext.Wizards.Inspector.TexturePicker(ref st)) { w.EndCapStencil = st; changed = true; }
-            ImGui.PopID();
-        }
-        bool rim = w.Rim;
-        if (ImGui.Checkbox("Rim over the walkway edge", ref rim)) { w.Rim = rim; changed = true; }
-        if (ImGui.IsItemHovered()) ImGui.SetTooltip("A thin strip of the picture's top laid over the walkway's edge, hiding the seam.");
-        if (w.Rim) changed |= SliderRow("Rim height", label, () => w.RimHeight, v => w.RimHeight = v, 2, 64, "%.0f px");
-
-        Ui.Section("Perspective (optional)");
-        bool warp = w.Warp is not null;
-        if (ImGui.Checkbox("Perspective warp", ref warp)) { w.Warp = warp ? new MaterialWarp() : null; changed = true; }
-        if (w.Warp is not null)
-        {
-            var t = _wallTaper;
-            var texObj = Services.Textures.Get(w.Texture);
-            ImGui.TextUnformatted("Taper"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
-            bool tc = ImGui.SliderFloat("##wtaper", ref t.taper, -0.9f, 0.9f, t.taper >= 0 ? "bottom %.2f" : "top %.2f");
-            ImGui.TextUnformatted("Squash"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
-            tc |= ImGui.SliderFloat("##wsquash", ref t.squash, 0f, 0.8f, "%.2f");
-            if (tc) { _wallTaper = t; w.Warp = MaterialWarp.Taper(t.taper, t.squash, texObj.Width * w.Scale, texObj.Height * w.Scale); changed = true; }
-            if (ImGui.Button("Reset warp")) { w.Warp = new MaterialWarp(); _wallTaper = (0, 0); changed = true; }
-        }
+            WallStep.Picture => PictureStep(w),
+            WallStep.LeftFace => LeftFaceStep(w),
+            WallStep.RightFace => RightFaceStep(w),
+            WallStep.OuterCorners => VariantStep(w.OuterCorners, () => new OuterCornerVariant { Name = $"Corner {w.OuterCorners.Count + 1}" }, OuterCornerFields),
+            WallStep.InnerCorners => VariantStep(w.InnerCorners, () => new InnerCornerVariant { Name = $"Notch {w.InnerCorners.Count + 1}" }, InnerCornerFields),
+            WallStep.EndCaps => VariantStep(w.EndCapVariants, () => new EndCapVariant { Name = $"End {w.EndCapVariants.Count + 1}" }, EndCapFields),
+            WallStep.Steps => StepsStep(),
+            WallStep.Rim => RimStep(w),
+            WallStep.DepthFade => DepthStep(w),
+            _ => ReviewStep(w),
+        };
         ImGui.EndChild();
         if (changed) PreviewChanged();
 
+        // Footer: back / approve / save / close.
+        bool approved = w.Approved.Contains(step.ToString());
+        ImGui.BeginDisabled(idx == 0);
+        if (ImGui.Button("< Back", new Num.Vector2(80, 0))) GoToStep(WallSteps[idx - 1].step);
+        ImGui.EndDisabled();
+        ImGui.SameLine();
+        if (step != WallStep.Review)
+        {
+            if (Ui.AccentButton(approved ? "Approved - next >" : "Approve & next >", new Num.Vector2(170, 0)))
+            {
+                if (!approved) w.Approved.Add(step.ToString());
+                GoToStep(WallSteps[idx + 1].step);
+            }
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Happy with this part? Tick it off and go to the next.");
+        }
+        ImGui.Spacing();
         ImGui.BeginDisabled(string.IsNullOrWhiteSpace(w.Name) || string.IsNullOrEmpty(w.Texture));
-        if (Ui.AccentButton(WallDirty ? "Save wall *" : "Save wall", new Num.Vector2(130, 0))) SaveWall();
+        if (Ui.AccentButton(WallDirty ? "Save wall *" : "Save wall", new Num.Vector2(120, 0))) SaveWall();
         ImGui.EndDisabled();
         ImGui.SameLine();
         if (!_wallIsNew && ImGui.Button("Duplicate"))
@@ -493,7 +499,227 @@ public sealed partial class MapEditorScene
         if (!_wallIsNew && ImGui.Button("Delete...") && Services.Defs.TryGet<WallDef>(w.Id, out var saved)) AskDeleteWall(saved);
         ImGui.SameLine();
         if (ImGui.Button("Close")) CloseWallEditor();
-        BackdropPopup();
+    }
+
+    private void GoToStep(WallStep step)
+    {
+        _wallStep = step;
+        _variantTab = 0;
+        PreviewChanged();
+    }
+
+    // ---- steps
+
+    private bool PictureStep(WallDef w)
+    {
+        const float label = 120;
+        bool changed = false;
+        ImGui.TextUnformatted("Name"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
+        string name = w.Name;
+        if (ImGui.InputText("##wname", ref name, 80)) w.Name = name;
+        ImGui.TextUnformatted("Category"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
+        string cat = w.Category;
+        if (ImGui.InputTextWithHint("##wcat", "e.g. Cliffs", ref cat, 60)) w.Category = cat;
+        ImGui.TextUnformatted("Kind"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
+        string[] kinds = { "Wall down (cliff)", "Wall up" };
+        int k = w.Kind == MaterialKind.WallUp ? 1 : 0;
+        if (ImGui.Combo("##wkind", ref k, kinds, kinds.Length)) { w.Kind = k == 1 ? MaterialKind.WallUp : MaterialKind.WallDown; BuildPreview(); }
+        ImGui.TextUnformatted("Texture"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
+        string tex = w.Texture;
+        ImGui.PushID("wtex");
+        if (ToolContext.Wizards.Inspector.TexturePicker(ref tex)) { w.Texture = tex; changed = true; }
+        ImGui.PopID();
+        Ui.Hint("One left-facing strip of wall. The right side, corners and ends are made from it.");
+        changed |= SliderRow("Zoom", label, () => w.Scale, v => w.Scale = v, 0.1f, 4f, "%.2fx", log: true);
+        changed |= SliderRow(w.Kind == MaterialKind.WallUp ? "Foot line" : "Lip line", label, () => w.LipLine, v => w.LipLine = v, 0, 1, "%.2f");
+        ImGui.TextUnformatted("Tint"); ImGui.SameLine(label);
+        var col = HexToColor(w.Tint);
+        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - 64);
+        if (ImGui.ColorEdit3("##wtint", ref col, ImGuiColorEditFlags.PickerHueWheel | ImGuiColorEditFlags.DisplayHex)) { w.Tint = ColorToHex(col); changed = true; }
+        ImGui.SameLine(0, 4);
+        if (ImGui.Button("Reset##wt")) { w.Tint = "#ffffff"; changed = true; }
+        ImGui.TextUnformatted("Flip"); ImGui.SameLine(label);
+        bool fx = w.FlipX, fy = w.FlipY;
+        if (ImGui.Checkbox("Flip X##w", ref fx)) { w.FlipX = fx; changed = true; }
+        ImGui.SameLine(0, 20);
+        if (ImGui.Checkbox("Flip Y##w", ref fy)) { w.FlipY = fy; changed = true; }
+        Ui.Section("Perspective (optional)");
+        bool warp = w.Warp is not null;
+        if (ImGui.Checkbox("Perspective warp", ref warp)) { w.Warp = warp ? new MaterialWarp() : null; changed = true; }
+        if (w.Warp is not null)
+        {
+            var t = _wallTaper;
+            var texObj = Services.Textures.Get(w.Texture);
+            ImGui.TextUnformatted("Taper"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
+            bool tc = ImGui.SliderFloat("##wtaper", ref t.taper, -0.9f, 0.9f, t.taper >= 0 ? "bottom %.2f" : "top %.2f");
+            ImGui.TextUnformatted("Squash"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
+            tc |= ImGui.SliderFloat("##wsquash", ref t.squash, 0f, 0.8f, "%.2f");
+            if (tc) { _wallTaper = t; w.Warp = MaterialWarp.Taper(t.taper, t.squash, texObj.Width * w.Scale, texObj.Height * w.Scale); changed = true; }
+            if (ImGui.Button("Reset warp")) { w.Warp = new MaterialWarp(); _wallTaper = (0, 0); changed = true; }
+        }
+        return changed;
+    }
+
+    private bool LeftFaceStep(WallDef w)
+    {
+        bool changed = SliderRow("Brightness", 120, () => w.LeftShade, v => w.LeftShade = v, 0.2f, 1.5f, "%.2f");
+        bool skew = w.SkewFaces;
+        if (ImGui.Checkbox("Slant along the cell edges", ref skew)) { w.SkewFaces = skew; changed = true; }
+        Ui.Hint("Slant keeps vertical lines vertical while the face follows the diagonal edge (the isometric look). Turn it off only if your picture is already drawn on the diagonal.");
+        return changed;
+    }
+
+    private bool RightFaceStep(WallDef w)
+    {
+        bool changed = SliderRow("Brightness", 120, () => w.RightShade, v => w.RightShade = v, 0.2f, 1.5f, "%.2f");
+        Ui.Hint("A little darker than the left face reads as light from one side - this is most of the 3D feel.");
+        ImGui.TextUnformatted("Own art"); ImGui.SameLine(120); ImGui.SetNextItemWidth(-1);
+        string rtex = w.RightTexture;
+        ImGui.PushID("wrtex");
+        if (ToolContext.Wizards.Inspector.TexturePicker(ref rtex)) { w.RightTexture = rtex; changed = true; }
+        ImGui.PopID();
+        Ui.Hint(string.IsNullOrEmpty(w.RightTexture) ? "Empty = the left face, mirrored (usually all you need)." : "Using your own right-face picture (same zoom and lip line).");
+        return changed;
+    }
+
+    /// <summary>Tabs for a part's variants (1 = the default everywhere), with add / delete, then the selected one's fields.</summary>
+    private bool VariantStep<T>(List<T> list, Func<T> make, Func<T, bool> fields)
+    {
+        bool changed = false;
+        if (list.Count == 0) { list.Add(make()); changed = true; }
+        _variantTab = Math.Clamp(_variantTab, 0, list.Count - 1);
+        Ui.Hint("Variant 1 is used everywhere by default. Extra variants can be swapped in on specific spots of a tile (Walls page > Swap corners & ends).");
+        for (int i = 0; i < list.Count; i++)
+        {
+            string name = list[i] switch { OuterCornerVariant o => o.Name, InnerCornerVariant n => n.Name, EndCapVariant e => e.Name, _ => "" };
+            if (i > 0) ImGui.SameLine(0, 4);
+            if (Ui.ToggleButton($"{i + 1}. {name}##vt{i}", _variantTab == i, new Num.Vector2(0, 0), i == 0 ? "The default" : "Swap in on tiles"))
+            { _variantTab = i; changed = true; }
+            if (ImGui.GetContentRegionAvail().X < 120) ImGui.NewLine();
+        }
+        ImGui.SameLine(0, 8);
+        if (ImGui.Button("+ Add variant")) { list.Add(make()); _variantTab = list.Count - 1; changed = true; }
+        ImGui.Separator();
+        var v = list[_variantTab];
+        changed |= fields(v);
+        if (list.Count > 1)
+        {
+            ImGui.Spacing();
+            if (_variantTab > 0 && ImGui.Button("Make this the default (move to 1)")) { list.RemoveAt(_variantTab); list.Insert(0, v); _variantTab = 0; changed = true; }
+            if (_variantTab > 0) ImGui.SameLine();
+            if (ImGui.Button("Delete this variant")) { list.RemoveAt(_variantTab); _variantTab = Math.Max(0, _variantTab - 1); changed = true; }
+            Ui.Hint("Tiles that swapped to a deleted variant fall back to the nearest one.");
+        }
+        return changed;
+    }
+
+    private bool OuterCornerFields(OuterCornerVariant v)
+    {
+        const float label = 120;
+        bool changed = NameRow(v.Name, n => v.Name = n);
+        ImGui.TextUnformatted("Style"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
+        string[] styles = { "Seam (the faces meet on a line)", "Bevel (narrow cut face)" };
+        int st = (int)v.Style;
+        if (ImGui.Combo("##ocstyle", ref st, styles, styles.Length)) { v.Style = (CornerStyle)st; changed = true; }
+        changed |= SliderRow("Lean", label, () => v.Lean, x => v.Lean = x, -60, 60, "%.0f deg");
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Tilts the corner line: one face wraps a little further round as it goes down.");
+        changed |= SliderRow("Softness", label, () => v.Blend, x => v.Blend = x, 0, 80, "%.0f px");
+        if (v.Style == CornerStyle.Bevel)
+        {
+            changed |= SliderRow("Bevel width", label, () => v.BevelWidth, x => v.BevelWidth = x, 2, 60, "%.0f px");
+            bool auto = v.BevelShade is null;
+            if (ImGui.Checkbox("Bevel brightness: halfway between the faces", ref auto)) { v.BevelShade = auto ? null : 0.86f; changed = true; }
+            if (!auto) changed |= SliderRow("Bevel brightness", label, () => v.BevelShade ?? 0.86f, x => v.BevelShade = x, 0.2f, 1.5f, "%.2f");
+        }
+        changed |= SliderRow("Highlight", label, () => v.Highlight, x => v.Highlight = x, 0, 1, "%.2f");
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("A thin light line down the corner edge.");
+        if (v.Highlight > 0) changed |= SliderRow("Highlight width", label, () => v.HighlightWidth, x => v.HighlightWidth = x, 1, 20, "%.0f px");
+        return changed;
+    }
+
+    private bool InnerCornerFields(InnerCornerVariant v)
+    {
+        const float label = 120;
+        bool changed = NameRow(v.Name, n => v.Name = n);
+        changed |= SliderRow("Lean", label, () => v.Lean, x => v.Lean = x, -60, 60, "%.0f deg");
+        changed |= SliderRow("Softness", label, () => v.Blend, x => v.Blend = x, 0, 80, "%.0f px");
+        changed |= SliderRow("Shadow", label, () => v.Shadow, x => v.Shadow = x, 0, 1, "%.2f");
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Darkening in the notch: makes it read as going in.");
+        if (v.Shadow > 0) changed |= SliderRow("Shadow width", label, () => v.ShadowWidth, x => v.ShadowWidth = x, 2, 80, "%.0f px");
+        return changed;
+    }
+
+    private bool EndCapFields(EndCapVariant v)
+    {
+        const float label = 120;
+        bool changed = NameRow(v.Name, n => v.Name = n);
+        ImGui.TextUnformatted("Style"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
+        string[] caps = { "None (hard cut)", "Soft (fades out)", "Stencil (carved shape)" };
+        int cap = (int)v.Style;
+        if (ImGui.Combo("##ecstyle", ref cap, caps, caps.Length)) { v.Style = (EndCapStyle)cap; changed = true; }
+        if (v.Style == EndCapStyle.Soft) changed |= SliderRow("Softness", label, () => v.Softness, x => v.Softness = x, 4, 128, "%.0f px");
+        if (v.Style == EndCapStyle.Stencil)
+        {
+            ImGui.TextUnformatted("Stencil"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
+            string st = v.Stencil;
+            ImGui.PushID("ecst");
+            if (ToolContext.Wizards.Inspector.TexturePicker(ref st)) { v.Stencil = st; changed = true; }
+            ImGui.PopID();
+            Ui.Hint("Draw your own from art/stencils/_template_cell.png (opaque keeps, transparent cuts).");
+        }
+        return changed;
+    }
+
+    private bool StepsStep()
+    {
+        Ui.Hint("Nothing to set here: check that the faces carry on cleanly where the walkway steps. If not, go back and adjust zoom, lip line or slant.");
+        return false;
+    }
+
+    private bool RimStep(WallDef w)
+    {
+        bool changed = false;
+        bool rim = w.Rim;
+        if (ImGui.Checkbox("Rim over the walkway edge", ref rim)) { w.Rim = rim; changed = true; }
+        Ui.Hint("A thin strip of the picture's top laid over the walkway edge, hiding the seam between ground and wall.");
+        if (w.Rim) changed |= SliderRow("Rim height", 120, () => w.RimHeight, v => w.RimHeight = v, 2, 64, "%.0f px");
+        return changed;
+    }
+
+    private bool DepthStep(WallDef w)
+    {
+        bool changed = false;
+        int depth = w.Depth, run = w.MaxRun;
+        ImGui.TextUnformatted("Depth"); ImGui.SameLine(120); ImGui.SetNextItemWidth(-1);
+        if (ImGui.SliderInt("##wdepth", ref depth, 1, 10, "%d cells")) { w.Depth = depth; changed = true; }
+        ImGui.TextUnformatted("Piece length"); ImGui.SameLine(120); ImGui.SetNextItemWidth(-1);
+        if (ImGui.SliderInt("##wrun", ref run, 1, 24, "up to %d cells")) { w.MaxRun = run; changed = true; }
+        int fits = Math.Max(1, (int)(Services.Textures.Get(w.Texture).Width * w.Scale / 64) - 1);
+        Ui.Colored(run > fits ? Ui.Warn : Ui.Muted, $"Your picture covers about {fits} cells at this zoom{(run > fits ? " - longer pieces will run out of picture" : "")}.");
+        var fade = _floor is null ? null : (w.Kind == MaterialKind.WallUp ? _floor.WallUpFade : _floor.WallDownFade);
+        Ui.Hint(fade is null ? "The fade into the clouds is set per floor (Walls page)."
+            : $"Fade (from this floor's default): starts {fade.Start:0.##} cells, gone after {fade.Length:0.##} more. Set per floor on the Walls page; each wall on a floor can have its own.");
+        return changed;
+    }
+
+    private bool ReviewStep(WallDef w)
+    {
+        foreach (var (step, title, _) in WallSteps.Where(x => x.step != WallStep.Review))
+        {
+            bool ok = w.Approved.Contains(step.ToString());
+            Ui.Colored(ok ? Ui.Good : Ui.Warn, $"{(ok ? "Approved" : "Not approved yet")}:  {title}");
+        }
+        ImGui.Spacing();
+        Ui.Hint($"Variants: {w.OuterCorners.Count} outer corner(s), {w.InnerCorners.Count} inner corner(s), {w.EndCapVariants.Count} end(s). Save, then it's ready to add to floors.");
+        return false;
+    }
+
+    private bool NameRow(string value, Action<string> set)
+    {
+        ImGui.TextUnformatted("Name"); ImGui.SameLine(120); ImGui.SetNextItemWidth(-1);
+        string n = value;
+        if (ImGui.InputText("##vname", ref n, 60)) { set(n); return true; }
+        return false;
     }
 
     private bool SliderRow(string name, float label, Func<float> get, Action<float> set, float min, float max, string fmt, bool log = false)
@@ -531,56 +757,81 @@ public sealed partial class MapEditorScene
         _panel = Panel.Walls;
     }
 
-    private void BackdropPopup()
-    {
-        if (_openBackdrop) { ImGui.OpenPopup("Preview the wall on..."); _openBackdrop = false; }
-        CenterNextWindow();
-        if (!ImGui.BeginPopupModal("Preview the wall on...", ImGuiWindowFlags.AlwaysAutoResize)) return;
-        Ui.Hint("You'll paint walkable cells on it and watch the wall build itself. You can switch any time.");
-        var size = new Num.Vector2(300, 40);
-        void Pick(Backdrop b, string text, string tip)
-        {
-            if (ImGui.Button(text, size)) { _backdrop = b; BuildPreview(); ImGui.CloseCurrentPopup(); }
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip(tip);
-        }
-        Pick(Backdrop.Blank, "Blank", "Nothing but the wall on a plain background.");
-        Pick(Backdrop.Grid, "Grid only", "The cell grid, so you can judge sizes.");
-        Pick(Backdrop.ThisTile, "This tile (a copy)", "The tile you're working on, with its own walkable cells.");
-        Pick(Backdrop.Sample, "Basic sample", "A generated walkway with paths and corners (reshuffle any time).");
-        ImGui.EndPopup();
-    }
-
-    /// <summary>Map input in the wall editor: paint the preview's walkable cells.</summary>
+    /// <summary>Wall builder: the map only previews (H toggles grid & captions).</summary>
     private bool UpdateWallPreviewInput(InputState input)
     {
         if (_panel != Panel.WallEdit || _previewTile is null) return false;
         if (input.KeyPressed(Microsoft.Xna.Framework.Input.Keys.H) && !input.KeyboardCapturedByUi) _previewHelpers = !_previewHelpers;
-        if (!_previewPaint) return true;
-        if (input.LeftReleased || input.RightReleased) _dragMode = null;
-        bool before = false;
-        PaintCells(input, c => _previewTile.Walkable[c], (c, v) => { _previewTile.SetWalkable(c, v); before = true; }, rightPaintsFalse: true, editsTile: false);
-        if (before) { SyncPreviewGround(); Services.TileVisuals.Invalidate(_previewTile); }
         return true;
     }
 
-    /// <summary>The wall editor's preview, drawn instead of the tile.</summary>
+    /// <summary>Cells this step is about (for the spotlight). Null = everything.</summary>
+    private HashSet<CellCoord>? StepCells()
+    {
+        if (_previewTile is null || _wall is null) return null;
+        bool up = _wall.Kind == MaterialKind.WallUp;
+        int s = up ? -1 : 1;
+        // Only as deep as the wall is still visible (the fade hides the rest).
+        var fade = _previewFloor is null ? null : (up ? _previewFloor.WallUpFade : _previewFloor.WallDownFade);
+        int visible = Math.Max(1, Math.Min(_wall.Depth, (int)MathF.Ceiling((fade?.Start ?? 1) + (fade?.Length ?? 1.5f))));
+        HashSet<CellCoord> ColumnsAt(IEnumerable<CellCoord> starts)
+        {
+            var set = new HashSet<CellCoord>();
+            foreach (var st in starts)
+            {
+                var c = st;
+                for (int i = 0; i < visible && IsoGrid.InTile(c) && !_previewTile.Walkable[c]; i++, c = new CellCoord(c.Q + s, c.R + s)) set.Add(c);
+            }
+            return set;
+        }
+        var pieces = Services.TileVisuals.WallsFor(_previewTile, _previewFloor);
+        switch (_wallStep)
+        {
+            case WallStep.LeftFace: return ColumnsAt(pieces.Where(p => p.Kind == WallPieceKind.Face && !p.RightFace).SelectMany(TopCells));
+            case WallStep.RightFace: return ColumnsAt(pieces.Where(p => p.Kind == WallPieceKind.Face && p.RightFace).SelectMany(TopCells));
+            case WallStep.OuterCorners:
+                return ColumnsAt(_previewJunctions.Where(j => j.Part == WallPart.OuterCorner).Select(j => new CellCoord(j.Cell.Q + s, j.Cell.R + s)));
+            case WallStep.InnerCorners: return ColumnsAt(_previewJunctions.Where(j => j.Part == WallPart.InnerCorner).Select(j => j.Cell));
+            case WallStep.EndCaps: return ColumnsAt(_previewJunctions.Where(j => j.Part == WallPart.EndCap).Select(j => j.Cell));
+            case WallStep.Steps:
+            {
+                int o = up ? 3 : 0;
+                var stepCells = up ? new[] { new CellCoord(15 + o, -3 + o), new CellCoord(16 + o, -3 + o) } : new[] { new CellCoord(16 + o, 3 + o), new CellCoord(17 + o, 3 + o) };
+                return ColumnsAt(pieces.Where(p => p.Kind == WallPieceKind.Face && p.Cells.Any(c => stepCells.Any(sc => Math.Abs(sc.Q - c.Q) + Math.Abs(sc.R - c.R) <= 1)))
+                    .SelectMany(TopCells)).Concat(stepCells).ToHashSet();
+            }
+            case WallStep.Rim: return pieces.Where(p => p.Kind == WallPieceKind.Rim).SelectMany(p => p.Cells).Concat(pieces.Where(p => p.Kind == WallPieceKind.Face).SelectMany(p => p.Cells.Take(2))).ToHashSet();
+            default: return null;
+        }
+        // The top cell of each column a piece covers (the cell right under its edge).
+        IEnumerable<CellCoord> TopCells(WallPiece p) =>
+            p.Cells.Where(c => !p.Cells.Contains(new CellCoord(c.Q - s, c.R - s)));
+    }
+
+    /// <summary>The wall builder's preview, drawn instead of the tile.</summary>
     private void DrawWallPreview(SpriteBatch batch)
     {
         var t = _previewTile!;
         var s = Services;
-        TileRenderer.QueueLayers(_queue, s, t, _previewFloor, includeProps: _backdrop == Backdrop.ThisTile);
+        TileRenderer.QueueLayers(_queue, s, t, _previewFloor, includeProps: false);
         _queue.Flush(batch);
-        if (!_previewHelpers) return; // clean: exactly what the game draws
-        batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend);
         var d = s.Draw;
-        bool grid = _backdrop != Backdrop.Blank;
-        foreach (var c in IsoGrid.AllCells)
+        var focus = _spotlight ? StepCells() : null;
+        if (focus is null && !_previewHelpers) return;
+        batch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend);
+        if (focus is not null)
+            // A margin past the tile too, so the half cells along the screen edges are dimmed as well.
+            for (int q = IsoGrid.MinQ - 2; q <= IsoGrid.MaxQ + 2; q++)
+                for (int r = IsoGrid.MinR - 2; r <= IsoGrid.MaxR + 2; r++)
+                {
+                    var c = new CellCoord(q, r);
+                    if (!focus.Contains(c)) d.DiamondFill(batch, IsoGrid.CellCenter(c), IsoGrid.CellWidth, IsoGrid.CellHeight, new Color(8, 10, 18) * 0.62f);
+                }
+        if (_previewHelpers)
         {
-            var p = IsoGrid.CellCenter(c);
-            if (grid) d.DiamondOutline(batch, p, IsoGrid.CellWidth, IsoGrid.CellHeight, EditorPrefs.ToColor(_prefs.GridColor));
-            if (_previewPaint && t.Walkable[c]) d.DiamondOutline(batch, p, 110, 55, WalkGreen * 0.55f, 1.5f);
+            foreach (var c in IsoGrid.AllCells) d.DiamondOutline(batch, IsoGrid.CellCenter(c), IsoGrid.CellWidth, IsoGrid.CellHeight, EditorPrefs.ToColor(_prefs.GridColor));
+            d.TextShadowed(batch, $"Wall builder: {_wall!.DisplayName}  -  {WallSteps.First(x => x.step == _wallStep).title}", new Vector2(24, 24), Color.White, 26 / CanvasScale(), bold: true);
         }
-        d.TextShadowed(batch, $"Wall preview: {_wall!.DisplayName}   (paint walkable cells; right-click removes)", new Vector2(24, 24), Color.White, 26 / CanvasScale(), bold: true);
         batch.End();
     }
 }

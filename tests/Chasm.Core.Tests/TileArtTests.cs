@@ -176,23 +176,59 @@ public class TileArtTests
         var t = WalkableTile(new CellCoord(10, 2));            // one walkable cell: open on both lower sides
         var (floor, walls, grey, _) = WallFloor();
         var pieces = AutoWalls.Build(t, floor, up: false, walls);
-        Assert.Equal(2, pieces.Count);                         // a left and a right face
+        Assert.Equal(2, pieces.Count(p => p.Kind == WallPieceKind.Face));   // a left and a right face
         Assert.All(pieces, p => Assert.Same(grey, p.Wall));    // the first wall draws automatically
-        var left = pieces.Single(p => !p.RightFace); var right = pieces.Single(p => p.RightFace);
+        var left = pieces.Single(p => p.Kind == WallPieceKind.Face && !p.RightFace); var right = pieces.Single(p => p.Kind == WallPieceKind.Face && p.RightFace);
         Assert.True(right.Mirror);                             // no right art: the left face mirrored
         var corner = new CellCoord(11, 3);                     // straight under the point
         Assert.Contains(corner, left.Cells); Assert.Contains(corner, right.Cells);
-        // The two halves cover the corner cell exactly once (no double-dark corner).
-        var l = RegionMask.BuildBase(left.Cells, 0, clips: left.Clips).shape;
-        var r = RegionMask.BuildBase(right.Cells, 0, clips: right.Clips).shape;
+        // Left face, bevel and right face together cover the corner cell exactly once.
+        var masks = pieces.Where(p => !p.IsOverlay).Select(p => RegionMask.BuildBase(p.Cells, 0, clips: p.Clips).shape).ToList();
         var c = IsoGrid.CellCenter(corner);
-        foreach (float dx in new[] { -40f, -4f, 0f, 4f, 40f })
+        foreach (float dx in new[] { -40f, -12f, -4f, 0f, 4f, 12f, 40f })
         {
-            float a = At(l, c.X + dx, c.Y), b = At(r, c.X + dx, c.Y);
-            Assert.InRange(b + a * (1 - b), 0.99f, 1.01f);    // 'over' compositing of left then right = solid
+            float cover = 0;
+            foreach (var m in masks) { float a = At(m, c.X + dx, c.Y); cover = a + cover * (1 - a); } // 'over', in draw order
+            Assert.InRange(cover, 0.99f, 1.01f);
         }
+        Assert.Contains(pieces, p => p.Kind == WallPieceKind.Bevel);
+        Assert.Contains(pieces, p => p.Kind == WallPieceKind.Highlight);
+        // A straight seam instead: two pieces only, left keeps the left, right the right.
+        grey.OuterCorners[0].Style = CornerStyle.Seam; grey.OuterCorners[0].Highlight = 0;
+        var seam = AutoWalls.Build(t, floor, false, walls);
+        var l = RegionMask.BuildBase(seam[0].Cells, 0, clips: seam[0].Clips).shape;
+        var r = RegionMask.BuildBase(seam[1].Cells, 0, clips: seam[1].Clips).shape;
         Assert.Equal(1f, At(l, c.X - 40, c.Y), 2); Assert.Equal(0f, At(r, c.X - 40, c.Y), 2);
         Assert.Equal(1f, At(r, c.X + 40, c.Y), 2);
+    }
+
+    [Fact]
+    public void Variants_default_to_the_first_and_a_tile_can_swap_one_spot()
+    {
+        var t = WalkableTile(new CellCoord(10, 2), new CellCoord(14, 2));     // two lone cells: two outer corners
+        var (floor, walls, grey, _) = WallFloor();
+        grey.OuterCorners = new() { new OuterCornerVariant { Name = "A", BevelWidth = 10 }, new OuterCornerVariant { Name = "B", BevelWidth = 30 } };
+        var junctions = new List<WallJunction>();
+        AutoWalls.Build(t, floor, false, walls, junctions);
+        Assert.Equal(2, junctions.Count(j => j.Part == WallPart.OuterCorner));
+        Assert.All(junctions.Where(j => j.Part == WallPart.OuterCorner), j => Assert.Equal(0, j.Index));
+        t.WallVariants.Add(new TileWallVariant { Side = "down", Part = WallPart.OuterCorner, Cell = new(14, 2), Index = 1 });
+        junctions.Clear();
+        var pieces = AutoWalls.Build(t, floor, false, walls, junctions);
+        Assert.Equal(1, junctions.Single(j => j.Cell.Equals(new CellCoord(14, 2))).Index);
+        Assert.Equal(0, junctions.Single(j => j.Cell.Equals(new CellCoord(10, 2))).Index);
+        Assert.Equal(2, pieces.Count(p => p.Kind == WallPieceKind.Bevel));
+    }
+
+    [Fact]
+    public void Old_wall_files_fold_into_the_first_variant()
+    {
+        string json = """{ "Id": "w", "Texture": "x.png", "CornerBlend": 20, "EndCaps": "Stencil", "EndCapSoftness": 30, "EndCapStencil": "stencils/a.png" }""";
+        var w = Chasm.Core.Serialization.ChasmJson.Deserialize<WallDef>(json)!;
+        Assert.Equal(20, w.OuterCorners[0].Blend);
+        Assert.Equal(EndCapStyle.Stencil, w.EndCapVariants[0].Style);
+        Assert.Equal("stencils/a.png", w.EndCapVariants[0].Stencil);
+        Assert.DoesNotContain("CornerBlend", Chasm.Core.Serialization.ChasmJson.Serialize(w));
     }
 
     [Fact]
@@ -222,7 +258,7 @@ public class TileArtTests
         var floor = new FloorDef { Id = "f" };
         floor.WallsUp.Add(new FloorWall { Wall = "up" });
         var pieces = AutoWalls.Build(t, floor, up: true, id => id == "up" ? up : null);
-        Assert.Single(pieces, p => p.RightFace);
+        Assert.Single(pieces, p => p.Kind == WallPieceKind.Face && p.RightFace);
         Assert.All(pieces, p => Assert.All(p.Cells, c => Assert.False(t.IsWalkable(c))));
     }
 
@@ -233,7 +269,7 @@ public class TileArtTests
         var (floor, walls, grey, red) = WallFloor();
         t.WallPaint.Add(new TileWallPaint { Side = "down", Wall = "red", Cells = { new(6, 4), new(7, 4) } });
         t.WallPaint.Add(new TileWallPaint { Side = "down", Wall = TileWallPaint.NoWall, Cells = { new(9, 4) } });
-        var lefts = AutoWalls.Build(t, floor, false, walls).Where(p => !p.RightFace).ToList();
+        var lefts = AutoWalls.Build(t, floor, false, walls).Where(p => p.Kind == WallPieceKind.Face && !p.RightFace).ToList();
         Assert.Contains(lefts, p => p.Wall == red && p.Cells.Contains(new(6, 4)));
         Assert.Contains(lefts, p => p.Wall == grey && p.Cells.Contains(new(4, 4)));
         Assert.DoesNotContain(lefts, p => p.Cells.Contains(new(9, 4)));
@@ -247,12 +283,12 @@ public class TileArtTests
         // Steps don't get caps (the faces carry on); a 'no wall' cell does.
         var steps = WalkableTile(new CellCoord(5, 3), new CellCoord(6, 3), new CellCoord(6, 4), new CellCoord(7, 4));
         var (floor, walls, grey, _) = WallFloor();
-        Assert.DoesNotContain(AutoWalls.Build(steps, floor, false, walls), p => p.Clips.Any(c => c.Blend == grey.EndCapSoftness));
+        Assert.DoesNotContain(AutoWalls.Build(steps, floor, false, walls), p => p.Clips.Any(c => c.Blend == grey.EndCapVariants[0].Softness));
         var line = WalkableTile(Enumerable.Range(4, 6).Select(q => new CellCoord(q, 3)).ToArray());
         line.WallPaint.Add(new TileWallPaint { Side = "down", Wall = TileWallPaint.NoWall, Cells = { new(7, 4) } });
         grey.Rim = true;
         var pieces = AutoWalls.Build(line, floor, false, walls);
-        Assert.Equal(2, pieces.Count(p => !p.Rim && !p.RightFace && p.Clips.Any(c => c.Ramp && c.Blend == grey.EndCapSoftness)));
+        Assert.Equal(2, pieces.Count(p => !p.Rim && !p.RightFace && p.Clips.Any(c => c.Ramp && c.Blend == grey.EndCapVariants[0].Softness)));
         Assert.Contains(pieces, p => p.Rim && p.Fade is { Lower: false });
     }
 

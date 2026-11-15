@@ -64,6 +64,8 @@ public sealed class TileDef : Def
     public List<TileCloudOverride> CloudOverrides { get; set; } = new();
     [Hidden, Tooltip("Cells painted with a wall other than the floor's default (or with no wall).")]
     public List<TileWallPaint> WallPaint { get; set; } = new();
+    [Hidden, Tooltip("Corners / ends on this tile swapped to another variant of their wall.")]
+    public List<TileWallVariant> WallVariants { get; set; } = new();
     [Hidden, Tooltip("Kept in the Archive section of lists (the original game's content).")]
     public bool Archived { get; set; }
 

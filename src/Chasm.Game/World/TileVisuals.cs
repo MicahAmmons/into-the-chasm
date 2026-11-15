@@ -142,8 +142,8 @@ public sealed class TileVisuals : IDisposable
         WallOverride?.Invoke(id) ?? (_defs.TryGet<WallDef>(id, out var w) ? w : null);
 
     /// <summary>The tile's live walls (down and up), worked out from its walkable cells and its floor's wall lists.</summary>
-    public List<WallPiece> WallsFor(TileDef tile, FloorDef? floor) =>
-        AutoWalls.Build(tile, floor, up: false, FindWall).Concat(AutoWalls.Build(tile, floor, up: true, FindWall)).ToList();
+    public List<WallPiece> WallsFor(TileDef tile, FloorDef? floor, List<WallJunction>? junctions = null) =>
+        AutoWalls.Build(tile, floor, up: false, FindWall, junctions).Concat(AutoWalls.Build(tile, floor, up: true, FindWall, junctions)).ToList();
 
     private bool DrawLayer(TileDef tile, FloorDef? floor, PaintLayer layer, RenderTarget2D target)
     {
@@ -195,10 +195,19 @@ public sealed class TileVisuals : IDisposable
     /// <summary>One wall piece: its picture (pinned, slanted, maybe mirrored) cut to its cells, seams, caps and fade.</summary>
     private void DrawWallPiece(WallPiece piece, int feather, RenderTarget2D target)
     {
-        var tex = _textures.Get(piece.Texture);
         _device.SetRenderTarget(_scratch);
         _device.Clear(Color.Transparent);
-        DrawQuad(tex, piece.Corners(tex.Width, tex.Height), piece.Tint, piece.Wall.FlipX, piece.Wall.FlipY);
+        if (piece.IsOverlay)
+        {
+            // Highlight / shadow: plain colour over the whole screen, cut to a soft band by the mask.
+            var screen = new[] { new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(1920, 0), new System.Numerics.Vector2(1920, 1080), new System.Numerics.Vector2(0, 1080) };
+            DrawQuad(_textures.Pixel, screen, piece.Tint, false, false, piece.Opacity);
+        }
+        else
+        {
+            var tex = _textures.Get(piece.Texture);
+            DrawQuad(tex, piece.Corners(tex.Width, tex.Height), piece.Tint, piece.Wall.FlipX, piece.Wall.FlipY);
+        }
         var mask = Mask(piece.Cells, feather, piece.Stencils, piece.Clips, piece.Fade);
         _batch.Begin(SpriteSortMode.Immediate, MultiplyByAlpha, SamplerState.LinearClamp);
         _batch.Draw(mask, new Rectangle(0, 0, 1920, 1080), Color.White);

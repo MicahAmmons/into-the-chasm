@@ -68,7 +68,7 @@ public sealed partial class MapEditorScene : Scene
         ToolContext.Wizards.Inspector.CellPicker = cb => { _cellPick = cb; Status("Click a cell on the map (Esc cancels)."); };
         Art.ArtLibrary.KeysMoved += OnArtMoved;
         if (_openOnStart is not null && Services.Defs.TryGet<TileDef>(_openOnStart, out var t)) Open(t);
-        // Dev convenience for automated screenshots: CHASM_EDITOR=tool[:panel][:neighbours][:mat=<id>][:cut][:dup][:warp][:place=<prefab>][:prefab=<prefab>][:wall=<id>][:back=<n>][:game]
+        // Dev convenience for automated screenshots: CHASM_EDITOR=tool[:panel][:neighbours][:mat=<id>][:cut][:dup][:warp][:place=<prefab>][:prefab=<prefab>][:wall=<id>][:step=<n>][:swap][:game]
         if (_tile is not null && Environment.GetEnvironmentVariable("CHASM_EDITOR") is { } dev)
         {
             var parts = dev.Split(':');
@@ -98,12 +98,13 @@ public sealed partial class MapEditorScene : Scene
             }
             if (parts.FirstOrDefault(x => x.StartsWith("prefab=")) is { } pe && Services.Defs.TryGet<PrefabDef>(pe[7..], out var pfEdit))
                 OpenPrefabEditor(pfEdit, isNew: false);
-            // wall=<id>[:back=<0-3>]: open the wall editor with a preview backdrop.
+            // wall=<id>[:step=<n>]: open the wall builder at a step (0 = Picture).
             if (parts.FirstOrDefault(x => x.StartsWith("wall=")) is { } wd && Services.Defs.TryGet<WallDef>(wd[5..], out var wallDev))
             {
-                if (parts.FirstOrDefault(x => x.StartsWith("back=")) is { } bd && int.TryParse(bd[5..], out int bi)) _backdrop = (Backdrop)bi;
                 OpenWallEditor(wallDev, isNew: false);
+                if (parts.FirstOrDefault(x => x.StartsWith("step=")) is { } sd && int.TryParse(sd[5..], out int si)) GoToStep((WallStep)si);
             }
+            if (parts.Contains("swap")) _swapMode = true;
             if (parts.Contains("selectall")) foreach (var c in IsoGrid.AllCells.Where(c => _tile.Walkable[c])) _selection.Add(c);
         }
     }
