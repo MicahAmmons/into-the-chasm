@@ -83,7 +83,9 @@ public enum FadeAngle
 /// Measured from the region's own top edge (lower clouds) or bottom edge (upper clouds),
 /// so a cliff fades the same way wherever it sits on screen.
 /// </summary>
-public readonly record struct EdgeFade(bool Lower, float StartCells, float LengthCells, FadeAngle Angle)
+/// <param name="Curve">Shape of the thinning: 1 = even; above 1 stays solid longer then drops away; below 1 thins quickly at first.</param>
+/// <param name="Haze">0..1: how much the bottom of the fade takes on <paramref name="HazeColor"/> (distance haze).</param>
+public readonly record struct EdgeFade(bool Lower, float StartCells, float LengthCells, FadeAngle Angle, float Curve = 1f, float Haze = 0f, string HazeColor = "#a8acbc")
 {
     public const float CellPx = 64f;
 }
@@ -167,6 +169,30 @@ public sealed class CellStencil
 /// <summary>A stencil's alpha channel, 0..1, row by row.</summary>
 public sealed record StencilImage(int Width, int Height, float[] Alpha)
 {
+    private float[]? _reach;
+
+    /// <summary>
+    /// How far down the shape reaches at u (0..1 across): the lowest opaque point of that column,
+    /// 0 = top, 1 = bottom. Used when a bottom shape steers the fade instead of cutting it.
+    /// </summary>
+    public float ReachAt(float u)
+    {
+        if (_reach is null)
+        {
+            var r = new float[Width];
+            for (int x = 0; x < Width; x++)
+            {
+                int low = -1;
+                for (int y = Height - 1; y >= 0; y--) if (Alpha[y * Width + x] > 0.5f) { low = y; break; }
+                r[x] = (low + 1) / (float)Height;
+            }
+            _reach = r;
+        }
+        float fx = Math.Clamp(u * Width - 0.5f, 0, Width - 1);
+        int x0 = (int)fx, x1 = Math.Min(Width - 1, x0 + 1);
+        return _reach[x0] + (_reach[x1] - _reach[x0]) * (fx - x0);
+    }
+
     /// <summary>Bilinear sample at u, v in 0..1.</summary>
     public float Sample(float u, float v)
     {

@@ -197,8 +197,29 @@ public sealed class TileDef : Def
 /// <summary>A numbered floor: groups Tiles and holds floor-wide look and feel.</summary>
 [DefFolder("floors", "Floors")]
 [Tooltip("A numbered floor of the chasm.")]
-public sealed class FloorDef : Def
+public sealed class FloorDef : Def, System.Text.Json.Serialization.IJsonOnDeserialized
 {
+    /// <summary>
+    /// Older files kept bottom shapes on each wall entry. They now belong to the fade: a wall with its
+    /// own fade takes them into it; a wall on the floor default gets its own fade (a copy of the
+    /// default) carrying them, so it looks the same as before.
+    /// </summary>
+    public void OnDeserialized()
+    {
+        foreach (var (list, def) in new[] { (WallsDown, WallDownFade), (WallsUp, WallUpFade) })
+            foreach (var e in list)
+            {
+                if (e.BottomEdges is not { Count: > 0 } old) { e.BottomEdges = null; continue; }
+                if (e.FadeMode == WallFadeMode.Default)
+                {
+                    e.FadeMode = WallFadeMode.Own;
+                    e.Fade = new WallFade { Start = def.Start, Length = def.Length, Angle = def.Angle, Curve = def.Curve, Haze = def.Haze, HazeColor = def.HazeColor };
+                }
+                if (e.Fade.BottomEdges.Count == 0) e.Fade.BottomEdges.AddRange(old);
+                e.BottomEdges = null;
+            }
+    }
+
     [Range(0, 9999)] public int Number { get; set; } = 1;
     [Ref(typeof(TileDef)), Tooltip("Where you arrive on this floor by default.")]
     public string EntryTile { get; set; } = "";
