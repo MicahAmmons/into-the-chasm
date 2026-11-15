@@ -263,16 +263,37 @@ public class TileArtTests
         var combo = new EndCapComboDef { Id = "taper", Rows = { new EndCapRow { Mode = EndCapRowMode.Stencil, Stencil = "s1" }, new EndCapRow { Mode = EndCapRowMode.Stencil, Stencil = "s2" }, new EndCapRow { Mode = EndCapRowMode.Hide } } };
         grey.EndCapVariants = new() { new EndCapVariant { Style = EndCapStyle.Stencil, Combo = "taper" } };
         var pieces = AutoWalls.Build(t, floor, false, walls, null, id => id == "taper" ? combo : null);
-        var stencils = pieces.SelectMany(p => p.Stencils).ToList();
-        Assert.Contains(stencils, x => x.Stencil == "s1");
-        Assert.Contains(stencils, x => x.Stencil == "s2");
-        Assert.Contains(stencils, x => x.Hide);
-        Assert.DoesNotContain(stencils, x => x.Stencil == "" && !x.Hide);            // row 4 = keep (nothing added)
-        // Both ends of the gap: one mirrored.
-        Assert.Contains(stencils, x => x.Stencil == "s1" && x.FlipX);
-        Assert.Contains(stencils, x => x.Stencil == "s1" && !x.FlipX);
+        var ends = pieces.SelectMany(p => p.Ends).ToList();
+        Assert.Contains(ends, x => x.Stencil == "s1" && x.Row == 0);
+        Assert.Contains(ends, x => x.Stencil == "s2" && x.Row == 1);
+        Assert.Contains(ends, x => x.Hide && x.Row == 2);
+        Assert.DoesNotContain(ends, x => x.Row == 3);                                 // row 4 = keep (nothing added)
+        // Both sides of the gap, each on the last edge's width, ending exactly at the gap.
+        float gapLeft = AutoWalls.EdgeMid(new(7, 3), true, false).X - IsoGrid.HalfW / 2, gapRight = gapLeft + IsoGrid.HalfW;
+        Assert.Contains(ends, x => x.Row == 0 && x.EndX == gapLeft && x.InnerX == gapLeft - IsoGrid.HalfW);   // wall stops on its right
+        Assert.Contains(ends, x => x.Row == 0 && x.EndX == gapRight && x.InnerX == gapRight + IsoGrid.HalfW); // mirrored
         combo.Rows[0].Stencil = "s1b";                                                  // edit the combo: walls follow
-        Assert.Contains(AutoWalls.Build(t, floor, false, walls, null, id => id == "taper" ? combo : null).SelectMany(p => p.Stencils), x => x.Stencil == "s1b");
+        Assert.Contains(AutoWalls.Build(t, floor, false, walls, null, id => id == "taper" ? combo : null).SelectMany(p => p.Ends), x => x.Stencil == "s1b");
+    }
+
+    [Fact]
+    public void End_masks_shape_the_end_slice_not_the_face_beside_it()
+    {
+        // A wall end from x 500 (inner) to 564 (where it stops), edge line level at y 300.
+        var a = Enumerable.Repeat(1f, RegionMask.Width * RegionMask.Height).ToArray();
+        var hide = new EndStencil(500, 564, 300, 0, Row: 1, Up: false, Hide: true, "");
+        RegionMask.ApplyEndsIn(MaskArea.Full, a, new[] { hide }, _ => null);
+        float At(float x, float y) => a[(int)(y / 2) * RegionMask.Width + (int)(x / 2)];
+        Assert.Equal(0f, At(530, 400));      // slice 2 of the end: hidden
+        Assert.Equal(1f, At(530, 340));      // slice 1: kept
+        Assert.Equal(1f, At(470, 400));      // the face before the end: untouched
+        // A mask keeping only its left half cuts the end's outer half.
+        var half = new StencilImage(2, 1, new[] { 1f, 0f });
+        a = Enumerable.Repeat(1f, a.Length).ToArray();
+        RegionMask.ApplyEndsIn(MaskArea.Full, a, new[] { new EndStencil(500, 564, 300, 0, 0, false, false, "half") }, _ => half);
+        Assert.True(At(508, 330) > 0.9f);
+        Assert.True(At(558, 330) < 0.1f);
+        Assert.Equal(1f, At(470, 330));
     }
 
     [Fact]

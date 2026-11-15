@@ -258,6 +258,23 @@ public sealed record ClipZone(IReadOnlyCollection<CellCoord>? Cells, float X, bo
 
 public enum WallPieceKind { Face, Bevel, Highlight, Shadow, Rim }
 
+/// <summary>
+/// A mask on one slice of a wall end. The end is the last edge's width of the face (64 px), hanging
+/// from the edge line; slice <see cref="Row"/> is the 64 px band at that depth, slanted like the edge.
+/// In the mask picture, left is toward the wall and right is the end (left-hand ends mirror), top is
+/// toward the walkway. Pixels outside the picture are kept.
+/// </summary>
+public sealed record EndStencil(float InnerX, float EndX, float EdgeY, float Slope, int Row, bool Up, bool Hide, string Stencil,
+    float Rotation = 0, float OffsetX = 0, float OffsetY = 0, float Scale = 1, bool FlipY = false, bool Last = false)
+{
+    /// <summary><see cref="Last"/>: the bottom slice of the wall; hiding it also hides the soft spill below.</summary>
+    public const float Size = 64f;
+    public string Key => $"{InnerX:0.#},{EndX:0.#},{EdgeY:0.#},{Slope},{Row},{Up}:{(Hide ? "H" : Stencil)}{(FlipY ? "y" : "")}{(Last ? "L" : "")}/{Rotation:0.#},{OffsetX:0.#},{OffsetY:0.#},{Scale:0.##}";
+
+    /// <summary>Depth below (or above, for walls up) the edge line at screen x.</summary>
+    public float Depth(float x, float y) => (Up ? -1 : 1) * (y - (EdgeY + Slope * (x - InnerX)));
+}
+
 /// <summary>One drawn piece of a wall on a tile.</summary>
 public sealed class WallPiece
 {
@@ -272,6 +289,8 @@ public sealed class WallPiece
     public bool Mirror { get; set; }
     public List<ClipZone> Clips { get; } = new();
     public List<CellStencil> Stencils { get; } = new();
+    /// <summary>Wall-end masks, each on one 64 px slice of the end (see <see cref="EndStencil"/>).</summary>
+    public List<EndStencil> Ends { get; } = new();
     public EdgeFade? Fade { get; set; }
     /// <summary>Bottom-edge shapes along the piece (need a fade to anchor to).</summary>
     public List<BottomSegment> Bottom { get; } = new();
@@ -524,18 +543,19 @@ public static class AutoWalls
                     piece.Clips.Add(new ClipZone(null, cx, KeepLeft: endOnRight, Ramp: true, cap.Softness));
                 else if (cap.Style == EndCapStyle.Stencil)
                 {
-                    // Row by row down the end's column: keep, shape with a mask, or hide. Masks are
-                    // drawn for a right-hand end and mirrored for a left-hand one.
+                    // Slice by slice down the end: keep, shape with a mask, or hide. The end is the last
+                    // edge's width of the face, from the inner side to where the wall stops.
                     var rows = cap.RowsFrom(combos);
+                    float inner = endOnRight ? cx - IsoGrid.HalfW : cx + IsoGrid.HalfW;
+                    float slope = (isLeft ^ up) ? 0.5f : -0.5f;
+                    var mid = EdgeMid(w, isLeft, up);
+                    float edgeY = mid.Y + slope * (inner - mid.X);
                     for (int i = 0; i < col.Count && i < rows.Count; i++)
                     {
                         var row = rows[i];
                         if (row.Mode == EndCapRowMode.Keep) continue;
-                        piece.Stencils.Add(new CellStencil
-                        {
-                            Cell = col[i], Hide = row.Mode == EndCapRowMode.Hide, Stencil = row.Stencil, FlipX = !endOnRight, FlipY = row.FlipY ^ up,
-                            Rotation = row.Rotation, OffsetX = row.OffsetX, OffsetY = up ? -row.OffsetY : row.OffsetY, Scale = row.Scale,
-                        });
+                        piece.Ends.Add(new EndStencil(inner, cx, edgeY, slope, i, up, row.Mode == EndCapRowMode.Hide, row.Stencil,
+                            row.Rotation, row.OffsetX, row.OffsetY, row.Scale, row.FlipY, Last: i == col.Count - 1));
                     }
                 }
             }

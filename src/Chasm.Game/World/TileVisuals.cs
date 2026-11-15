@@ -209,7 +209,7 @@ public sealed class TileVisuals : IDisposable
     /// <summary>One wall piece: its picture (pinned, slanted, maybe mirrored) cut to its cells, seams, caps and fade.</summary>
     private void DrawWallPiece(WallPiece piece, int feather, RenderTarget2D target)
     {
-        var (mask, rect, maskKey) = Mask(piece.Cells, feather, piece.Stencils, piece.Clips, piece.Fade, piece.Bottom);
+        var (mask, rect, maskKey) = Mask(piece.Cells, feather, piece.Stencils, piece.Clips, piece.Fade, piece.Bottom, piece.Ends);
         if (mask is null) return;
         Texture2D tex = piece.IsOverlay ? _textures.Pixel : _textures.Get(piece.Texture);
         var corners = piece.IsOverlay
@@ -380,15 +380,15 @@ public sealed class TileVisuals : IDisposable
     public static double TicksToMs(long t) => t * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
 
     private (Texture2D? mask, Rectangle rect, string key) Mask(IReadOnlyCollection<CellCoord> cells, int feather, IReadOnlyList<CellStencil> stencils, IReadOnlyList<ClipZone>? clips, EdgeFade? fade,
-        IReadOnlyList<BottomSegment>? bottom = null)
+        IReadOnlyList<BottomSegment>? bottom = null, IReadOnlyList<EndStencil>? ends = null)
     {
         long m0 = _bakeClock.ElapsedTicks;
-        try { return MaskCore(cells, feather, stencils, clips, fade, bottom); }
+        try { return MaskCore(cells, feather, stencils, clips, fade, bottom, ends); }
         finally { MaskTicks += _bakeClock.ElapsedTicks - m0; }
     }
 
     private (Texture2D? mask, Rectangle rect, string key) MaskCore(IReadOnlyCollection<CellCoord> cells, int feather, IReadOnlyList<CellStencil> stencils, IReadOnlyList<ClipZone>? clips, EdgeFade? fade,
-        IReadOnlyList<BottomSegment>? bottom)
+        IReadOnlyList<BottomSegment>? bottom, IReadOnlyList<EndStencil>? ends)
     {
         var sb = new StringBuilder();
         foreach (var c in cells.OrderBy(c => c.Q).ThenBy(c => c.R)) sb.Append(c.Q).Append(',').Append(c.R).Append(' ');
@@ -396,6 +396,7 @@ public sealed class TileVisuals : IDisposable
         foreach (var st in stencils) sb.Append("|s").Append(st.Key);
         string shapeKey = sb.ToString();   // cells + soft edge: the expensive part
         if (clips is not null) foreach (var c in clips) sb.Append("|c").Append(c.Key);
+        if (ends is not null) foreach (var e in ends) sb.Append("|e").Append(e.Key);
         string baseKey = sb.ToString();    // + cut lines (corners, trims, caps): cheap to redo
         string slot = baseKey + "|" + (fade is { } f0 ? $"{f0.Lower}/{f0.Angle}" : "none");
         string fadeKey = (fade?.ToString() ?? "none") + (bottom is { Count: > 0 } && fade is not null ? "|b" + string.Join(";", bottom.Select(x => x.Key)) : "");
@@ -421,6 +422,7 @@ public sealed class TileVisuals : IDisposable
             }
             var shape = (float[])shaped.shape.Clone();
             if (clips is { Count: > 0 }) RegionMask.ApplyClipsIn(shaped.area, shape, clips);
+            if (ends is { Count: > 0 }) RegionMask.ApplyEndsIn(shaped.area, shape, ends, LoadStencil);
             b = (shaped.area, shaped.inside, shape, _tick);
             if (_maskBases.Count >= MaxBases)
                 foreach (var old in _maskBases.OrderBy(kv => kv.Value.used).Take(_maskBases.Count - MaxBases + 1).ToList())
