@@ -69,11 +69,10 @@ public sealed partial class MapEditorScene
         ImGui.SameLine();
         PanelButton("Textures", Panel.FloorTextures, half,
             "The floor's texture library: materials (texture + rotation, tint, flips, cloud fade) and cut-out cells.\n\nMaterials are shared by every tile on this floor.");
-        PanelButton("Properties", Panel.FloorProperties, full - 20,
+        PanelButton("Properties", Panel.FloorProperties, half,
             "Floor-wide settings (name, look, numbers).\n\nWARNING: changes here affect EVERY tile on this floor.");
-        PanelButton("Lower clouds", Panel.LowerClouds, half, "The cloud layer cliffs fade down into (floor-wide).");
         ImGui.SameLine();
-        PanelButton("Upper clouds", Panel.UpperClouds, half, "The cloud layer walls fade up into (floor-wide).");
+        PanelButton("Clouds", Panel.Clouds, half, "Animated cloud layers behind the tile: the floor's layers (every tile) and this tile's overrides.");
         ImGui.EndDisabled();
 
         // ---- tools
@@ -116,7 +115,6 @@ public sealed partial class MapEditorScene
             ImGui.SameLine(); if (ColorSwatch("##centrecol", _prefs.CenterLineColor, "Centre line colour")) _prefs.Save();
             ImGui.TableNextColumn(); ImGui.Checkbox("Markers", ref _showMarkers);
             if (ImGui.IsItemHovered()) ImGui.SetTooltip("Player starts, enemy spawns, spawn point, exits.");
-            ImGui.TableNextColumn(); ImGui.Checkbox("Cloud lines", ref _showCloudLines);
             ImGui.TableNextColumn();
             if (ImGui.Checkbox("Neighbours", ref _showNeighbours) && _showNeighbours && Services.Canvas.Zoom > 0.8f)
                 Services.Canvas.ZoomAround(Services.Canvas.Area.Center, 0.62f);

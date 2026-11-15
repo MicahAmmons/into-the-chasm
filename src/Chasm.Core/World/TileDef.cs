@@ -60,6 +60,8 @@ public sealed class TileDef : Def
     public List<MaterialDef> LocalMaterials { get; set; } = new();
 
     [Hidden] public List<PropDef> Props { get; set; } = new();
+    [Hidden, Tooltip("This tile's own settings for some of its floor's cloud layers.")]
+    public List<TileCloudOverride> CloudOverrides { get; set; } = new();
 
     [Tooltip("Colour behind all layers, as #RRGGBB.")]
     public string BackgroundColor { get; set; } = "#1a1d2e";
@@ -193,10 +195,32 @@ public sealed class FloorDef : Def
     public string EntryTile { get; set; } = "";
     [Multiline] public string Theme { get; set; } = "";
 
-    [Group("Clouds"), Tooltip("Clouds below: cliffs fade down into these.")]
-    public CloudLayerDef LowerClouds { get; set; } = new() { Line = 0.7f };
-    [Group("Clouds"), Tooltip("Clouds above: walls fade up into these.")]
-    public CloudLayerDef UpperClouds { get; set; } = new() { Line = 0.12f, Enabled = false, Coverage = CloudCoverage.Band };
+    [Hidden, Tooltip("Animated cloud layers behind every tile on this floor. First = furthest back.")]
+    public List<CloudLayer> Clouds
+    {
+        get => _clouds;
+        set { _clouds = value ?? new(); _cloudsAreDefault = false; }
+    }
+    private List<CloudLayer> _clouds = new() { new CloudLayer { Id = "cloud_1", Name = "Cloud sea", Texture = CloudStack.DefaultTexture, Mirror = true } };
+    private bool _cloudsAreDefault = true;
+
+    // Old floor files had two cloud bands; they become cloud layers when loaded (and vanish on save).
+    [Hidden, JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CloudLayerDef? LowerClouds { get => null; set => MigrateLegacy(value, "Lower clouds"); }
+    [Hidden, JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CloudLayerDef? UpperClouds { get => null; set => MigrateLegacy(value, "Upper clouds"); }
+
+    private void MigrateLegacy(CloudLayerDef? old, string name)
+    {
+        if (old is null) return;
+        if (_cloudsAreDefault) { _clouds.Clear(); _cloudsAreDefault = false; }
+        if (!old.Enabled) return;
+        _clouds.Add(new CloudLayer
+        {
+            Id = "cloud_" + (_clouds.Count + 1), Name = name, Texture = old.Texture, Tint = old.Tint,
+            Opacity = old.Opacity, Speed = old.Speed, Direction = 0, Mirror = true,
+        });
+    }
 
     [Group("Look"), Range(0, 64), Tooltip("Default soft edge (pixels) for painted regions.")]
     public int DefaultFeather { get; set; } = 6;

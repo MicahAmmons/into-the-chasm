@@ -28,7 +28,7 @@ namespace Chasm.Tools.MapEditor;
 public sealed partial class MapEditorScene : Scene
 {
     private enum Tool { Select, Walkable, PlayerStarts, EnemySpawns, PaintTexture, PlaceProp, Interaction }
-    private enum Panel { Selection, FloorProperties, FloorTextures, LowerClouds, UpperClouds, Reference, TileSettings }
+    private enum Panel { Selection, FloorProperties, FloorTextures, Clouds, Reference, TileSettings }
 
     private const int LeftW = 310, RightW = 480, MenuH = 24, StatusH = 28;
 
@@ -43,7 +43,7 @@ public sealed partial class MapEditorScene : Scene
     private string? _status;
     private float _statusTime;
     private EditorPrefs _prefs = new();
-    private bool _showGrid = true, _showArt = true, _showLabels = true, _showNeighbours, _showMarkers = true, _showCloudLines;
+    private bool _showGrid = true, _showArt = true, _showLabels = true, _showNeighbours, _showMarkers = true;
     private CellCoord? _hoverCell;
     private Num.Vector2 _hoverPx;
     private Action? _pendingAfterSave;   // "unsaved changes" prompt continuation

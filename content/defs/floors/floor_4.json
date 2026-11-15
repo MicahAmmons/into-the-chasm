@@ -4,28 +4,21 @@
   "Number": 4,
   "EntryTile": "",
   "Theme": "",
-  "LowerClouds": {
-    "Enabled": true,
-    "Coverage": "FullScreen",
-    "RowsOnScreen": 2,
-    "Line": 0.7,
-    "FadeLength": 0.15,
-    "Texture": "Original Art/backgrounds/clouds/Cloud1.png",
-    "Tint": "#ffffff",
-    "Speed": 20,
-    "Opacity": 1
-  },
-  "UpperClouds": {
-    "Enabled": false,
-    "Coverage": "FullScreen",
-    "RowsOnScreen": 2,
-    "Line": 0.12,
-    "FadeLength": 0.15,
-    "Texture": "Original Art/backgrounds/clouds/Cloud1.png",
-    "Tint": "#ffffff",
-    "Speed": 20,
-    "Opacity": 1
-  },
+  "Clouds": [
+    {
+      "Id": "cloud_1",
+      "Name": "Cloud sea",
+      "Enabled": true,
+      "Texture": "Original Art/backgrounds/clouds/Cloud1.png",
+      "Tint": "#ffffff",
+      "Opacity": 1,
+      "Blend": "Normal",
+      "Speed": 20,
+      "Direction": 0,
+      "Scale": 0.402,
+      "Mirror": true
+    }
+  ],
   "DefaultFeather": 6,
   "BackgroundColor": "#1a1d2e",
   "AmbientTint": "#ffffff",

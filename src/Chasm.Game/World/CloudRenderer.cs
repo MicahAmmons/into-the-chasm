@@ -6,84 +6,74 @@ using Microsoft.Xna.Framework.Graphics;
 namespace Chasm.Game.World;
 
 /// <summary>
-/// Placeholder cloud bands until the cloud FX are reworked: the floor's cloud texture tiled
-/// horizontally (every other copy mirrored to hide seams), drifting right and wrapping, tinted.
-/// The lower band fills from just above the lower cloud line to the bottom; the upper band from the
-/// top to just below the upper line. The edge facing the playfield fades in softly. Drawn beneath
-/// painted regions so cliffs and walls fade into them.
+/// Draws animated cloud layers (always behind the tile art, never baked). Each layer's texture
+/// repeats endlessly in every direction, scaled, tinted and faded, scrolling at its speed toward
+/// its direction. The texture should be seamless on all four sides.
 /// </summary>
 public static class CloudRenderer
 {
-    private const int EdgeStrips = 24;
-
-    public static void Draw(SpriteBatch b, GameServices s, CloudLayerDef cloud, bool lower)
+    /// <summary>"Screen": black adds nothing, white brightens - so clouds painted on black need no transparency.</summary>
+    private static readonly BlendState Screen = new()
     {
-        if (!cloud.Enabled || cloud.Opacity <= 0) return;
-        var tex = s.Textures.Get(cloud.Texture);
-        if (cloud.Coverage == CloudCoverage.FullScreen) { DrawFullScreen(b, s, cloud, tex); return; }
-        float lineY = cloud.Line * 1080, pad = Math.Max(40, cloud.FadeLength * 1080 * 0.5f);
-        int top = lower ? (int)(lineY - pad) : 0;
-        int bottom = lower ? 1080 : (int)(lineY + pad);
-        if (bottom <= top) return;
-        int h = bottom - top;
-        float scale = h / (float)tex.Height;
-        int w = Math.Max(1, (int)(tex.Width * scale));
-        float offset = (float)(s.TotalTime * cloud.Speed % (2 * w));
-        var color = TileRenderer.ParseColor(cloud.Tint, Color.White) * cloud.Opacity;
-        int soft = (int)Math.Min(h * 0.5f, pad * 1.6f); // height of the soft edge
+        ColorSourceBlend = Blend.One, ColorDestinationBlend = Blend.InverseSourceColor,
+        AlphaSourceBlend = Blend.One, AlphaDestinationBlend = Blend.InverseSourceAlpha,
+    };
 
-        int i = 0;
-        for (float x = offset - 2 * w; x < 1920; x += w, i++)
+    private static readonly BlendState Add = new()
+    {
+        ColorSourceBlend = Blend.One, ColorDestinationBlend = Blend.One,
+        AlphaSourceBlend = Blend.One, AlphaDestinationBlend = Blend.One,
+    };
+
+    /// <summary>Draws the layers in order (first = furthest back). Leaves the batch begun as the render queue expects.</summary>
+    public static void DrawLayers(SpriteBatch b, GameServices s, IReadOnlyList<CloudLayer> layers)
+    {
+        if (layers.Count == 0) return;
+        b.End();
+        foreach (var layer in layers)
         {
-            var fx = (i % 2 == 1 ? SpriteEffects.FlipHorizontally : 0) | (lower ? 0 : SpriteEffects.FlipVertically);
-            // Solid part.
-            int solidTop = lower ? top + soft : top, solidBottom = lower ? bottom : bottom - soft;
-            DrawSlice(b, tex, x, w, top, h, solidTop, solidBottom, color, fx);
-            // Soft edge: thin strips with rising opacity.
-            for (int k = 0; k < EdgeStrips; k++)
+            var blend = layer.Blend switch { CloudBlend.Screen => Screen, CloudBlend.Add => Add, _ => BlendState.AlphaBlend };
+            b.Begin(SpriteSortMode.Deferred, blend, SamplerState.LinearClamp);
+            DrawLayer(b, s, layer);
+            b.End();
+        }
+        b.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.LinearClamp);
+    }
+
+    public static void DrawLayer(SpriteBatch b, GameServices s, CloudLayer layer)
+    {
+        var tex = s.Textures.Get(layer.Texture);
+        float scale = Math.Clamp(layer.Scale, 0.05f, 16f);
+        float w = tex.Width * scale, h = tex.Height * scale;
+        if (w < 4 || h < 4) return;
+        var off = layer.OffsetAt(s.TotalTime);
+        // Wrap the offset into two copies (so mirrored pairs stay in step) and keep the numbers small.
+        float ox = Mod(off.X, 2 * w), oy = Mod(off.Y, 2 * h);
+        var color = TileRenderer.ParseColor(layer.Tint, Color.White) * Math.Clamp(layer.Opacity, 0f, 1f);
+        // Mirrored (not-quite-seamless) art: skip the outermost pixels, which are often a different shade.
+        Rectangle? src = null;
+        if (layer.Mirror)
+        {
+            int trim = Math.Max(1, Math.Min(tex.Width, tex.Height) / 200);
+            src = new Rectangle(trim, trim, tex.Width - trim * 2, tex.Height - trim * 2);
+        }
+        int row = 0;
+        for (float y = oy - 2 * h; y < 1080; y += h, row++)
+        {
+            int col = 0;
+            for (float x = ox - 2 * w; x < 1920; x += w, col++)
             {
-                float a = (k + 0.5f) / EdgeStrips;
-                int y0 = lower ? top + k * soft / EdgeStrips : bottom - (k + 1) * soft / EdgeStrips;
-                int y1 = lower ? top + (k + 1) * soft / EdgeStrips : bottom - k * soft / EdgeStrips;
-                DrawSlice(b, tex, x, w, top, h, y0, y1, color * a, fx);
+                if (x + w < 0 || y + h < 0) continue;
+                var fx = layer.Mirror
+                    ? (col % 2 == 1 ? SpriteEffects.FlipHorizontally : 0) | (row % 2 == 1 ? SpriteEffects.FlipVertically : 0)
+                    : SpriteEffects.None;
+                // Whole pixels; each copy ends exactly where the next begins (no gap, no doubled line).
+                int x0 = (int)MathF.Floor(x), y0 = (int)MathF.Floor(y);
+                var dest = new Rectangle(x0, y0, (int)MathF.Floor(x + w) - x0, (int)MathF.Floor(y + h) - y0);
+                b.Draw(tex, dest, src, color, 0, Vector2.Zero, fx, 0);
             }
         }
     }
 
-    /// <summary>
-    /// Fills the whole screen: the texture is scaled so <see cref="CloudLayerDef.RowsOnScreen"/>
-    /// copies stack top to bottom, repeated across. Neighbouring copies are mirrored so seams
-    /// line up, and everything drifts right and wraps.
-    /// </summary>
-    private static void DrawFullScreen(SpriteBatch b, GameServices s, CloudLayerDef cloud, Texture2D tex)
-    {
-        int rows = Math.Max(1, cloud.RowsOnScreen);
-        int h = (int)MathF.Ceiling(1080f / rows);
-        int w = Math.Max(1, (int)(tex.Width * (h / (float)tex.Height)));
-        float offset = (float)(s.TotalTime * cloud.Speed % (2 * w));
-        var color = TileRenderer.ParseColor(cloud.Tint, Color.White) * cloud.Opacity;
-        // Skip the texture's outermost pixels (often a different shade), so no seams show where copies meet.
-        int trim = Math.Max(1, Math.Min(tex.Width, tex.Height) / 200);
-        var src = new Rectangle(trim, trim, tex.Width - trim * 2, tex.Height - trim * 2);
-        int start = (int)offset - 2 * w;
-        for (int row = 0; row < rows; row++)
-        {
-            int y0 = row * 1080 / rows, y1 = (row + 1) * 1080 / rows;
-            for (int i = 0, x = start; x < 1920; x += w, i++)
-            {
-                var fx = (i % 2 == 1 ? SpriteEffects.FlipHorizontally : 0) | (row % 2 == 1 ? SpriteEffects.FlipVertically : 0);
-                b.Draw(tex, new Rectangle(x, y0, w, y1 - y0), src, color, 0, Vector2.Zero, fx, 0);
-            }
-        }
-    }
-
-    /// <summary>Draws rows [y0, y1) of a band that spans [top, top+h), keeping the texture aligned.</summary>
-    private static void DrawSlice(SpriteBatch b, Texture2D tex, float x, int w, int top, int h, int y0, int y1, Color c, SpriteEffects fx)
-    {
-        if (y1 <= y0) return;
-        float v0 = (y0 - top) / (float)h, v1 = (y1 - top) / (float)h;
-        if ((fx & SpriteEffects.FlipVertically) != 0) { (v0, v1) = (1 - v1, 1 - v0); }
-        var src = new Rectangle(0, (int)(v0 * tex.Height), tex.Width, Math.Max(1, (int)((v1 - v0) * tex.Height)));
-        b.Draw(tex, new Rectangle((int)x, y0, w, y1 - y0), src, c, 0, Vector2.Zero, fx, 0);
-    }
+    private static float Mod(float v, float m) { float r = v % m; return r < 0 ? r + m : r; }
 }

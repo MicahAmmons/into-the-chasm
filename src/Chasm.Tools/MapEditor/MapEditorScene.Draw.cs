@@ -105,11 +105,6 @@ public sealed partial class MapEditorScene
                 d.DiamondOutline(b, IsoGrid.CellCenter(c), 110, 55, new Color(200, 120, 255), 2);
 
         // Cloud lines.
-        if (_showCloudLines && _floor is not null)
-        {
-            CloudLine(b, _floor.LowerClouds, "lower cloud line", true);
-            CloudLine(b, _floor.UpperClouds, "upper cloud line", false);
-        }
 
         if (_prefs.ShowCenterLines)
         {
@@ -129,16 +124,6 @@ public sealed partial class MapEditorScene
         if (_cellPick is not null) d.TextCentered(b, "PICK A CELL", new Vector2(960, 40), Color.Cyan, 32, bold: true);
     }
 
-    private void CloudLine(SpriteBatch b, CloudLayerDef c, string label, bool lower)
-    {
-        if (!c.Enabled) return;
-        var d = Services.Draw;
-        float y = c.Line * 1080, y2 = (c.Line + (lower ? c.FadeLength : -c.FadeLength)) * 1080;
-        for (int x = 0; x < 1920; x += 40) d.Line(b, new Vector2(x, y), new Vector2(x + 24, y), Color.Cyan, 3);
-        for (int x = 0; x < 1920; x += 40) d.Line(b, new Vector2(x, y2), new Vector2(x + 12, y2), Color.Cyan * 0.6f, 2);
-        d.TextShadowed(b, label, new Vector2(12, y - 26), Color.Cyan, 18);
-        d.TextShadowed(b, "fully faded", new Vector2(12, y2 + (lower ? 4 : -24)), Color.Cyan * 0.7f, 14);
-    }
 
     private void DrawPlacementMarker(SpriteBatch b, Placement pl)
     {

@@ -27,16 +27,41 @@ public class TileArtTests
     }
 
     [Fact]
-    public void Cloud_fade_lower_and_upper()
+    public void Tiles_use_floor_clouds_unless_overridden()
     {
-        var lower = new CloudLayerDef { Line = 0.5f, FadeLength = 0.2f };
-        Assert.Equal(1f, lower.FadeAt(0.3f, lower: true));
-        Assert.Equal(0.5f, lower.FadeAt(0.6f, lower: true), 3);
-        Assert.Equal(0f, lower.FadeAt(0.8f, lower: true));
-        var upper = new CloudLayerDef { Line = 0.2f, FadeLength = 0.1f };
-        Assert.Equal(1f, upper.FadeAt(0.5f, lower: false));
-        Assert.Equal(0.5f, upper.FadeAt(0.15f, lower: false), 3);
-        Assert.Equal(0f, upper.FadeAt(0.05f, lower: false));
+        var floor = new FloorDef { Id = "f", Number = 1 };
+        floor.Clouds = new() { new CloudLayer { Id = "a", Texture = "a.png", Speed = 10 }, new CloudLayer { Id = "b", Texture = "b.png" } };
+        var plain = new TileDef { Id = "t1" };
+        Assert.Equal(new[] { "a", "b" }, CloudStack.Resolve(floor, plain).Select(c => c.Id));
+        var custom = new TileDef { Id = "t2" };
+        custom.CloudOverrides.Add(new TileCloudOverride { Layer = "a", Settings = new CloudLayer { Id = "a", Texture = "a.png", Speed = 99 } });
+        custom.CloudOverrides.Add(new TileCloudOverride { Layer = "b", Settings = new CloudLayer { Id = "b", Texture = "b.png", Enabled = false } });
+        var r = CloudStack.Resolve(floor, custom);
+        Assert.Single(r);
+        Assert.Equal(99, r[0].Speed);
+    }
+
+    [Fact]
+    public void Old_two_band_cloud_floors_become_cloud_layers()
+    {
+        string json = """{ "Id": "old", "Number": 3, "LowerClouds": { "Enabled": true, "Texture": "x.png", "Speed": 33 }, "UpperClouds": { "Enabled": false } }""";
+        var f = Chasm.Core.Serialization.ChasmJson.Deserialize<FloorDef>(json)!;
+        Assert.Single(f.Clouds);
+        Assert.Equal("x.png", f.Clouds[0].Texture);
+        Assert.Equal(33, f.Clouds[0].Speed);
+        Assert.DoesNotContain("LowerClouds", Chasm.Core.Serialization.ChasmJson.Serialize(f));
+        Assert.Single(new FloorDef().Clouds); // new floors start with one default layer
+    }
+
+    [Fact]
+    public void Cloud_direction_sets_scroll_offset()
+    {
+        var c = new CloudLayer { Speed = 10, Direction = 90 };
+        var o = c.OffsetAt(2);
+        Assert.Equal(0, o.X, 3);
+        Assert.Equal(20, o.Y, 3);
+        c.Direction = 180;
+        Assert.Equal(-20, c.OffsetAt(2).X, 3);
     }
 
     [Fact]

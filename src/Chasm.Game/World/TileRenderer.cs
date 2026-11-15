@@ -25,7 +25,7 @@ public static class TileRenderer
 
     /// <summary>
     /// Queues everything static about a tile, back to front:
-    /// background colour, cloud bands, hand-painted full-screen layers, painted regions (behind),
+    /// background colour, animated cloud layers (floor's, with the tile's overrides), hand-painted full-screen layers, painted regions (behind),
     /// props, painted regions (in front), foreground / fog layers.
     /// </summary>
     public static void QueueLayers(RenderQueue q, GameServices s, TileDef tile, FloorDef? floor = null, bool includeProps = true, float opacity = 1f)
@@ -35,8 +35,8 @@ public static class TileRenderer
         if (opacity >= 1f) q.Add(RenderLayer.Background, 0, b => s.Draw.Rect(b, new Rectangle(0, 0, 1920, 1080), bg));
         if (floor is not null && opacity >= 1f)
         {
-            q.Add(RenderLayer.Background, 0, b => CloudRenderer.Draw(b, s, floor.UpperClouds, lower: false));
-            q.Add(RenderLayer.Background, 0, b => CloudRenderer.Draw(b, s, floor.LowerClouds, lower: true));
+            var clouds = CloudStack.Resolve(floor, tile);
+            if (clouds.Count > 0) q.Add(RenderLayer.Background, 0, b => CloudRenderer.DrawLayers(b, s, clouds));
         }
         QueueImageLayers(q, s, tile, TileLayerKind.Background, opacity);
         var bake = s.TileVisuals.Get(tile, floor);

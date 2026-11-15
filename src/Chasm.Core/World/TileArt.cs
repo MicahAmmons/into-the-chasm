@@ -147,37 +147,93 @@ public sealed class PropDef
     public override string ToString() => $"{Id}: {Texture}";
 }
 
-public enum CloudCoverage
+/// <summary>How a cloud layer combines with what's under it.</summary>
+public enum CloudBlend
 {
-    [Label("Whole screen (texture repeats to fill it)")] FullScreen,
-    [Label("Band at the cloud line")] Band,
+    [Label("Normal (uses the PNG's transparency)")] Normal,
+    [Label("Screen (black = see-through)")] Screen,
+    [Label("Add (glowing)")] Add,
 }
 
-/// <summary>A scrolling cloud layer (the visual floor separators).</summary>
+/// <summary>
+/// One animated cloud layer. A floor has a list of them (first = furthest back); tiles use the
+/// floor's list and can override any layer. Always drawn behind the tile art, never baked.
+///
+/// The texture repeats in every direction (paint it seamless, e.g. 2048x2048) and scrolls
+/// <see cref="Speed"/> pixels per second toward <see cref="Direction"/>.
+/// </summary>
+public sealed class CloudLayer
+{
+    [Order(-10), Tooltip("Stable id that tile overrides point at.")] public string Id { get; set; } = "";
+    [Order(-9)] public string Name { get; set; } = "Clouds";
+    public bool Enabled { get; set; } = true;
+    [Texture] public string Texture { get; set; } = "";
+    [Tooltip("Multiplied over the clouds, #RRGGBB. White = unchanged.")] public string Tint { get; set; } = "#ffffff";
+    [Range(0, 1), Tooltip("0 = invisible, 1 = solid.")] public float Opacity { get; set; } = 1f;
+    public CloudBlend Blend { get; set; } = CloudBlend.Normal;
+    [Range(0, 600), Tooltip("Pixels per second.")] public float Speed { get; set; } = 20f;
+    [Range(0, 360), Tooltip("Which way it drifts, in degrees: 0 = right, 90 = down, 180 = left, 270 = up.")]
+    public float Direction { get; set; }
+    [Range(0.1f, 4), Tooltip("1 = the texture at its real size. Bigger = larger, slower-looking clouds.")]
+    public float Scale { get; set; } = 1f;
+    [Tooltip("Flip every other copy so edges always match. Use for art that isn't quite seamless.")]
+    public bool Mirror { get; set; }
+
+    public CloudLayer Copy() => (CloudLayer)MemberwiseClone();
+
+    /// <summary>Scroll offset in screen pixels at a time (seconds).</summary>
+    public System.Numerics.Vector2 OffsetAt(double seconds)
+    {
+        double rad = Direction * Math.PI / 180.0, dist = Speed * seconds;
+        return new System.Numerics.Vector2((float)(Math.Cos(rad) * dist), (float)(Math.Sin(rad) * dist));
+    }
+
+    public override string ToString() => string.IsNullOrEmpty(Name) ? Id : Name;
+}
+
+/// <summary>A tile's own settings for one of its floor's cloud layers.</summary>
+public sealed class TileCloudOverride
+{
+    [Tooltip("The floor cloud layer id this replaces on this tile.")] public string Layer { get; set; } = "";
+    public CloudLayer Settings { get; set; } = new();
+}
+
+/// <summary>Works out the clouds a tile actually shows: the floor's layers with the tile's overrides applied.</summary>
+public static class CloudStack
+{
+    public const string DefaultTexture = "Original Art/backgrounds/clouds/Cloud1.png";
+
+    public static List<CloudLayer> Resolve(FloorDef? floor, TileDef tile)
+    {
+        var result = new List<CloudLayer>();
+        if (floor is null) return result;
+        foreach (var layer in floor.Clouds)
+        {
+            var o = tile.CloudOverrides.FirstOrDefault(x => x.Layer == layer.Id);
+            var effective = o?.Settings ?? layer;
+            if (effective.Enabled && effective.Opacity > 0 && !string.IsNullOrEmpty(effective.Texture)) result.Add(effective);
+        }
+        return result;
+    }
+
+    /// <summary>A fresh layer id not used on the floor.</summary>
+    public static string NewId(FloorDef floor)
+    {
+        for (int n = 1; ; n++) { string id = "cloud_" + n; if (floor.Clouds.All(c => c.Id != id)) return id; }
+    }
+}
+
+/// <summary>Old two-band cloud settings (before cloud layers). Only read, to convert old floor files.</summary>
 public sealed class CloudLayerDef
 {
     public bool Enabled { get; set; } = true;
-    [Tooltip("Whole screen: the cloud texture fills everything behind the tile. Band: only near the cloud line.")]
-    public CloudCoverage Coverage { get; set; } = CloudCoverage.FullScreen;
-    [Range(1, 6), Tooltip("Whole screen: how many copies of the texture stack top to bottom.")]
-    public int RowsOnScreen { get; set; } = 2;
-    [Range(0, 1), Tooltip("Where the cloud line sits on screen: 0 = top, 1 = bottom.")]
-    public float Line { get; set; } = 0.65f;
-    [Range(0, 1), Tooltip("How far (fraction of screen height) textures take to fade out past the line.")]
-    public float FadeLength { get; set; } = 0.15f;
-    [Texture] public string Texture { get; set; } = "Original Art/backgrounds/clouds/Cloud1.png";
+    public string Texture { get; set; } = CloudStack.DefaultTexture;
     public string Tint { get; set; } = "#ffffff";
-    [Range(0, 2000), Tooltip("Pixels per second, drifting right and wrapping around.")]
     public float Speed { get; set; } = 20;
-    [Range(0, 1)] public float Opacity { get; set; } = 1f;
-
-    /// <summary>Alpha multiplier for a material at screen fraction y (0 top, 1 bottom).</summary>
-    public float FadeAt(float y, bool lower)
-    {
-        if (!Enabled) return 1f;
-        float len = Math.Max(0.0001f, FadeLength);
-        return lower
-            ? Math.Clamp(1f - (y - Line) / len, 0f, 1f)   // visible above the line, gone FadeLength below it
-            : Math.Clamp(1f - (Line - y) / len, 0f, 1f);  // mirrored: gone FadeLength above the line
-    }
+    public float Opacity { get; set; } = 1f;
+    // Ignored now (fades are measured from each cliff's own edge).
+    public string? Coverage { get; set; }
+    public int RowsOnScreen { get; set; } = 2;
+    public float Line { get; set; }
+    public float FadeLength { get; set; }
 }

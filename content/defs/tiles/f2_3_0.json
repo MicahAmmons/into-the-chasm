@@ -155,6 +155,7 @@
   ],
   "LocalMaterials": [],
   "Props": [],
+  "CloudOverrides": [],
   "BackgroundColor": "#2a2f45",
   "Exits": [],
   "Spawn": "12,-6",

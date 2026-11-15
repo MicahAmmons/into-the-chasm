@@ -26,8 +26,7 @@ public sealed partial class MapEditorScene
         {
             case Panel.FloorProperties: FloorPanel(); break;
             case Panel.FloorTextures: FloorTexturesPanel(); break;
-            case Panel.LowerClouds: CloudPanel(lower: true); break;
-            case Panel.UpperClouds: CloudPanel(lower: false); break;
+            case Panel.Clouds: CloudsPanel(); break;
             case Panel.Reference: ReferencePanel(); break;
             case Panel.TileSettings: TileSettingsPanel(); break;
             default:
@@ -50,8 +49,7 @@ public sealed partial class MapEditorScene
         {
             Panel.FloorProperties => $"Floor {_floor?.Number} properties",
             Panel.FloorTextures => $"Floor {_floor?.Number} textures",
-            Panel.LowerClouds => "Lower clouds",
-            Panel.UpperClouds => "Upper clouds",
+            Panel.Clouds => "Clouds",
             Panel.Reference => "Reference tile",
             Panel.TileSettings => "Tile settings",
             _ => _tool switch
@@ -338,7 +336,7 @@ public sealed partial class MapEditorScene
         ImGui.Text("Name"); ImGui.SameLine(170); ImGui.SetNextItemWidth(-1);
         if (ImGui.InputText("##fname", ref name, 100)) { _floor.Name = name; Edited(); }
         ImGui.BeginChild("floor");
-        Edit(_floor, p => p.Name is not (nameof(FloorDef.Materials) or nameof(FloorDef.LowerClouds) or nameof(FloorDef.UpperClouds) or "Id" or "Name"));
+        Edit(_floor, p => p.Name is not (nameof(FloorDef.Materials) or nameof(FloorDef.Clouds) or nameof(FloorDef.LowerClouds) or nameof(FloorDef.UpperClouds) or "Id" or "Name"));
         ImGui.Spacing();
         Ui.Hint("Textures (the floor's material library) moved to the Textures button.");
         ImGui.EndChild();
@@ -353,18 +351,6 @@ public sealed partial class MapEditorScene
         ImGui.EndChild();
     }
 
-    private void CloudPanel(bool lower)
-    {
-        if (_floor is null) return;
-        var cloud = lower ? _floor.LowerClouds : _floor.UpperClouds;
-        Ui.Section(lower ? "Lower clouds (cliffs fade down into these)" : "Upper clouds (walls fade up into these)");
-        ImGui.TextColored(Warn, "Floor-wide: affects every tile on this floor.");
-        ImGui.TextWrapped("The cloud picture shown behind the tiles. How cliffs and walls fade into it is set per material "
-            + "(Textures > Cloud fade), measured from each cliff's own edge. Line / Fade Length here only matter for the 'Band' coverage look.");
-        _showCloudLines = true;
-        if (Edit(cloud)) Services.TileVisuals.InvalidateAll();
-        ImGui.TextDisabled("Placeholder visuals: drifts right and wraps. More FX settings come with the cloud rework.");
-    }
 
     // ------------------------------------------------------------------ props + archive
 
