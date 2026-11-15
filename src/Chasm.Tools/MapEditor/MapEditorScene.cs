@@ -28,7 +28,7 @@ namespace Chasm.Tools.MapEditor;
 public sealed partial class MapEditorScene : Scene
 {
     private enum Tool { Select, Walkable, PlayerStarts, EnemySpawns, PaintTexture, PlaceProp, Interaction }
-    private enum Panel { Selection, FloorProperties, FloorTextures, Walls, Clouds, Reference, TileSettings }
+    private enum Panel { Selection, FloorProperties, FloorTextures, Walls, Clouds, Reference, TileSettings, Prefab }
 
     private const int LeftW = 310, RightW = 480, MenuH = 24, StatusH = 28;
 
@@ -68,7 +68,7 @@ public sealed partial class MapEditorScene : Scene
         ToolContext.Wizards.Inspector.CellPicker = cb => { _cellPick = cb; Status("Click a cell on the map (Esc cancels)."); };
         Art.ArtLibrary.KeysMoved += OnArtMoved;
         if (_openOnStart is not null && Services.Defs.TryGet<TileDef>(_openOnStart, out var t)) Open(t);
-        // Dev convenience for automated screenshots: CHASM_EDITOR=tool[:panel][:neighbours][:mat=<id>][:cut][:dup][:warp][:game]
+        // Dev convenience for automated screenshots: CHASM_EDITOR=tool[:panel][:neighbours][:mat=<id>][:cut][:dup][:warp][:place=<prefab>][:prefab=<prefab>][:game]
         if (_tile is not null && Environment.GetEnvironmentVariable("CHASM_EDITOR") is { } dev)
         {
             var parts = dev.Split(':');
@@ -89,6 +89,15 @@ public sealed partial class MapEditorScene : Scene
                 }
             }
             if (parts.Contains("game")) ToggleGameView();
+            if (parts.FirstOrDefault(x => x.StartsWith("place=")) is { } place && Services.Defs.TryGet<PrefabDef>(place[6..], out var pfDev))
+            {
+                PlacePrefab(pfDev);
+                var reg = _tile.PaintRegions[^1];
+                for (int q = 3; q <= 9; q++) for (int i = 0; i < 3; i++) reg.Cells.Add(new CellCoord(q + i, 4 + i));
+                _placeCellsRegion = null;
+            }
+            if (parts.FirstOrDefault(x => x.StartsWith("prefab=")) is { } pe && Services.Defs.TryGet<PrefabDef>(pe[7..], out var pfEdit))
+                OpenPrefabEditor(pfEdit, isNew: false);
             if (parts.Contains("selectall")) foreach (var c in IsoGrid.AllCells.Where(c => _tile.Walkable[c])) _selection.Add(c);
         }
     }

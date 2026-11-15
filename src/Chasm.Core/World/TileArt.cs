@@ -186,13 +186,23 @@ public sealed class PaintRegion
     [Hidden] public float? FadeStart { get; set; }
     [Hidden] public float? FadeLength { get; set; }
     [Hidden] public FadeAngle? FadeAngle { get; set; }
+    /// <summary>A prefab placement: the prefab this region shows (instead of a material).</summary>
+    [Hidden] public string? Prefab { get; set; }
+    /// <summary>Prefab placement: nudge from the automatic anchor, in pixels.</summary>
+    [Hidden] public float NudgeX { get; set; }
+    [Hidden] public float NudgeY { get; set; }
+    /// <summary>Prefab placement: mirror left/right on this tile.</summary>
+    [Hidden] public bool MirrorX { get; set; }
+    /// <summary>Fade on/off for this region (null = the usual: walls fade, general textures don't).</summary>
+    [Hidden] public bool? FadeEnabled { get; set; }
+
     /// <summary>Hand-drawn carve-outs: a stencil image cuts away part of a cell's texture.</summary>
     [Hidden] public List<CellStencil> Stencils { get; set; } = new();
 
     /// <summary>The fade this region bakes with, or null when its material doesn't fade.</summary>
     public EdgeFade? FadeFor(MaterialDef mat) => mat.Fade == CloudFade.None ? null
         : new EdgeFade(mat.Fade == CloudFade.IntoLowerClouds, FadeStart ?? mat.FadeStart, FadeLength ?? mat.FadeLength, FadeAngle ?? mat.FadeAngle);
-    public override string ToString() => $"{Material} ({Cells.Count} cells)";
+    public override string ToString() => $"{Prefab ?? Material} ({Cells.Count} cells)";
 }
 
 public enum PropLayer

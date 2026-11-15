@@ -15,19 +15,6 @@ public sealed partial class MapEditorScene
     private bool _wallsUp;   // Walls page: false = Wall down, true = Wall up
     private bool _cloudsTop; // Clouds page: false = Bottom clouds, true = Top clouds
 
-    private void WallsPanel()
-    {
-        if (_floor is null) { ImGui.TextDisabled("This tile has no floor."); return; }
-        SideSwitch("Wall down", "Wall up", ref _wallsUp,
-            "Cliffs going down: they fade into the bottom clouds.", "Walls going up: they fade into the top clouds.");
-        Ui.Hint(_wallsUp
-            ? "Walls rising up. Fade is measured up from each wall's bottom edge into the top clouds. Shared by every tile; cut-out cells are per tile."
-            : "Cliffs dropping away. Fade is measured down from each cliff's top edge into the bottom clouds. Shared by every tile; cut-out cells are per tile.");
-        ImGui.BeginChild("walls");
-        MaterialsEditor(_floor.Materials, isFloor: true, _wallsUp ? MaterialKind.WallUp : MaterialKind.WallDown);
-        ImGui.EndChild();
-    }
-
     /// <summary>Two big side-by-side toggles (e.g. Wall down | Wall up).</summary>
     private static void SideSwitch(string a, string b, ref bool second, string tipA, string tipB)
     {

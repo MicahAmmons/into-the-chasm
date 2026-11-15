@@ -116,6 +116,29 @@ public class TileArtTests
     }
 
     [Fact]
+    public void Prefab_anchors_its_lip_to_the_top_of_its_cells_and_fades_by_floor()
+    {
+        var prefab = new PrefabDef { Id = "p", Kind = MaterialKind.WallDown, LipLine = 0.25f, Scale = 1 };
+        var region = new PaintRegion { Id = "r1", Prefab = "p", Cells = new() { new(10, 2), new(11, 3) } };
+        var a = PrefabPlacement.Anchor(region, prefab);
+        Assert.Equal(IsoGrid.CellCenter(new(10, 2)).Y - IsoGrid.HalfH, a.Y, 2);         // top of the higher cell
+        var c = PrefabPlacement.Corners(region, prefab, 400, 200);
+        Assert.Equal(a.Y - 50, c[0].Y, 2);                                                 // lip 25% down a 200 px picture
+        Assert.Equal(a.X - 200, c[0].X, 2);
+        region.NudgeX = 30;
+        Assert.Equal(a.X + 30, PrefabPlacement.Anchor(region, prefab).X, 2);
+        var floor = new FloorDef { Id = "f" };
+        floor.WallDownFade.Start = 2.5f;
+        Assert.Equal(2.5f, PrefabPlacement.FadeFor(region, prefab, floor)!.Value.StartCells);   // floor default
+        region.FadeStart = 0.5f;
+        Assert.Equal(0.5f, PrefabPlacement.FadeFor(region, prefab, floor)!.Value.StartCells);   // placement override
+        region.FadeEnabled = false;
+        Assert.Null(PrefabPlacement.FadeFor(region, prefab, floor));
+        prefab.Kind = MaterialKind.WallUp; region.FadeEnabled = null;
+        Assert.False(PrefabPlacement.FadeFor(region, prefab, floor)!.Value.Lower);
+    }
+
+    [Fact]
     public void Cloud_direction_sets_scroll_offset()
     {
         var c = new CloudLayer { Speed = 10, Direction = 90 };

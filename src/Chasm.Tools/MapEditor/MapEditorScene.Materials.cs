@@ -206,10 +206,14 @@ public sealed partial class MapEditorScene
     private void DrawFadeLines(Microsoft.Xna.Framework.Graphics.SpriteBatch b)
     {
         var t = _tile!;
-        PaintRegion? region = _cutOutMaterial is { } cut ? t.PaintRegions.FirstOrDefault(r => r.Material == cut) : _selectedRegion;
+        string? placement = _placeCellsRegion ?? _nudgeRegion ?? (_panel == Panel.Walls ? _openPlacement : null);
+        PaintRegion? region = _cutOutMaterial is { } cut ? t.PaintRegions.FirstOrDefault(r => r.Material == cut)
+            : placement is not null ? t.PaintRegions.FirstOrDefault(r => r.Id == placement) : _selectedRegion;
         if (region is null || region.Cells.Count == 0 || !t.PaintRegions.Contains(region)) return;
-        var mat = t.FindMaterial(region.Material, _floor);
-        if (mat is null || region.FadeFor(mat) is not { } fade) return;
+        EdgeFade? maybeFade;
+        if (region.Prefab is not null) maybeFade = PrefabOf(region) is { } pf ? PrefabPlacement.FadeFor(region, pf, _floor) : null;
+        else maybeFade = t.FindMaterial(region.Material, _floor) is { } mat ? region.FadeFor(mat) : null;
+        if (maybeFade is not { } fade) return;
         string key = string.Join(' ', region.Cells.OrderBy(c => c.Q).ThenBy(c => c.R)) + "|" + fade;
         if (key != _fadeLinesKey)
         {

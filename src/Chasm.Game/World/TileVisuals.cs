@@ -70,7 +70,7 @@ public sealed class TileVisuals : IDisposable
             }
             InvalidateAll();
         };
-        _defs.Changed += d => { if (d is FloorDef) InvalidateAll(); else if (d is TileDef t) Invalidate(t); };
+        _defs.Changed += d => { if (d is FloorDef or PrefabDef) InvalidateAll(); else if (d is TileDef t) Invalidate(t); };
     }
 
     private static string Key(TileDef t) => $"{t.Id}#{RuntimeHelpers.GetHashCode(t)}";
@@ -131,13 +131,20 @@ public sealed class TileVisuals : IDisposable
         bool any = false;
         foreach (var region in tile.PaintRegions.Where(r => r.Layer == layer && r.Cells.Count > 0))
         {
-            var mat = tile.FindMaterial(region.Material, floor);
-            if (mat is null) continue;
+            // A prefab placement draws its prefab once at its anchor; otherwise the region's material.
+            PrefabDef? prefab = region.Prefab is { } pid && _defs.TryGet<PrefabDef>(pid, out var pf) ? pf : null;
+            var mat = prefab is not null ? prefab.AsMaterial() : tile.FindMaterial(region.Material, floor);
+            if (mat is null || (region.Prefab is not null && prefab is null)) continue;
             any = true;
             // 1. texture into scratch
             _device.SetRenderTarget(_scratch);
             _device.Clear(Color.Transparent);
-            if (mat.Warp is not null) DrawWarped(mat, region.Opacity);
+            if (prefab is not null)
+            {
+                var ptex = _textures.Get(prefab.Texture);
+                DrawQuad(ptex, PrefabPlacement.Corners(region, prefab, ptex.Width, ptex.Height), mat.Tint, prefab.FlipX, prefab.FlipY, region.Opacity);
+            }
+            else if (mat.Warp is not null) DrawWarped(mat, region.Opacity);
             else
             {
                 _batch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.LinearWrap);
@@ -145,7 +152,8 @@ public sealed class TileVisuals : IDisposable
                 _batch.End();
             }
             // 2. multiply by mask
-            var mask = Mask(region, mat, floor);
+            var fade = prefab is not null ? PrefabPlacement.FadeFor(region, prefab, floor) : region.FadeFor(mat);
+            var mask = Mask(region, fade, floor);
             _batch.Begin(SpriteSortMode.Immediate, MultiplyByAlpha, SamplerState.LinearClamp);
             _batch.Draw(mask, new Rectangle(0, 0, 1920, 1080), Color.White);
             _batch.End();
@@ -193,9 +201,14 @@ public sealed class TileVisuals : IDisposable
     public void DrawWarped(MaterialDef mat, float opacity = 1f)
     {
         var tex = _textures.Get(mat.Texture);
-        var c = MaterialSheet.Corners(mat, tex.Width, tex.Height);
+        DrawQuad(tex, MaterialSheet.Corners(mat, tex.Width, tex.Height), mat.Tint, mat.FlipX, mat.FlipY, opacity);
+    }
+
+    /// <summary>One copy of a texture pinned to four screen corners (TL, TR, BR, BL) with true perspective.</summary>
+    public void DrawQuad(Texture2D tex, System.Numerics.Vector2[] c, string tintHex, bool flipX, bool flipY, float opacity = 1f)
+    {
         var h = Homography.SquareToQuad(c[0], c[1], c[2], c[3]);
-        var tint = TileRenderer.ParseColor(mat.Tint, Color.White) * opacity;
+        var tint = TileRenderer.ParseColor(tintHex, Color.White) * opacity;
         int n = WarpGrid;
         _warpVerts ??= new VertexPositionColorTexture[(n + 1) * (n + 1)];
         if (_warpIndices is null)
@@ -215,7 +228,7 @@ public sealed class TileVisuals : IDisposable
             {
                 float u = x / (float)n, v = y / (float)n;
                 var p = h.Map(u, v);
-                float tu = mat.FlipX ? 1 - u : u, tv = mat.FlipY ? 1 - v : v;
+                float tu = flipX ? 1 - u : u, tv = flipY ? 1 - v : v;
                 _warpVerts[y * (n + 1) + x] = new VertexPositionColorTexture(new Vector3(p.X, p.Y, 0), tint, new Vector2(tu, tv));
             }
         _warpEffect ??= new BasicEffect(_device) { TextureEnabled = true, VertexColorEnabled = true, LightingEnabled = false };
@@ -236,10 +249,9 @@ public sealed class TileVisuals : IDisposable
 
     // ------------------------------------------------------------------ masks
 
-    private Texture2D Mask(PaintRegion region, MaterialDef mat, FloorDef? floor)
+    private Texture2D Mask(PaintRegion region, EdgeFade? fade, FloorDef? floor)
     {
         int feather = region.Feather ?? floor?.DefaultFeather ?? 6;
-        var fade = region.FadeFor(mat);
         var sb = new StringBuilder();
         foreach (var c in region.Cells.OrderBy(c => c.Q).ThenBy(c => c.R)) sb.Append(c.Q).Append(',').Append(c.R).Append(' ');
         sb.Append('|').Append(feather).Append('|').Append(fade?.ToString() ?? "nofade");

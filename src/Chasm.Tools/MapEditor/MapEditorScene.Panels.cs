@@ -27,6 +27,7 @@ public sealed partial class MapEditorScene
             case Panel.FloorProperties: FloorPanel(); break;
             case Panel.FloorTextures: FloorTexturesPanel(); break;
             case Panel.Walls: WallsPanel(); break;
+            case Panel.Prefab: PrefabPanel(); break;
             case Panel.Clouds: CloudsPanel(); break;
             case Panel.Reference: ReferencePanel(); break;
             case Panel.TileSettings: TileSettingsPanel(); break;
@@ -51,6 +52,7 @@ public sealed partial class MapEditorScene
             Panel.FloorProperties => $"Floor {_floor?.Number} properties",
             Panel.FloorTextures => $"Floor {_floor?.Number} textures",
             Panel.Walls => $"Floor {_floor?.Number} walls",
+            Panel.Prefab => _prefab is null ? "Prefab" : $"Prefab: {_prefab.DisplayName}",
             Panel.Clouds => "Clouds",
             Panel.Reference => "Reference tile",
             Panel.TileSettings => "Tile settings",
@@ -155,7 +157,7 @@ public sealed partial class MapEditorScene
             if (ImGui.ArrowButton("down", ImGuiDir.Down)) moveDown = i;
             ImGui.SameLine();
             var mat = t.FindMaterial(r.Material, _floor);
-            string label = $"{r.Id}: {mat?.Name ?? $"missing '{r.Material}'"}  {r.Cells.Count} cells{(r.Layer == PaintLayer.InFrontOfCharacters ? "  [front]" : "")}";
+            string label = $"{r.Id}: {(r.Prefab is not null ? "prefab " + (PrefabOf(r)?.DisplayName ?? $"missing '{r.Prefab}'") : mat?.Name ?? $"missing '{r.Material}'")}  {r.Cells.Count} cells{(r.Layer == PaintLayer.InFrontOfCharacters ? "  [front]" : "")}";
             if (ImGui.Selectable(label, _selectedRegion == r)) _selectedRegion = _selectedRegion == r ? null : r;
             ImGui.PopID();
         }
@@ -266,6 +268,9 @@ public sealed partial class MapEditorScene
                 MaterialFields(m, isFloor);
                 int uses = _tile!.PaintRegions.Count(r => r.Material == (isFloor ? m.Id : "local:" + m.Id));
                 Ui.Hint($"Used by {uses} region(s) on this tile{(isFloor ? " (other tiles on the floor may use it too)" : "")}.");
+                if (isFloor && kind is not null && ImGui.Button("Save as prefab")) SaveMaterialAsPrefab(m);
+                if (isFloor && kind is not null && ImGui.IsItemHovered()) ImGui.SetTooltip("Make a reusable prefab from this (any floor, any tile). Then Place it from the Walls page.");
+                if (isFloor && kind is not null) ImGui.SameLine();
                 if (ImGui.Button("Duplicate...")) AskDuplicateMaterial(m, list, isFloor);
                 if (ImGui.IsItemHovered()) ImGui.SetTooltip("Copy it to this list (e.g. Left -> Right, mirrored) or to the other side / another page.");
                 ImGui.SameLine();

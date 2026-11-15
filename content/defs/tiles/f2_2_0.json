@@ -16,6 +16,11 @@
       "FadeStart": null,
       "FadeLength": null,
       "FadeAngle": null,
+      "Prefab": null,
+      "NudgeX": 0,
+      "NudgeY": 0,
+      "MirrorX": false,
+      "FadeEnabled": null,
       "Stencils": []
     },
     {
@@ -28,6 +33,11 @@
       "FadeStart": null,
       "FadeLength": null,
       "FadeAngle": null,
+      "Prefab": null,
+      "NudgeX": 0,
+      "NudgeY": 0,
+      "MirrorX": false,
+      "FadeEnabled": null,
       "Stencils": []
     }
   ],

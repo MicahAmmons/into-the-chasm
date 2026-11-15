@@ -16,9 +16,14 @@
       "Speed": 20,
       "Direction": 0,
       "Scale": 0.402,
-      "Mirror": true
+      "Mirror": true,
+      "Pattern": "Scroll",
+      "PatternAmount": 40,
+      "PatternCycle": 8,
+      "RippleLength": 320
     }
   ],
+  "TopClouds": [],
   "DefaultFeather": 6,
   "BackgroundColor": "#1a1d2e",
   "AmbientTint": "#ffffff",
@@ -26,5 +31,16 @@
   "Music": "",
   "DefaultEncounters": [],
   "Materials": [],
+  "Prefabs": [],
+  "WallDownFade": {
+    "Start": 1,
+    "Length": 1.5,
+    "Angle": "Auto"
+  },
+  "WallUpFade": {
+    "Start": 1,
+    "Length": 1.5,
+    "Angle": "Auto"
+  },
   "Notes": "Ported from JustPlaying."
 }

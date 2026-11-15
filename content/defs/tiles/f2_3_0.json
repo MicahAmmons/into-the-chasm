@@ -16,6 +16,11 @@
       "FadeStart": null,
       "FadeLength": null,
       "FadeAngle": null,
+      "Prefab": null,
+      "NudgeX": 0,
+      "NudgeY": 0,
+      "MirrorX": false,
+      "FadeEnabled": null,
       "Stencils": [
         {
           "Cell": "10,-3",
@@ -77,6 +82,11 @@
       "FadeStart": null,
       "FadeLength": null,
       "FadeAngle": null,
+      "Prefab": null,
+      "NudgeX": 0,
+      "NudgeY": 0,
+      "MirrorX": false,
+      "FadeEnabled": null,
       "Stencils": [
         {
           "Cell": "22,-3",
@@ -138,6 +148,11 @@
       "FadeStart": null,
       "FadeLength": null,
       "FadeAngle": null,
+      "Prefab": null,
+      "NudgeX": 0,
+      "NudgeY": 0,
+      "MirrorX": false,
+      "FadeEnabled": null,
       "Stencils": []
     },
     {
@@ -150,6 +165,11 @@
       "FadeStart": null,
       "FadeLength": null,
       "FadeAngle": null,
+      "Prefab": null,
+      "NudgeX": 0,
+      "NudgeY": 0,
+      "MirrorX": false,
+      "FadeEnabled": null,
       "Stencils": []
     }
   ],

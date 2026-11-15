@@ -175,7 +175,10 @@ public sealed class TileDef : Def
         if (!IsWalkable(Spawn)) yield return $"Spawn cell {Spawn} is not walkable.";
         FloorDef? floor = Floor is int f ? registry.All<FloorDef>().FirstOrDefault(x => x.Number == f) : null;
         foreach (var r in PaintRegions)
-            if (FindMaterial(r.Material, floor) is null) yield return $"Paint region '{r.Id}' uses missing material '{r.Material}'.";
+        {
+            if (r.Prefab is { } pf) { if (!registry.Exists(typeof(PrefabDef), pf)) yield return $"Placement '{r.Id}' uses missing prefab '{pf}'."; }
+            else if (FindMaterial(r.Material, floor) is null) yield return $"Paint region '{r.Id}' uses missing material '{r.Material}'.";
+        }
         if (OnMap)
         {
             var me = this;
@@ -236,4 +239,11 @@ public sealed class FloorDef : Def
 
     [Tooltip("The floor's texture library. Every tile on this floor can paint with these.")]
     public List<MaterialDef> Materials { get; set; } = new();
+
+    [Hidden, Ref(typeof(PrefabDef)), Tooltip("Prefabs this floor uses (its shortlist on the Walls page).")]
+    public List<string> Prefabs { get; set; } = new();
+    [Hidden, Tooltip("How walls going down fade into the bottom clouds on this floor (placements can override).")]
+    public WallFade WallDownFade { get; set; } = new();
+    [Hidden, Tooltip("How walls going up fade into the top clouds on this floor (placements can override).")]
+    public WallFade WallUpFade { get; set; } = new();
 }
