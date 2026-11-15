@@ -206,6 +206,41 @@ public sealed partial class MapEditorScene
         float sc = c.Scale;
         if (ImGui.SliderFloat("##csc", ref sc, 0.1f, 4f, "%.2fx", ImGuiSliderFlags.Logarithmic)) { c.Scale = sc; changed = true; }
 
+        // Pattern: extra motion on top of the scroll.
+        ImGui.TextUnformatted("Pattern"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
+        string[] patterns = { "Scroll (straight drift)", "Wave (snakes side to side)", "Swirl (loops in circles)", "Gusts (surges and eases)",
+            "Ripple (wavy bands, like haze)", "Breathe (swells and shrinks)", "Shimmer (fades in and out)" };
+        int pat = (int)c.Pattern;
+        if (ImGui.Combo("##cpat", ref pat, patterns, patterns.Length)) { c.Pattern = (CloudPattern)pat; changed = true; }
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Plays on top of the scroll. Set Speed to 0 for motion in place.");
+        if (c.Pattern != CloudPattern.Scroll)
+        {
+            bool percent = c.Pattern is CloudPattern.Breathe or CloudPattern.Shimmer;
+            ImGui.TextUnformatted("Amount"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
+            float amt = c.PatternAmount;
+            if (ImGui.SliderFloat("##camt", ref amt, 0, percent ? 100 : 400, percent ? "%.0f%%" : "%.0f px")) { c.PatternAmount = amt; changed = true; }
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip(c.Pattern switch
+            {
+                CloudPattern.Wave => "How far it snakes to each side.",
+                CloudPattern.Swirl => "Radius of the loops.",
+                CloudPattern.Gusts => "How far each surge pushes ahead.",
+                CloudPattern.Ripple => "How far the bands bend sideways.",
+                CloudPattern.Breathe => "How much bigger it swells.",
+                _ => "How much it fades at the dimmest point.",
+            });
+            ImGui.TextUnformatted("Cycle"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
+            float cyc = c.PatternCycle;
+            if (ImGui.SliderFloat("##ccyc", ref cyc, 0.5f, 120f, "%.1f s", ImGuiSliderFlags.Logarithmic)) { c.PatternCycle = cyc; changed = true; }
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Seconds for one full cycle. Lower = faster.");
+            if (c.Pattern == CloudPattern.Ripple)
+            {
+                ImGui.TextUnformatted("Wave length"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
+                float rl = c.RippleLength;
+                if (ImGui.SliderFloat("##crl", ref rl, 40, 2000, "%.0f px", ImGuiSliderFlags.Logarithmic)) { c.RippleLength = rl; changed = true; }
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Distance between wave crests, top to bottom.");
+            }
+        }
+
         ImGui.TextUnformatted("Mirror"); ImGui.SameLine(label);
         bool mi = c.Mirror;
         if (ImGui.Checkbox("Flip every other copy##cmi", ref mi)) { c.Mirror = mi; changed = true; }

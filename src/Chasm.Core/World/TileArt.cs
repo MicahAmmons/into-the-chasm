@@ -155,6 +155,21 @@ public enum CloudBlend
     [Label("Add (glowing)")] Add,
 }
 
+/// <summary>Extra motion on top of a cloud layer's scroll (set Speed to 0 for motion in place).</summary>
+public enum CloudPattern
+{
+    [Label("Scroll (straight drift)")] Scroll,
+    [Label("Wave (snakes side to side)")] Wave,
+    [Label("Swirl (loops in circles)")] Swirl,
+    [Label("Gusts (surges and eases)")] Gusts,
+    [Label("Ripple (wavy bands, like haze)")] Ripple,
+    [Label("Breathe (swells and shrinks)")] Breathe,
+    [Label("Shimmer (fades in and out)")] Shimmer,
+}
+
+/// <summary>Where a cloud layer is at a moment: scroll offset, size multiplier, opacity multiplier.</summary>
+public readonly record struct CloudMotion(System.Numerics.Vector2 Offset, float ScaleMul, float OpacityMul);
+
 /// <summary>
 /// One animated cloud layer. A floor has a list of them (first = furthest back); tiles use the
 /// floor's list and can override any layer. Always drawn behind the tile art, never baked.
@@ -179,7 +194,40 @@ public sealed class CloudLayer
     [Tooltip("Flip every other copy so edges always match. Use for art that isn't quite seamless.")]
     public bool Mirror { get; set; }
 
+    [Tooltip("Extra motion on top of the scroll.")] public CloudPattern Pattern { get; set; } = CloudPattern.Scroll;
+    [Range(0, 600), Tooltip("How strong the pattern is: pixels for movement, percent for Breathe / Shimmer.")]
+    public float PatternAmount { get; set; } = 40f;
+    [Range(0.5f, 120), Tooltip("Seconds for one full cycle of the pattern.")]
+    public float PatternCycle { get; set; } = 8f;
+    [Range(40, 2000), Tooltip("Ripple only: distance between wave crests, in pixels.")]
+    public float RippleLength { get; set; } = 320f;
+
     public CloudLayer Copy() => (CloudLayer)MemberwiseClone();
+
+    /// <summary>The layer's scroll + pattern at a time (seconds). Ripple's banding is applied by the renderer.</summary>
+    public CloudMotion MotionAt(double seconds)
+    {
+        var scroll = OffsetAt(seconds);
+        double rad = Direction * Math.PI / 180.0;
+        var along = new System.Numerics.Vector2((float)Math.Cos(rad), (float)Math.Sin(rad));
+        var across = new System.Numerics.Vector2(-along.Y, along.X);
+        double phase = 2 * Math.PI * seconds / Math.Max(0.1, PatternCycle);
+        float sin = (float)Math.Sin(phase), cos = (float)Math.Cos(phase), a = PatternAmount;
+        return Pattern switch
+        {
+            CloudPattern.Wave => new(scroll + across * (a * sin), 1, 1),
+            CloudPattern.Swirl => new(scroll + new System.Numerics.Vector2(cos, sin) * a, 1, 1),
+            CloudPattern.Gusts => new(scroll + along * (a * (float)Math.Sin(phase - Math.Sin(phase) * 0.6)), 1, 1),
+            CloudPattern.Breathe => new(scroll, 1 + a / 100f * 0.5f * (1 + sin), 1),
+            CloudPattern.Shimmer => new(scroll, 1, Math.Clamp(1 - a / 100f * 0.5f * (1 + sin), 0, 1)),
+            _ => new(scroll, 1, 1),
+        };
+    }
+
+    /// <summary>Ripple: sideways shift of the horizontal band at screen y.</summary>
+    public float RippleShiftAt(double seconds, float y) =>
+        Pattern != CloudPattern.Ripple ? 0f
+        : PatternAmount * (float)Math.Sin(2 * Math.PI * (seconds / Math.Max(0.1, PatternCycle) + y / Math.Max(1, RippleLength)));
 
     /// <summary>Scroll offset in screen pixels at a time (seconds).</summary>
     public System.Numerics.Vector2 OffsetAt(double seconds)

@@ -54,6 +54,27 @@ public class TileArtTests
     }
 
     [Fact]
+    public void Cloud_patterns_move_on_top_of_the_scroll()
+    {
+        var c = new CloudLayer { Speed = 0, Direction = 0, PatternAmount = 50, PatternCycle = 4 };
+        c.Pattern = CloudPattern.Wave;    // across the direction (0 deg = right, so it moves up/down)
+        var q = c.MotionAt(1).Offset;     // quarter cycle: full swing
+        Assert.Equal(0, q.X, 2);
+        Assert.Equal(50, q.Y, 2);
+        c.Pattern = CloudPattern.Swirl;   // circle of radius 50
+        Assert.Equal(50, c.MotionAt(1.3).Offset.Length(), 2);
+        c.Pattern = CloudPattern.Breathe; // swells up to +50%
+        Assert.Equal(1.5f, c.MotionAt(1).ScaleMul, 3);
+        c.Pattern = CloudPattern.Shimmer; // dims down to 50%
+        Assert.Equal(0.5f, c.MotionAt(1).OpacityMul, 3);
+        c.Pattern = CloudPattern.Ripple;
+        Assert.NotEqual(c.RippleShiftAt(0, 0), c.RippleShiftAt(0, 80));
+        c.Pattern = CloudPattern.Scroll;
+        c.Speed = 10;
+        Assert.Equal(new System.Numerics.Vector2(20, 0), c.MotionAt(2).Offset);
+    }
+
+    [Fact]
     public void Cloud_direction_sets_scroll_offset()
     {
         var c = new CloudLayer { Speed = 10, Direction = 90 };
