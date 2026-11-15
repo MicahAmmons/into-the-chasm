@@ -9,7 +9,7 @@
       "Id": "cloud_1",
       "Name": "Cloud sea",
       "Enabled": true,
-      "Texture": "Original Art/backgrounds/clouds/Cloud1.png",
+      "Texture": "Archive/Original Art/backgrounds/clouds/Cloud1.png",
       "Tint": "#ffffff",
       "Opacity": 1,
       "Blend": "Normal",
@@ -42,5 +42,8 @@
     "Length": 1.5,
     "Angle": "Auto"
   },
+  "WallsDown": [],
+  "WallsUp": [],
+  "Archived": true,
   "Notes": "Ported from JustPlaying."
 }

@@ -28,7 +28,7 @@ namespace Chasm.Tools.MapEditor;
 public sealed partial class MapEditorScene : Scene
 {
     private enum Tool { Select, Walkable, PlayerStarts, EnemySpawns, PaintTexture, PlaceProp, Interaction }
-    private enum Panel { Selection, FloorProperties, FloorTextures, Walls, Clouds, Reference, TileSettings, Prefab }
+    private enum Panel { Selection, FloorProperties, FloorTextures, Walls, Clouds, Reference, TileSettings, Prefab, WallEdit }
 
     private const int LeftW = 310, RightW = 480, MenuH = 24, StatusH = 28;
 
@@ -68,7 +68,7 @@ public sealed partial class MapEditorScene : Scene
         ToolContext.Wizards.Inspector.CellPicker = cb => { _cellPick = cb; Status("Click a cell on the map (Esc cancels)."); };
         Art.ArtLibrary.KeysMoved += OnArtMoved;
         if (_openOnStart is not null && Services.Defs.TryGet<TileDef>(_openOnStart, out var t)) Open(t);
-        // Dev convenience for automated screenshots: CHASM_EDITOR=tool[:panel][:neighbours][:mat=<id>][:cut][:dup][:warp][:place=<prefab>][:prefab=<prefab>][:autodemo][:newset][:game]
+        // Dev convenience for automated screenshots: CHASM_EDITOR=tool[:panel][:neighbours][:mat=<id>][:cut][:dup][:warp][:place=<prefab>][:prefab=<prefab>][:wall=<id>][:back=<n>][:game]
         if (_tile is not null && Environment.GetEnvironmentVariable("CHASM_EDITOR") is { } dev)
         {
             var parts = dev.Split(':');
@@ -98,21 +98,11 @@ public sealed partial class MapEditorScene : Scene
             }
             if (parts.FirstOrDefault(x => x.StartsWith("prefab=")) is { } pe && Services.Defs.TryGet<PrefabDef>(pe[7..], out var pfEdit))
                 OpenPrefabEditor(pfEdit, isNew: false);
-            if (parts.Contains("autodemo") && _floor is not null)
+            // wall=<id>[:back=<0-3>]: open the wall editor with a preview backdrop.
+            if (parts.FirstOrDefault(x => x.StartsWith("wall=")) is { } wd && Services.Defs.TryGet<WallDef>(wd[5..], out var wallDev))
             {
-                // Walkable = the cells painted with grass; kit = the starter prefab; generate.
-                foreach (var c in IsoGrid.AllCells) _tile.SetWalkable(c, false);
-                foreach (var r in _tile.PaintRegions.Where(r => r.Material is "ph_grass" or "grass_test")) foreach (var c in r.Cells) _tile.SetWalkable(c, true);
-                _tile.PaintRegions.RemoveAll(r => r.Material is "ph_cliff" or "ph_cliff_right" or "cliff_test");
-                _floor.CliffKitDown.LeftFace = "strata_cliff";
-                _floor.CliffKitDown.Depth = 3;
-                GenerateAutoCliffs(_floor.CliffKitDown, up: false);
-            }
-            if (parts.Contains("newset"))
-            {
-                OpenPrefabEditor(new PrefabDef { Name = "Test rock - left", Texture = "placeholder/textures/rock_strata.png", Kind = MaterialKind.WallDown, Category = "Cliff walls", Scale = 0.7f }, isNew: true);
-                SavePrefab();
-                if (Services.Defs.TryGet<PrefabDef>("test_rock_right", out var rightDev)) OpenPrefabEditor(rightDev, isNew: false);
+                if (parts.FirstOrDefault(x => x.StartsWith("back=")) is { } bd && int.TryParse(bd[5..], out int bi)) _backdrop = (Backdrop)bi;
+                OpenWallEditor(wallDev, isNew: false);
             }
             if (parts.Contains("selectall")) foreach (var c in IsoGrid.AllCells.Where(c => _tile.Walkable[c])) _selection.Add(c);
         }
@@ -478,7 +468,23 @@ public sealed partial class MapEditorScene : Scene
     /// <summary>All tiles grouped by floor (sketches last).</summary>
     private void TileList(Action<TileDef> chosen, string search, string? exclude = null)
     {
-        foreach (var group in Services.Defs.All<TileDef>().GroupBy(t => t.Floor).OrderBy(g => g.Key is null ? int.MaxValue : g.Key))
+        var all = Services.Defs.All<TileDef>().ToList();
+        TileGroups(all.Where(t => !t.Archived), chosen, search, exclude);
+        var archived = all.Where(t => t.Archived).ToList();
+        if (archived.Count == 0) return;
+        ImGui.Spacing();
+        // The original game's levels live in a folder of their own.
+        if (search.Length > 0) ImGui.SetNextItemOpen(true);
+        if (ImGui.TreeNode($"Archive (original game)  -  {archived.Count} tile(s)###archive"))
+        {
+            TileGroups(archived, chosen, search, exclude);
+            ImGui.TreePop();
+        }
+    }
+
+    private void TileGroups(IEnumerable<TileDef> tiles, Action<TileDef> chosen, string search, string? exclude)
+    {
+        foreach (var group in tiles.GroupBy(t => t.Floor).OrderBy(g => g.Key is null ? int.MaxValue : g.Key))
         {
             ImGui.TextDisabled(group.Key is int f ? $"Floor {f}" : "Sketches (no floor)");
             foreach (var t in group.OrderBy(t => t.Y).ThenBy(t => t.X))
@@ -529,6 +535,7 @@ public sealed partial class MapEditorScene : Scene
         DeletePopup();
         DuplicatePopup();
         DeletePrefabPopup();
+        DeleteWallPopup();
         DeleteFloorPopup();
         if (_askUnsaved) { ImGui.OpenPopup("Unsaved changes"); _askUnsaved = false; }
         if (!ImGui.BeginPopupModal("Unsaved changes", ImGuiWindowFlags.AlwaysAutoResize)) return;

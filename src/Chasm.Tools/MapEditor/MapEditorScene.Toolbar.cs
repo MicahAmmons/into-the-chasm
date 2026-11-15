@@ -174,12 +174,21 @@ public sealed partial class MapEditorScene
         ImGui.SetNextItemWidth(-1);
         if (!ImGui.BeginCombo("##floor", preview)) return;
         if (ImGui.Selectable("(no floor - sketch)", _floor is null)) Guard(() => SetFloor(null));
-        foreach (var f in floors)
+        void FloorItem(FloorDef f)
+        {
             if (ImGui.Selectable($"Floor {f.Number}: {f.DisplayName}", _floor?.Number == f.Number) && _floor?.Number != f.Number)
             {
                 var chosen = f;
                 if (FloorDirty) Guard(() => SetFloor(chosen)); else SetFloor(chosen);
             }
+        }
+        foreach (var f in floors.Where(f => !f.Archived)) FloorItem(f);
+        var archivedFloors = floors.Where(f => f.Archived).ToList();
+        if (archivedFloors.Count > 0 && ImGui.TreeNode("Archive (original game)"))
+        {
+            foreach (var f in archivedFloors) FloorItem(f);
+            ImGui.TreePop();
+        }
         if (_floor is not null && ImGui.Selectable($"Delete floor {_floor.Number}...")) _openDeleteFloor = true;
         if (ImGui.Selectable("+ New floor..."))
         {

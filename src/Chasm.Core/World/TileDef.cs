@@ -62,6 +62,10 @@ public sealed class TileDef : Def
     [Hidden] public List<PropDef> Props { get; set; } = new();
     [Hidden, Tooltip("This tile's own settings for some of its floor's cloud layers.")]
     public List<TileCloudOverride> CloudOverrides { get; set; } = new();
+    [Hidden, Tooltip("Cells painted with a wall other than the floor's default (or with no wall).")]
+    public List<TileWallPaint> WallPaint { get; set; } = new();
+    [Hidden, Tooltip("Kept in the Archive section of lists (the original game's content).")]
+    public bool Archived { get; set; }
 
     [Tooltip("Colour behind all layers, as #RRGGBB.")]
     public string BackgroundColor { get; set; } = "#1a1d2e";
@@ -246,8 +250,10 @@ public sealed class FloorDef : Def
     public WallFade WallDownFade { get; set; } = new();
     [Hidden, Tooltip("How walls going up fade into the top clouds on this floor (placements can override).")]
     public WallFade WallUpFade { get; set; } = new();
-    [Hidden, Tooltip("Prefabs auto cliffs use for walls going down on this floor.")]
-    public CliffKit CliffKitDown { get; set; } = new();
-    [Hidden, Tooltip("Prefabs auto walls use for walls going up on this floor.")]
-    public CliffKit CliffKitUp { get; set; } = new();
+    [Hidden, Tooltip("Walls going down (cliffs) on this floor. The first is drawn automatically along every edge; the others are painted onto cells.")]
+    public List<FloorWall> WallsDown { get; set; } = new();
+    [Hidden, Tooltip("Walls going up on this floor. The first is drawn automatically; the others are painted onto cells.")]
+    public List<FloorWall> WallsUp { get; set; } = new();
+    [Hidden, Tooltip("Kept in the Archive section of lists (the original game's content).")]
+    public bool Archived { get; set; }
 }

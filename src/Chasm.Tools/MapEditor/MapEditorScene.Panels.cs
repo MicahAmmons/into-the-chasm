@@ -28,6 +28,7 @@ public sealed partial class MapEditorScene
             case Panel.FloorTextures: FloorTexturesPanel(); break;
             case Panel.Walls: WallsPanel(); break;
             case Panel.Prefab: PrefabPanel(); break;
+            case Panel.WallEdit: WallEditPanel(); break;
             case Panel.Clouds: CloudsPanel(); break;
             case Panel.Reference: ReferencePanel(); break;
             case Panel.TileSettings: TileSettingsPanel(); break;
@@ -53,6 +54,7 @@ public sealed partial class MapEditorScene
             Panel.FloorTextures => $"Floor {_floor?.Number} textures",
             Panel.Walls => $"Floor {_floor?.Number} walls",
             Panel.Prefab => _prefab is null ? "Prefab" : $"Prefab: {_prefab.DisplayName}",
+            Panel.WallEdit => _wall is null ? "Wall" : $"Wall: {(_wall.Name.Length > 0 ? _wall.Name : "(new)")}",
             Panel.Clouds => "Clouds",
             Panel.Reference => "Reference tile",
             Panel.TileSettings => "Tile settings",

@@ -32,7 +32,7 @@ public static class RegionMask
     /// edge), and the carved + softened shape. Editors cache this so fade sliders stay quick.
     /// </summary>
     public static (float[] inside, float[] shape) BuildBase(IReadOnlyCollection<CellCoord> cells, int featherPx,
-        IReadOnlyList<CellStencil>? stencils = null, Func<string, StencilImage?>? loadStencil = null)
+        IReadOnlyList<CellStencil>? stencils = null, Func<string, StencilImage?>? loadStencil = null, IReadOnlyList<ClipZone>? clips = null)
     {
         var inside = Inside(cells);
         var a = (float[])inside.Clone();
@@ -46,7 +46,28 @@ public static class RegionMask
             var tmp = new float[a.Length];
             for (int i = 0; i < 2; i++) { BoxBlur(a, tmp, pass, horizontal: true); BoxBlur(tmp, a, pass, horizontal: false); }
         }
+        // Corner seams / end caps: after the blur, so two faces sharing a cell stay exactly complementary.
+        if (clips is { Count: > 0 }) ApplyClips(a, clips);
         return (inside, a);
+    }
+
+    /// <summary>Multiplies the pixels inside each clip's cells by its left/right factor.</summary>
+    public static void ApplyClips(float[] a, IReadOnlyList<ClipZone> clips)
+    {
+        foreach (var clip in clips)
+            foreach (var c in clip.Cells)
+            {
+                var centre = IsoGrid.CellCenter(c);
+                int x0 = Math.Max(0, (int)((centre.X - IsoGrid.HalfW) / 2) - 1), x1 = Math.Min(Width - 1, (int)((centre.X + IsoGrid.HalfW) / 2) + 1);
+                int y0 = Math.Max(0, (int)((centre.Y - IsoGrid.HalfH) / 2) - 1), y1 = Math.Min(Height - 1, (int)((centre.Y + IsoGrid.HalfH) / 2) + 1);
+                for (int y = y0; y <= y1; y++)
+                    for (int x = x0; x <= x1; x++)
+                    {
+                        var p = new System.Numerics.Vector2(x * 2 + 1, y * 2 + 1);
+                        if (IsoGrid.CellAt(p) != c) continue;
+                        a[y * Width + x] *= clip.Factor(p.X);
+                    }
+            }
     }
 
     /// <summary>Multiplies a mask by the edge fade, measured from <paramref name="edge"/> (see <see cref="Edge"/>).</summary>

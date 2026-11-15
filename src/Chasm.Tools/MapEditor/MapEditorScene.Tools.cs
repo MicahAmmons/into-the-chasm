@@ -46,6 +46,8 @@ public sealed partial class MapEditorScene
     private void UpdateTool(InputState input)
     {
         var t = _tile!;
+        if (UpdateWallPreviewInput(input)) return;
+        if (UpdateWallBrush(input)) return;
         if (UpdatePrefabInput(input)) return;
         if (UpdateSheetHandles(input)) return;
         if (UpdateStencilPlacing(input)) return;

@@ -147,74 +147,6 @@ public class TileArtTests
     }
 
     [Fact]
-    public void Auto_cliffs_hang_faces_and_corners_under_open_edges()
-    {
-        // A short diagonal walkway: (10,2) (11,2) (12,2) runs down-right.
-        var t = WalkableTile(new(10, 2), new(11, 2), new(12, 2));
-        var face = new PrefabDef { Id = "face", Kind = MaterialKind.WallDown };
-        var corner = new PrefabDef { Id = "corner", Kind = MaterialKind.WallDown };
-        var kit = new CliffKit { LeftFace = "face", OuterCorner = "corner", Depth = 2, MaxRun = 10 };
-        int n = 0;
-        var pieces = AutoCliffs.Generate(t, kit, up: false, id => id == "face" ? face : id == "corner" ? corner : null, _ => "a" + n++);
-        Assert.All(pieces, p => Assert.Equal(AutoCliffs.TagDown, p.Auto));
-        // Left faces: one run of 3 cells along r = 2; their columns start at (q, 3).
-        var leftFace = pieces.Single(p => p.Prefab == "face" && !p.MirrorX);
-        Assert.Contains(new CellCoord(10, 3), leftFace.Cells);
-        Assert.Contains(new CellCoord(11, 4), leftFace.Cells);   // straight below (10,3)
-        Assert.Equal(0.5f, leftFace.Skew);
-        // Right faces: only (12,2) is open down-right; no right prefab, so the left face mirrored.
-        Assert.Single(pieces, p => p.Prefab == "face" && p.MirrorX);
-        // Outer corner only under the end cell (12,2): the others have a walkway neighbour down-right.
-        Assert.Single(pieces, p => p.Prefab == "corner");
-        Assert.Contains(new CellCoord(13, 3), pieces.Single(p => p.Prefab == "corner").Cells);
-        // No piece covers a walkable cell, and the lip lands on the open edge.
-        Assert.All(pieces, p => Assert.DoesNotContain(p.Cells, c => t.IsWalkable(c)));
-        var anchor = PrefabPlacement.Anchor(leftFace, face);
-        var expected = (IsoGrid.CellCenter(new(11, 2)) + new System.Numerics.Vector2(-IsoGrid.HalfW / 2, IsoGrid.HalfH / 2));
-        Assert.True((anchor - expected).Length() < 0.2f);
-    }
-
-    [Fact]
-    public void Auto_cliffs_split_long_runs_and_need_a_left_face()
-    {
-        var t = WalkableTile(Enumerable.Range(4, 8).Select(q => new CellCoord(q, 3)).ToArray());
-        var face = new PrefabDef { Id = "face" };
-        int n = 0;
-        var kit = new CliffKit { LeftFace = "face", MaxRun = 3, Depth = 1 };
-        var pieces = AutoCliffs.Generate(t, kit, false, id => id == "face" ? face : null, _ => "a" + n++);
-        Assert.Equal(3, pieces.Count(p => !p.MirrorX && p.Cells.All(c => c.R == 4))); // 8 cells -> 3 + 3 + 2
-        Assert.Empty(AutoCliffs.Generate(t, new CliffKit(), false, _ => null, _ => "x"));
-        // Without an outer corner prefab, the cell under the end point is still covered by the faces.
-        var single = WalkableTile(new CellCoord(10, 2));
-        var faces = AutoCliffs.Generate(single, new CliffKit { LeftFace = "face", Depth = 1 }, false, id => id == "face" ? face : null, _ => "b" + n++);
-        Assert.Contains(faces, p => p.Cells.Contains(new CellCoord(11, 3)));
-    }
-
-    [Fact]
-    public void Making_a_left_face_makes_the_whole_set_and_syncs_it()
-    {
-        var left = new PrefabDef { Id = "rock_left", Name = "Rock columns - left", Kind = MaterialKind.WallDown, Texture = "rock.png",
-            Scale = 0.7f, Tint = "#c8c8c8", Warp = new MaterialWarp { BottomLeftX = 40, BottomRightX = -10 } };
-        var members = PrefabSets.MakeSet(left, name => name.ToLowerInvariant().Replace(' ', '_'));
-        Assert.Equal(PrefabRole.LeftFace, left.Role);
-        Assert.Equal(new[] { "Rock columns - right", "Rock columns - outer corner", "Rock columns - inner corner" }, members.Select(m => m.Name));
-        var right = members[0];
-        Assert.True(right.FlipX);                                  // mirrored
-        Assert.Equal("rock.png", right.Texture);
-        Assert.Equal(0.7f, right.Scale);
-        Assert.Equal(10, right.Warp!.BottomLeftX);                  // warp mirrored: right's BL = -left's BR
-        Assert.Equal(-40, right.Warp.BottomRightX);
-        Assert.Equal(PrefabSets.Shaded("#c8c8c8", 0.72f), right.Tint); // darker side
-        Assert.All(members, m => Assert.Equal("rock_left", m.SetId));
-        // Change the leader, sync: shared look follows, shade stays.
-        left.Scale = 1.2f; left.Tint = "#ffffff";
-        PrefabSets.Sync(left, right);
-        Assert.Equal(1.2f, right.Scale);
-        Assert.Equal("#b8b8b8", right.Tint);
-        Assert.Equal("Rock columns", PrefabSets.BaseName("Rock columns - left"));
-    }
-
-    [Fact]
     public void Mask_base_plus_fade_equals_the_full_build()
     {
         var cells = new List<CellCoord> { new(8, 1), new(9, 2), new(10, 3) };
@@ -223,6 +155,74 @@ public class TileArtTests
         var (inside, shape) = RegionMask.BuildBase(cells, 8);
         RegionMask.ApplyFade(shape, RegionMask.Edge(inside, fade), fade);
         Assert.Equal(full, shape);
+    }
+
+    private static float At(float[] m, float canvasX, float canvasY) =>
+        m[(int)(canvasY / 2) * RegionMask.Width + (int)(canvasX / 2)];
+
+    private static (FloorDef floor, Func<string, WallDef?> walls, WallDef grey, WallDef red) WallFloor()
+    {
+        var grey = new WallDef { Id = "grey", Texture = "g.png", Depth = 2, MaxRun = 10 };
+        var red = new WallDef { Id = "red", Texture = "r.png", Depth = 2, MaxRun = 10 };
+        var floor = new FloorDef { Id = "f" };
+        floor.WallsDown.Add(new FloorWall { Wall = "grey" });
+        floor.WallsDown.Add(new FloorWall { Wall = "red", FadeMode = WallFadeMode.Own, Fade = new WallFade { Start = 3 } });
+        return (floor, id => id == "grey" ? grey : id == "red" ? red : null, grey, red);
+    }
+
+    [Fact]
+    public void Walls_default_to_the_first_and_split_corners_down_the_middle()
+    {
+        var t = WalkableTile(new CellCoord(10, 2));            // one walkable cell: open on both lower sides
+        var (floor, walls, grey, _) = WallFloor();
+        var pieces = AutoWalls.Build(t, floor, up: false, walls);
+        Assert.Equal(2, pieces.Count);                         // a left and a right face
+        Assert.All(pieces, p => Assert.Same(grey, p.Wall));    // the first wall draws automatically
+        var left = pieces.Single(p => !p.RightFace); var right = pieces.Single(p => p.RightFace);
+        Assert.True(right.Mirror);                             // no right art: the left face mirrored
+        var corner = new CellCoord(11, 3);                     // straight under the point
+        Assert.Contains(corner, left.Cells); Assert.Contains(corner, right.Cells);
+        // The two halves cover the corner cell exactly once (no double-dark corner).
+        var l = RegionMask.BuildBase(left.Cells, 0, clips: left.Clips).shape;
+        var r = RegionMask.BuildBase(right.Cells, 0, clips: right.Clips).shape;
+        var c = IsoGrid.CellCenter(corner);
+        foreach (float dx in new[] { -40f, -4f, 0f, 4f, 40f })
+        {
+            float a = At(l, c.X + dx, c.Y), b = At(r, c.X + dx, c.Y);
+            Assert.InRange(b + a * (1 - b), 0.99f, 1.01f);    // 'over' compositing of left then right = solid
+        }
+        Assert.Equal(1f, At(l, c.X - 40, c.Y), 2); Assert.Equal(0f, At(r, c.X - 40, c.Y), 2);
+        Assert.Equal(1f, At(r, c.X + 40, c.Y), 2);
+    }
+
+    [Fact]
+    public void Painted_cells_switch_wall_or_remove_it_and_walls_keep_their_own_fade()
+    {
+        var t = WalkableTile(Enumerable.Range(4, 6).Select(q => new CellCoord(q, 3)).ToArray());
+        var (floor, walls, grey, red) = WallFloor();
+        t.WallPaint.Add(new TileWallPaint { Side = "down", Wall = "red", Cells = { new(6, 4), new(7, 4) } });
+        t.WallPaint.Add(new TileWallPaint { Side = "down", Wall = TileWallPaint.NoWall, Cells = { new(9, 4) } });
+        var lefts = AutoWalls.Build(t, floor, false, walls).Where(p => !p.RightFace).ToList();
+        Assert.Contains(lefts, p => p.Wall == red && p.Cells.Contains(new(6, 4)));
+        Assert.Contains(lefts, p => p.Wall == grey && p.Cells.Contains(new(4, 4)));
+        Assert.DoesNotContain(lefts, p => p.Cells.Contains(new(9, 4)));
+        Assert.Equal(3f, lefts.First(p => p.Wall == red).Fade!.Value.StartCells);   // its own fade
+        Assert.Equal(floor.WallDownFade.Start, lefts.First(p => p.Wall == grey).Fade!.Value.StartCells); // floor default
+    }
+
+    [Fact]
+    public void Face_ends_get_soft_caps_and_rims_follow_the_edge()
+    {
+        // Steps don't get caps (the faces carry on); a 'no wall' cell does.
+        var steps = WalkableTile(new CellCoord(5, 3), new CellCoord(6, 3), new CellCoord(6, 4), new CellCoord(7, 4));
+        var (floor, walls, grey, _) = WallFloor();
+        Assert.DoesNotContain(AutoWalls.Build(steps, floor, false, walls), p => p.Clips.Any(c => c.Blend == grey.EndCapSoftness));
+        var line = WalkableTile(Enumerable.Range(4, 6).Select(q => new CellCoord(q, 3)).ToArray());
+        line.WallPaint.Add(new TileWallPaint { Side = "down", Wall = TileWallPaint.NoWall, Cells = { new(7, 4) } });
+        grey.Rim = true;
+        var pieces = AutoWalls.Build(line, floor, false, walls);
+        Assert.Equal(2, pieces.Count(p => !p.Rim && !p.RightFace && p.Clips.Any(c => c.Ramp && c.Blend == grey.EndCapSoftness)));
+        Assert.Contains(pieces, p => p.Rim && p.Fade is { Lower: false });
     }
 
     [Fact]

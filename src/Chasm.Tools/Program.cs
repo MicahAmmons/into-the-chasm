@@ -21,6 +21,17 @@ if (args.Contains("--resave"))
     return;
 }
 
+// --make-demo: (re)build the clean test floor 2 with one demo tile and a placeholder wall.
+if (args.Contains("--make-demo"))
+{
+    Chasm.Core.Serialization.ChasmJson.RegisterAssembly(typeof(ChasmGame).Assembly);
+    var dp = Chasm.Game.Assets.ContentPaths.Resolve();
+    var reg = new Chasm.Core.Content.DefRegistry();
+    reg.LoadAll(dp.Defs);
+    foreach (var line in Chasm.Tools.MapEditor.DemoContent.Build(reg)) Console.WriteLine(line);
+    return;
+}
+
 // --generate-stencils: (re)build the starter carve-out stencils in content/art/stencils.
 if (args.Contains("--generate-stencils"))
 {

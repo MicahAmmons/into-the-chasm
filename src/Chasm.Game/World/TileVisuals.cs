@@ -78,7 +78,7 @@ public sealed class TileVisuals : IDisposable
             }
             InvalidateAll();
         };
-        _defs.Changed += d => { if (d is FloorDef or PrefabDef) InvalidateAll(); else if (d is TileDef t) Invalidate(t); };
+        _defs.Changed += d => { if (d is FloorDef or PrefabDef or WallDef) InvalidateAll(); else if (d is TileDef t) Invalidate(t); };
     }
 
     private static string Key(TileDef t) => $"{t.Id}#{RuntimeHelpers.GetHashCode(t)}";
@@ -97,8 +97,8 @@ public sealed class TileVisuals : IDisposable
     /// <summary>The baked images for a tile (built now if missing or out of date). Null if it paints nothing.</summary>
     public TileBake? Get(TileDef tile, FloorDef? floor = null)
     {
-        if (tile.PaintRegions.Count == 0) return null;
         floor ??= FloorOf(tile);
+        if (tile.PaintRegions.Count == 0 && (floor is null || floor.WallsDown.Count + floor.WallsUp.Count == 0)) return null;
         string key = Key(tile);
         var node = _bakes.First;
         while (node is not null && node.Value.key != key) node = node.Next;
@@ -135,11 +135,25 @@ public sealed class TileVisuals : IDisposable
         return new TileBake { Behind = into.Behind, Front = into.Front, HasBehind = any0, HasFront = any1 };
     }
 
+    /// <summary>Walls are looked up here; editors can slip in an unsaved wall for previews.</summary>
+    public Func<string, WallDef?>? WallOverride { get; set; }
+
+    private WallDef? FindWall(string id) =>
+        WallOverride?.Invoke(id) ?? (_defs.TryGet<WallDef>(id, out var w) ? w : null);
+
+    /// <summary>The tile's live walls (down and up), worked out from its walkable cells and its floor's wall lists.</summary>
+    public List<WallPiece> WallsFor(TileDef tile, FloorDef? floor) =>
+        AutoWalls.Build(tile, floor, up: false, FindWall).Concat(AutoWalls.Build(tile, floor, up: true, FindWall)).ToList();
+
     private bool DrawLayer(TileDef tile, FloorDef? floor, PaintLayer layer, RenderTarget2D target)
     {
         _device.SetRenderTarget(target);
         _device.Clear(Color.Transparent);
         bool any = false;
+        // Walls: faces behind everything painted; rims over the walkway after it.
+        var walls = layer == PaintLayer.BehindCharacters ? WallsFor(tile, floor) : new List<WallPiece>();
+        int feather = floor?.DefaultFeather ?? 6;
+        foreach (var piece in walls.Where(p => !p.Rim)) { DrawWallPiece(piece, feather, target); any = true; }
         foreach (var region in tile.PaintRegions.Where(r => r.Layer == layer && r.Cells.Count > 0))
         {
             // A prefab placement draws its prefab once at its anchor; otherwise the region's material.
@@ -174,7 +188,25 @@ public sealed class TileVisuals : IDisposable
             _batch.Draw(_scratch, Vector2.Zero, Color.White);
             _batch.End();
         }
+        foreach (var piece in walls.Where(p => p.Rim)) { DrawWallPiece(piece, 0, target); any = true; }
         return any;
+    }
+
+    /// <summary>One wall piece: its picture (pinned, slanted, maybe mirrored) cut to its cells, seams, caps and fade.</summary>
+    private void DrawWallPiece(WallPiece piece, int feather, RenderTarget2D target)
+    {
+        var tex = _textures.Get(piece.Texture);
+        _device.SetRenderTarget(_scratch);
+        _device.Clear(Color.Transparent);
+        DrawQuad(tex, piece.Corners(tex.Width, tex.Height), piece.Tint, piece.Wall.FlipX, piece.Wall.FlipY);
+        var mask = Mask(piece.Cells, feather, piece.Stencils, piece.Clips, piece.Fade);
+        _batch.Begin(SpriteSortMode.Immediate, MultiplyByAlpha, SamplerState.LinearClamp);
+        _batch.Draw(mask, new Rectangle(0, 0, 1920, 1080), Color.White);
+        _batch.End();
+        _device.SetRenderTarget(target);
+        _batch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp);
+        _batch.Draw(_scratch, Vector2.Zero, Color.White);
+        _batch.End();
     }
 
     /// <summary>
@@ -271,13 +303,16 @@ public sealed class TileVisuals : IDisposable
     private Color[]? _maskColors;
     private const int MaxBases = 64;
 
-    private Texture2D Mask(PaintRegion region, EdgeFade? fade, FloorDef? floor)
+    private Texture2D Mask(PaintRegion region, EdgeFade? fade, FloorDef? floor) =>
+        Mask(region.Cells, region.Feather ?? floor?.DefaultFeather ?? 6, region.Stencils, null, fade);
+
+    private Texture2D Mask(IReadOnlyCollection<CellCoord> cells, int feather, IReadOnlyList<CellStencil> stencils, IReadOnlyList<ClipZone>? clips, EdgeFade? fade)
     {
-        int feather = region.Feather ?? floor?.DefaultFeather ?? 6;
         var sb = new StringBuilder();
-        foreach (var c in region.Cells.OrderBy(c => c.Q).ThenBy(c => c.R)) sb.Append(c.Q).Append(',').Append(c.R).Append(' ');
+        foreach (var c in cells.OrderBy(c => c.Q).ThenBy(c => c.R)) sb.Append(c.Q).Append(',').Append(c.R).Append(' ');
         sb.Append('|').Append(feather);
-        foreach (var st in region.Stencils) sb.Append("|s").Append(st.Cell.Q).Append(',').Append(st.Cell.R).Append(':').Append(st.Stencil).Append(st.FlipX ? "x" : "").Append(st.FlipY ? "y" : "");
+        foreach (var st in stencils) sb.Append("|s").Append(st.Cell.Q).Append(',').Append(st.Cell.R).Append(':').Append(st.Stencil).Append(st.FlipX ? "x" : "").Append(st.FlipY ? "y" : "");
+        if (clips is not null) foreach (var c in clips) sb.Append("|c").Append(c.Key);
         string baseKey = sb.ToString();
         string slot = baseKey + "|" + (fade is { } f0 ? $"{f0.Lower}/{f0.Angle}" : "none");
         string fadeKey = fade?.ToString() ?? "none";
@@ -291,7 +326,7 @@ public sealed class TileVisuals : IDisposable
         // Base shape (expensive: cells, carving, blur) - reused while only the fade changes.
         if (!_maskBases.TryGetValue(baseKey, out var b))
         {
-            var (inside, shape) = RegionMask.BuildBase(region.Cells, feather, region.Stencils, LoadStencil);
+            var (inside, shape) = RegionMask.BuildBase(cells, feather, stencils, LoadStencil, clips);
             b = (inside, shape, _tick);
             if (_maskBases.Count >= MaxBases)
                 foreach (var old in _maskBases.OrderBy(kv => kv.Value.used).Take(_maskBases.Count - MaxBases + 1).ToList())

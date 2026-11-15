@@ -337,7 +337,7 @@ public sealed class TileCloudOverride
 /// <summary>Works out the clouds a tile actually shows: the floor's layers with the tile's overrides applied.</summary>
 public static class CloudStack
 {
-    public const string DefaultTexture = "Original Art/backgrounds/clouds/Cloud1.png";
+    public const string DefaultTexture = "Archive/Original Art/backgrounds/clouds/Cloud1.png";
 
     /// <summary>The tile's clouds, back to front: the bottom clouds, then the top clouds (each with overrides).</summary>
     public static List<CloudLayer> Resolve(FloorDef? floor, TileDef tile)

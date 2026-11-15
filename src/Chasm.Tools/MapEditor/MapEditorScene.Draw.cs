@@ -25,6 +25,7 @@ public sealed partial class MapEditorScene
         }
         var s = Services;
         var t = _tile;
+        if (_panel == Panel.WallEdit && _previewTile is not null && _wall is not null) { DrawWallPreview(batch); return; }
         if (_gameView)
         {
             // As the game shows it: art, props and clouds only.
@@ -83,6 +84,7 @@ public sealed partial class MapEditorScene
         foreach (var c in _selection) d.DiamondFill(b, IsoGrid.CellCenter(c), 110, 55, new Color(255, 220, 60) * 0.45f);
         DrawFadeLines(b);
         DrawSheetHandles(b);
+        DrawWallPaint(b);
         DrawPlacementOverlays(b);
         // Carved cells of the region being stencilled (or the selected region).
         var stRegion = _stencilRegionId is { } stId ? t.PaintRegions.FirstOrDefault(r => r.Id == stId) : _selectedRegion;
