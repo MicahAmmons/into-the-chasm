@@ -57,6 +57,10 @@ public sealed class EndCapVariant
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Stencil { get => null; set { if (!string.IsNullOrEmpty(value) && Rows.Count == 0) Rows.Add(new EndCapRow { Mode = EndCapRowMode.Stencil, Stencil = value }); } }
 
+    /// <summary>The default end: cut straight, nothing else.</summary>
+    public static EndCapVariant Straight() => new() { Name = "Straight edge", Style = EndCapStyle.None };
+    public bool IsStraight => Style == EndCapStyle.None;
+
     /// <summary>The rows in use: the linked combo's, else its own.</summary>
     public List<EndCapRow> RowsFrom(Func<string, EndCapComboDef?>? combos) =>
         !string.IsNullOrEmpty(Combo) && combos?.Invoke(Combo) is { } c ? c.Rows : Rows;
@@ -151,7 +155,8 @@ public sealed class WallDef : Def
     // ---- parts with variants (the first is the default everywhere)
     public List<OuterCornerVariant> OuterCorners { get; set; } = new() { new() };
     public List<InnerCornerVariant> InnerCorners { get; set; } = new() { new() };
-    public List<EndCapVariant> EndCapVariants { get; set; } = new() { new() };
+    /// <summary>Wall ends. The first is always the plain straight edge (the default everywhere); the rest are variations.</summary>
+    public List<EndCapVariant> EndCapVariants { get; set; } = new() { EndCapVariant.Straight() };
 
     // ---- rim
     public bool Rim { get; set; }

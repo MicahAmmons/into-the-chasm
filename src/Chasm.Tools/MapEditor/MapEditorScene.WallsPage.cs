@@ -404,7 +404,7 @@ public sealed partial class MapEditorScene
         (WallStep.RightFace, "Right faces", "Walls facing down-right: usually the left face mirrored and darker."),
         (WallStep.OuterCorners, "Outer corners", "Where a wall turns outward to a point. Bevel or seam, lean, highlight. Add variants to swap on tiles."),
         (WallStep.InnerCorners, "Inner corners", "Notches where a wall turns inward: seam lean and shadow. Variants allowed."),
-        (WallStep.EndCaps, "Wall ends", "Where a wall stops next to a 'no wall' cell: soft fade or a stencil. Variants allowed."),
+        (WallStep.EndCaps, "Wall ends", "Where a wall stops next to a 'no wall' cell. End 1 is a plain straight edge; add variations to shape ends cell by cell."),
         (WallStep.Steps, "Steps", "Staircase edges: check the faces carry on cleanly from step to step."),
         (WallStep.Rim, "Rim", "Optional strip of the picture's top laid over the walkway edge."),
         (WallStep.DepthFade, "Depth & fade", "How deep faces reach and how long a piece is; the fade comes from each floor."),
@@ -460,6 +460,7 @@ public sealed partial class MapEditorScene
     /// </summary>
     private void BuildPreview()
     {
+        if (_capDraft is not null) { BuildCapDraftPreview(); return; }
         var w = _wall!;
         bool up = w.Kind == MaterialKind.WallUp;
         int o = up ? 3 : 0; // walls up rise above the walkway, so sit it lower on screen
@@ -474,8 +475,16 @@ public sealed partial class MapEditorScene
         // A gap with no wall: the faces either side of it end there.
         t.WallPaint.Add(new TileWallPaint { Side = up ? "up" : "down", Wall = TileWallPaint.NoWall,
             Cells = { up ? new CellCoord(10 + o, -3 + o) : new CellCoord(10 + o, 3 + o) } });
+        FinishPreview(t, walk.Where(IsoGrid.InTile).ToList());
+    }
+
+    /// <summary>The preview tile's ground, and a floor with just this wall on it (with the floor's fade and bottom edges for it).</summary>
+    private void FinishPreview(TileDef t, List<CellCoord> walk)
+    {
+        var w = _wall!;
+        bool up = w.Kind == MaterialKind.WallUp;
         t.LocalMaterials.Add(new MaterialDef { Id = "ground", Name = "Preview ground", Texture = "placeholder/textures/grass.png" });
-        t.PaintRegions.Add(new PaintRegion { Id = "ground", Material = "local:ground", Cells = walk.Where(IsoGrid.InTile).ToList() });
+        t.PaintRegions.Add(new PaintRegion { Id = "ground", Material = "local:ground", Cells = walk });
         t.InvalidateCaches();
         var f = _floor is null ? new FloorDef { Id = "__builder_floor" } : ChasmJson.Clone(_floor);
         f.Id = "__builder_floor";
@@ -558,7 +567,7 @@ public sealed partial class MapEditorScene
             WallStep.RightFace => RightFaceStep(w),
             WallStep.OuterCorners => VariantStep(w.OuterCorners, () => new OuterCornerVariant { Name = $"Corner {w.OuterCorners.Count + 1}" }, OuterCornerFields),
             WallStep.InnerCorners => VariantStep(w.InnerCorners, () => new InnerCornerVariant { Name = $"Notch {w.InnerCorners.Count + 1}" }, InnerCornerFields),
-            WallStep.EndCaps => VariantStep(w.EndCapVariants, () => new EndCapVariant { Name = $"End {w.EndCapVariants.Count + 1}" }, EndCapFields),
+            WallStep.EndCaps => _capDraft is not null ? CapDraftPanel(w) : EndCapStep(w),
             WallStep.Steps => StepsStep(),
             WallStep.Rim => RimStep(w),
             WallStep.DepthFade => DepthStep(w),
@@ -566,6 +575,7 @@ public sealed partial class MapEditorScene
         };
         ImGui.EndChild();
         if (changed) PreviewChanged();
+        if (_capDraft is not null) { CapDraftFooter(w); return; }
 
         // Footer: back / approve / save / close.
         bool approved = w.Approved.Contains(step.ToString());
@@ -603,6 +613,7 @@ public sealed partial class MapEditorScene
 
     private void GoToStep(WallStep step)
     {
+        if (_capDraft is not null) EndCapDraft(keep: false);
         _wallStep = step;
         _variantTab = 0;
         _rowTab = 0;
@@ -765,7 +776,7 @@ public sealed partial class MapEditorScene
         const float label = 120;
         bool changed = NameRow(v.Name, n => v.Name = n);
         ImGui.TextUnformatted("Style"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
-        string[] caps = { "None (hard cut)", "Soft (fades out)", "Masks, cell by cell" };
+        string[] caps = { "Straight (hard cut)", "Soft (fades out)", "Masks, cell by cell" };
         int cap = (int)v.Style;
         if (ImGui.Combo("##ecstyle", ref cap, caps, caps.Length)) { v.Style = (EndCapStyle)cap; changed = true; }
         if (v.Style == EndCapStyle.Soft) changed |= SliderRow("Softness", label, () => v.Softness, x => v.Softness = x, 4, 128, "%.0f px");
@@ -797,8 +808,15 @@ public sealed partial class MapEditorScene
         if (linked is not null) Ui.ColoredWrapped(Ui.Blue, $"Linked to '{linked.DisplayName}': edits below change the combo for every wall using it (saved with Save wall).");
         SaveComboPopup();
 
-        // Rows: one per cell down the end's column.
-        var rows = linked?.Rows ?? v.Rows;
+        bool rc = EndCapRows(linked?.Rows ?? v.Rows);
+        if (rc && linked is not null) _dirtyCombos.Add(linked.Id);
+        return changed | rc;
+    }
+
+    /// <summary>The cell-by-cell editor: one tab per cell down the end's column (keep / mask / hide).</summary>
+    private bool EndCapRows(List<EndCapRow> rows)
+    {
+        const float label = 120;
         int depth = Math.Max(1, _wall?.Depth ?? 4);
         while (rows.Count < depth) rows.Add(new EndCapRow());
         _rowTab = Math.Clamp(_rowTab, 0, rows.Count - 1);
@@ -831,8 +849,7 @@ public sealed partial class MapEditorScene
             ImGui.SameLine();
             if (ImGui.Button("Reset placement")) { row.Rotation = 0; row.OffsetX = 0; row.OffsetY = 0; row.Scale = 1; row.FlipY = false; rc = true; }
         }
-        if (rc && linked is not null) _dirtyCombos.Add(linked.Id);
-        return changed | rc;
+        return rc;
     }
 
     private readonly HashSet<string> _dirtyCombos = new();
