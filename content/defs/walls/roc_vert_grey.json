@@ -1,0 +1,71 @@
+{
+  "Id": "roc_vert_grey",
+  "Name": "Rock - Alpha",
+  "Category": "Cliffs",
+  "Kind": "WallDown",
+  "Texture": "Roc - Vert Grey.png",
+  "Scale": 0.45,
+  "LipLine": 0.48,
+  "Tint": "#e7c2a0",
+  "FlipX": false,
+  "FlipY": false,
+  "Warp": {
+    "TopLeftX": 0,
+    "TopLeftY": 0,
+    "TopRightX": 0,
+    "TopRightY": 0,
+    "BottomRightX": -81.823494,
+    "BottomRightY": -0,
+    "BottomLeftX": 81.823494,
+    "BottomLeftY": -0
+  },
+  "Depth": 6,
+  "MaxRun": 14,
+  "LeftShade": 0.99,
+  "RightShade": 0.71,
+  "RightTexture": "",
+  "SkewFaces": true,
+  "OuterCorners": [
+    {
+      "Name": "Corner",
+      "Style": "Seam",
+      "Lean": -0,
+      "Blend": 0,
+      "BevelWidth": 14,
+      "BevelShade": null,
+      "Highlight": 0,
+      "HighlightWidth": 4
+    }
+  ],
+  "InnerCorners": [
+    {
+      "Name": "Notch",
+      "Lean": 0,
+      "Blend": 6,
+      "Shadow": 0.15,
+      "ShadowWidth": 18
+    }
+  ],
+  "EndCapVariants": [
+    {
+      "Name": "End",
+      "Style": "None",
+      "Softness": 48,
+      "Stencil": "stencils/half_circle_top.png"
+    }
+  ],
+  "Rim": false,
+  "RimHeight": 2,
+  "Approved": [
+    "Picture",
+    "LeftFace",
+    "RightFace",
+    "OuterCorners",
+    "InnerCorners",
+    "EndCaps",
+    "Steps",
+    "Rim",
+    "DepthFade"
+  ],
+  "Notes": ""
+}

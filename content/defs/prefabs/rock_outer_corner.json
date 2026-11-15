@@ -1,0 +1,20 @@
+{
+  "Id": "rock_outer_corner",
+  "Name": "Rock - outer corner",
+  "Category": "Cliff walls",
+  "Kind": "WallDown",
+  "Texture": "Roc - Vert Grey.png",
+  "Rotation": 0,
+  "Tint": "#c89696",
+  "FlipX": false,
+  "FlipY": false,
+  "Scale": 0.54,
+  "LipLine": 0,
+  "Warp": null,
+  "SetId": "rock_left",
+  "Role": "OuterCorner",
+  "Shade": 0.86,
+  "InSet": true,
+  "IsSetLeader": false,
+  "Notes": ""
+}

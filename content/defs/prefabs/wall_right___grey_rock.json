@@ -1,0 +1,24 @@
+{
+  "Id": "wall_right___grey_rock",
+  "Name": "Wall Right - Grey Rock",
+  "Category": "Cliff walls",
+  "Kind": "WallDown",
+  "Texture": "Roc - Vert Grey.png",
+  "Rotation": 0,
+  "Tint": "#cfd0d0",
+  "FlipX": true,
+  "FlipY": false,
+  "Scale": 0.56,
+  "LipLine": 0.14,
+  "Warp": {
+    "TopLeftX": 0,
+    "TopLeftY": 0,
+    "TopRightX": 0,
+    "TopRightY": 0,
+    "BottomRightX": -122.892,
+    "BottomRightY": -0,
+    "BottomLeftX": 122.892,
+    "BottomLeftY": -0
+  },
+  "Notes": ""
+}

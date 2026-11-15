@@ -1,0 +1,24 @@
+{
+  "Id": "roc___vert_grey_2",
+  "Name": "Roc - Vert Grey",
+  "Category": "Cliff walls",
+  "Kind": "WallDown",
+  "Texture": "Roc - Vert Grey.png",
+  "Rotation": 0,
+  "Tint": "#bd9595",
+  "FlipX": false,
+  "FlipY": false,
+  "Scale": 1,
+  "LipLine": 0,
+  "Warp": {
+    "TopLeftX": 0,
+    "TopLeftY": 0,
+    "TopRightX": 0,
+    "TopRightY": 0,
+    "BottomRightX": -219.45,
+    "BottomRightY": -601.92,
+    "BottomLeftX": 219.45,
+    "BottomLeftY": -601.92
+  },
+  "Notes": ""
+}

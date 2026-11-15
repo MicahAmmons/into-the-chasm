@@ -1,0 +1,20 @@
+{
+  "Id": "rock_left",
+  "Name": "Rock Left",
+  "Category": "Cliff walls",
+  "Kind": "WallDown",
+  "Texture": "Roc - Vert Grey.png",
+  "Rotation": 0,
+  "Tint": "#e8afaf",
+  "FlipX": false,
+  "FlipY": false,
+  "Scale": 0.54,
+  "LipLine": 0,
+  "Warp": null,
+  "SetId": "rock_left",
+  "Role": "LeftFace",
+  "Shade": 1,
+  "InSet": true,
+  "IsSetLeader": true,
+  "Notes": ""
+}

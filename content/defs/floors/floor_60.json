@@ -1,0 +1,73 @@
+{
+  "Id": "floor_60",
+  "Name": "Floor 60",
+  "Number": 60,
+  "EntryTile": "",
+  "Theme": "",
+  "Clouds": [
+    {
+      "Id": "cloud_1",
+      "Name": "Lower clouds",
+      "Enabled": true,
+      "Texture": "backgrounds/clouds/cloud_sea_seamless_2208.png",
+      "Tint": "#ffffff",
+      "Opacity": 1,
+      "Blend": "Normal",
+      "Speed": 67,
+      "Direction": 29.744873,
+      "Scale": 0.81,
+      "Mirror": true,
+      "Pattern": "Scroll",
+      "PatternAmount": 40,
+      "PatternCycle": 8,
+      "RippleLength": 320
+    },
+    {
+      "Id": "cloud_2",
+      "Name": "Clouds 2",
+      "Enabled": true,
+      "Texture": "backgrounds/clouds/cloud_sea_seamless_2208.png",
+      "Tint": "#8d89f5",
+      "Opacity": 0.26,
+      "Blend": "Normal",
+      "Speed": 151,
+      "Direction": 278.42697,
+      "Scale": 1,
+      "Mirror": false,
+      "Pattern": "Scroll",
+      "PatternAmount": 40,
+      "PatternCycle": 8,
+      "RippleLength": 320
+    }
+  ],
+  "TopClouds": [],
+  "DefaultFeather": 6,
+  "BackgroundColor": "#1a1d2e",
+  "AmbientTint": "#ffffff",
+  "FogColor": "#000000",
+  "Music": "",
+  "DefaultEncounters": [],
+  "Materials": [
+    {
+      "Id": "cliff_left",
+      "Name": "Cliff Left",
+      "Texture": "Roc - Vert Grey.png",
+      "Rotation": 0,
+      "Tint": "#ffffff",
+      "FlipX": false,
+      "FlipY": false,
+      "OffsetX": 0,
+      "OffsetY": -3,
+      "Scale": 0.78,
+      "Warp": null,
+      "Fade": "IntoLowerClouds",
+      "FadeStart": 6.54,
+      "FadeLength": 5.17,
+      "FadeAngle": "Auto",
+      "Kind": "WallDown",
+      "EffectiveKind": "WallDown",
+      "UseForCutOut": true
+    }
+  ],
+  "Notes": ""
+}

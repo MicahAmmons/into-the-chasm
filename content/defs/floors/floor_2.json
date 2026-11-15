@@ -74,9 +74,9 @@
   ],
   "Prefabs": [],
   "WallDownFade": {
-    "Start": 1,
-    "Length": 1.5,
-    "Angle": "Auto"
+    "Start": 0.5,
+    "Length": 2.73,
+    "Angle": "Level"
   },
   "WallUpFade": {
     "Start": 1,
@@ -85,7 +85,7 @@
   },
   "WallsDown": [
     {
-      "Wall": "placeholder_rock",
+      "Wall": "roc_vert_grey",
       "FadeMode": "Default",
       "Fade": {
         "Start": 1,

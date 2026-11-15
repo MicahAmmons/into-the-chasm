@@ -1,0 +1,20 @@
+{
+  "Id": "rock_inner_corner",
+  "Name": "Rock - inner corner",
+  "Category": "Cliff walls",
+  "Kind": "WallDown",
+  "Texture": "Roc - Vert Grey.png",
+  "Rotation": 0,
+  "Tint": "#906c6c",
+  "FlipX": false,
+  "FlipY": false,
+  "Scale": 0.54,
+  "LipLine": 0,
+  "Warp": null,
+  "SetId": "rock_left",
+  "Role": "InnerCorner",
+  "Shade": 0.62,
+  "InSet": true,
+  "IsSetLeader": false,
+  "Notes": ""
+}

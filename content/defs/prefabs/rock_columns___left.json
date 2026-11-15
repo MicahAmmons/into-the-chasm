@@ -1,0 +1,24 @@
+{
+  "Id": "rock_columns___left",
+  "Name": "Rock columns - left",
+  "Category": "Cliff walls",
+  "Kind": "WallDown",
+  "Texture": "Roc - Vert Grey.png",
+  "Rotation": 0,
+  "Tint": "#d79090",
+  "FlipX": false,
+  "FlipY": false,
+  "Scale": 0.51,
+  "LipLine": 0,
+  "Warp": {
+    "TopLeftX": 0,
+    "TopLeftY": 0,
+    "TopRightX": 0,
+    "TopRightY": 0,
+    "BottomRightX": -95.931,
+    "BottomRightY": -153.4896,
+    "BottomLeftX": 95.931,
+    "BottomLeftY": -153.4896
+  },
+  "Notes": ""
+}
