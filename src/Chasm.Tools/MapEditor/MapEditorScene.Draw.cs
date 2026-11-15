@@ -25,6 +25,14 @@ public sealed partial class MapEditorScene
         }
         var s = Services;
         var t = _tile;
+        if (_gameView)
+        {
+            // As the game shows it: art, props and clouds only.
+            TileRenderer.QueueLayers(_queue, s, t, _floor, includeProps: false);
+            TileRenderer.QueueProps(_queue, s, t, 1f, null);
+            _queue.Flush(batch);
+            return;
+        }
         if (_showNeighbours) RenderNeighbours(batch);
 
         // Tile art (live, using the working copies of the tile and floor).
@@ -193,7 +201,7 @@ public sealed partial class MapEditorScene
     /// <summary>After the canvas is shown: neighbour tiles around it (window space).</summary>
     public override void DrawOverlayUi()
     {
-        if (!_showNeighbours || _tile is null || _neighbours.Count == 0) return;
+        if (_gameView || !_showNeighbours || _tile is null || _neighbours.Count == 0) return;
         var canvas = Services.Canvas;
         var dest = canvas.Destination;
         _overlayBatch ??= new SpriteBatch(Services.Graphics);

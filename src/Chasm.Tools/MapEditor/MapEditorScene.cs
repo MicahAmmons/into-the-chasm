@@ -61,13 +61,14 @@ public sealed partial class MapEditorScene : Scene
         Services.Canvas.Region = () =>
         {
             var pp = Services.Graphics.PresentationParameters;
+            if (_gameView && _tile is not null) return new Rectangle(0, 0, pp.BackBufferWidth, pp.BackBufferHeight);
             return new Rectangle(LeftW, MenuH, Math.Max(100, pp.BackBufferWidth - LeftW - RightW), Math.Max(100, pp.BackBufferHeight - MenuH - StatusH));
         };
         Services.Canvas.ResetView();
         ToolContext.Wizards.Inspector.CellPicker = cb => { _cellPick = cb; Status("Click a cell on the map (Esc cancels)."); };
         Art.ArtLibrary.KeysMoved += OnArtMoved;
         if (_openOnStart is not null && Services.Defs.TryGet<TileDef>(_openOnStart, out var t)) Open(t);
-        // Dev convenience for automated screenshots: CHASM_EDITOR=tool[:panel][:neighbours][:mat=<id>][:cut]
+        // Dev convenience for automated screenshots: CHASM_EDITOR=tool[:panel][:neighbours][:mat=<id>][:cut][:game]
         if (_tile is not null && Environment.GetEnvironmentVariable("CHASM_EDITOR") is { } dev)
         {
             var parts = dev.Split(':');
@@ -79,6 +80,7 @@ public sealed partial class MapEditorScene : Scene
                 _editingMaterial = md.Id;
                 if (parts.Contains("cut")) { md.UseForCutOut = true; _cutOutMaterial = md.Id; }
             }
+            if (parts.Contains("game")) ToggleGameView();
             if (parts.Contains("selectall")) foreach (var c in IsoGrid.AllCells.Where(c => _tile.Walkable[c])) _selection.Add(c);
         }
     }
@@ -323,23 +325,33 @@ public sealed partial class MapEditorScene : Scene
     public override void Update(float dt)
     {
         _statusTime -= dt;
-        ToolContext.MenuBar(Services, _tile is null ? "Map Editor" : $"Map Editor - {(_isNewTile ? "(new)" : _tile.Id)}{(HasUnsaved ? " *" : "")}", Menus);
+        if (!(_gameView && _tile is not null)) ToolContext.MenuBar(Services, _tile is null ? "Map Editor" : $"Map Editor - {(_isNewTile ? "(new)" : _tile.Id)}{(HasUnsaved ? " *" : "")}", Menus);
 
         if (_tile is null) { StartDialog(); DeletePopup(); ToolContext.Wizards.Draw(); return; }
+
+        var input = Services.Input;
+        bool ctrl = input.KeyHeld(Keys.LeftControl) || input.KeyHeld(Keys.RightControl);
+        if (_gameView)
+        {
+            // Art only: no panels, tools or overlays. The toggle stays on screen.
+            ZoomBar();
+            UpdateView(input, ctrl, dt);
+            _hoverCell = null;
+            return;
+        }
 
         LeftToolbar();
         RightPanelGui();
         StatusBar();
+        ZoomBar();
         ToolContext.Wizards.Draw();
         Popups();
 
-        var input = Services.Input;
-        bool ctrl = input.KeyHeld(Keys.LeftControl) || input.KeyHeld(Keys.RightControl);
         if (ctrl && input.KeyPressed(Keys.S)) Save();
         if (ctrl && input.KeyPressed(Keys.Z)) Undo();
         if (ctrl && (input.KeyPressed(Keys.Y) || (input.KeyHeld(Keys.LeftShift) && input.KeyPressed(Keys.Z)))) Redo();
 
-        UpdateView(input, ctrl);
+        UpdateView(input, ctrl, dt);
         UpdateHover(input);
         if (_cellPick is not null) UpdateCellPick(input);
         else if (!_panning) UpdateTool(input);
@@ -360,31 +372,6 @@ public sealed partial class MapEditorScene : Scene
     {
         if (input.Pressed(Game.Input.InputAction.Cancel)) { _cellPick = null; Status("Pick cancelled."); return; }
         if (_hoverCell is { } c && input.LeftClicked) { _cellPick!(c); _cellPick = null; Edited(); Status($"Picked {c}."); }
-    }
-
-    // ------------------------------------------------------------------ view: zoom + pan (trackpad friendly)
-
-    private bool _panning;
-
-    private void UpdateView(Game.Input.InputState input, bool ctrl)
-    {
-        var canvas = Services.Canvas;
-        bool overCanvas = canvas.Area.Contains(input.MouseWindow) && !input.MouseCapturedByUi;
-        if (overCanvas)
-        {
-            int wheel = input.ScrollDelta, hwheel = input.HorizontalScrollDelta;
-            if (ctrl && wheel != 0) canvas.ZoomAround(input.MouseWindow, canvas.Zoom * MathF.Pow(1.0015f, wheel));
-            else if (wheel != 0 || hwheel != 0) canvas.Pan += new Vector2(-hwheel * 0.5f, wheel * 0.5f);
-        }
-        bool spaceDrag = input.KeyHeld(Keys.Space) && input.LeftHeld;
-        _panning = (spaceDrag || input.MiddleHeld) && (overCanvas || _panning);
-        if (_panning) canvas.Pan += input.MouseDelta.ToVector2();
-        if (!input.KeyboardCapturedByUi)
-        {
-            if (input.KeyPressed(Keys.OemPlus) || input.KeyPressed(Keys.Add)) canvas.ZoomAround(canvas.Area.Center, canvas.Zoom * 1.25f);
-            if (input.KeyPressed(Keys.OemMinus) || input.KeyPressed(Keys.Subtract)) canvas.ZoomAround(canvas.Area.Center, canvas.Zoom / 1.25f);
-            if (input.KeyPressed(Keys.F)) canvas.ResetView();
-        }
     }
 
     // ------------------------------------------------------------------ start dialog + menus

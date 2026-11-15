@@ -124,13 +124,13 @@ public sealed partial class MapEditorScene
             ImGui.EndTable();
         }
         float third = (full - 16) / 3;
-        if (ImGui.Button("-", new Num.Vector2(third, 0))) Services.Canvas.ZoomAround(Services.Canvas.Area.Center, Services.Canvas.Zoom / 1.25f);
+        if (ImGui.Button("-", new Num.Vector2(third, 0))) ZoomBy(1 / 1.25f);
         ImGui.SameLine();
-        if (ImGui.Button($"{Services.Canvas.Zoom * 100:0}%", new Num.Vector2(third, 0))) Services.Canvas.ResetView();
+        if (ImGui.Button($"{Services.Canvas.Zoom * 100:0}%", new Num.Vector2(third, 0))) FitView();
         if (ImGui.IsItemHovered()) ImGui.SetTooltip("Click (or press F) to fit the tile to the window.");
         ImGui.SameLine();
-        if (ImGui.Button("+", new Num.Vector2(third, 0))) Services.Canvas.ZoomAround(Services.Canvas.Area.Center, Services.Canvas.Zoom * 1.25f);
-        Ui.Hint("Trackpad: two-finger scroll pans, Ctrl+scroll or pinch zooms, Space+drag pans.");
+        if (ImGui.Button("+", new Num.Vector2(third, 0))) ZoomBy(1.25f);
+        Ui.Hint("Trackpad: pinch zooms, two-finger drag pans (each gesture stays zoom or pan until you lift). Space+drag pans. G = game view.");
 
         // ---- problems
         var problems = Chasm.Core.Content.ContentValidator.Validate(t, Services.Defs).Where(p => !p.Contains("Id is empty")).ToList();
