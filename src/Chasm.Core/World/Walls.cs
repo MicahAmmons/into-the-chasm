@@ -48,7 +48,71 @@ public sealed class EndCapVariant
     public string Name { get; set; } = "End";
     public EndCapStyle Style { get; set; } = EndCapStyle.Soft;
     [Range(4, 128)] public float Softness { get; set; } = 48f;
-    [Texture] public string Stencil { get; set; } = "stencils/notch_right.png";
+    /// <summary>Stencil style: what happens in each cell of the end's column, top first.</summary>
+    public List<EndCapRow> Rows { get; set; } = new();
+    /// <summary>Stencil style: use a saved combo's rows instead (stays linked to it).</summary>
+    [Ref(typeof(EndCapComboDef))] public string Combo { get; set; } = "";
+
+    // Older files had one stencil: it becomes the top row.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Stencil { get => null; set { if (!string.IsNullOrEmpty(value) && Rows.Count == 0) Rows.Add(new EndCapRow { Mode = EndCapRowMode.Stencil, Stencil = value }); } }
+
+    /// <summary>The rows in use: the linked combo's, else its own.</summary>
+    public List<EndCapRow> RowsFrom(Func<string, EndCapComboDef?>? combos) =>
+        !string.IsNullOrEmpty(Combo) && combos?.Invoke(Combo) is { } c ? c.Rows : Rows;
+}
+
+public enum EndCapRowMode
+{
+    [Label("Keep (draw as normal)")] Keep,
+    [Label("Stencil (shape it)")] Stencil,
+    [Label("Hide (draw nothing)")] Hide,
+}
+
+/// <summary>One cell of a wall end's column (row 1 = the top cell, under the walkway).</summary>
+public sealed class EndCapRow
+{
+    public EndCapRowMode Mode { get; set; } = EndCapRowMode.Keep;
+    [Texture] public string Stencil { get; set; } = "";
+    [Range(-180, 180)] public float Rotation { get; set; }
+    [Range(-64, 64)] public float OffsetX { get; set; }
+    [Range(-32, 32)] public float OffsetY { get; set; }
+    [Range(0.25f, 3)] public float Scale { get; set; } = 1f;
+    public bool FlipY { get; set; }
+}
+
+/// <summary>
+/// A saved set of end-cap rows (e.g. "Taper, 4 cells"), reusable by any wall. Walls that use it
+/// stay linked, so improving the combo improves every wall using it.
+/// </summary>
+[DefFolder("endcaps", "End cap combos")]
+[Tooltip("A reusable column of end-cap masks.")]
+public sealed class EndCapComboDef : Def
+{
+    public List<EndCapRow> Rows { get; set; } = new();
+}
+
+/// <summary>
+/// One look for a wall's bottom edge on a floor: a strip mask laid along the wall where it fades
+/// into the clouds, giving the bottom a shape (rock tips, crumbling...). It's anchored to the fade,
+/// so it moves with the cloud level.
+/// </summary>
+public sealed class BottomEdgeVariant
+{
+    public string Name { get; set; } = "Bottom";
+    [Texture, Tooltip("A strip: opaque = keep, transparent = cut. Repeats along the wall.")]
+    public string Stencil { get; set; } = "";
+    [Range(-4, 4), Tooltip("Moves the strip up (-) or down (+) from the middle of the fade, in cells.")]
+    public float Offset { get; set; }
+    [Range(8, 256), Tooltip("How tall the strip is (pixels).")] public float Height { get; set; } = 64f;
+    [Range(32, 1024), Tooltip("How wide one repeat of the strip is (pixels).")] public float Repeat { get; set; } = 256f;
+    public bool FlipX { get; set; }
+}
+
+/// <summary>A stretch of a wall piece (screen x range) that uses one bottom edge.</summary>
+public sealed record BottomSegment(float MinX, float MaxX, string Stencil, float Offset, float Height, float Repeat, bool FlipX)
+{
+    public string Key => $"{MinX:0},{MaxX:0}:{Stencil}/{Offset:0.##}/{Height:0}/{Repeat:0}{(FlipX ? "x" : "")}";
 }
 
 /// <summary>
@@ -125,6 +189,8 @@ public sealed class FloorWall
     [Ref(typeof(WallDef))] public string Wall { get; set; } = "";
     public WallFadeMode FadeMode { get; set; } = WallFadeMode.Default;
     public WallFade Fade { get; set; } = new();
+    /// <summary>Shapes for the bottom where the wall fades away (first = default; empty = a smooth fade).</summary>
+    public List<BottomEdgeVariant> BottomEdges { get; set; } = new();
 }
 
 /// <summary>Cells on a tile painted with a wall other than the floor's default ("-" = no wall).</summary>
@@ -137,7 +203,7 @@ public sealed class TileWallPaint
 }
 
 /// <summary>Which part of a wall a variant choice is for.</summary>
-public enum WallPart { OuterCorner, InnerCorner, EndCap }
+public enum WallPart { OuterCorner, InnerCorner, EndCap, BottomEdge }
 
 /// <summary>A tile's choice of variant for one specific corner / end (default = the first).</summary>
 public sealed class TileWallVariant
@@ -150,13 +216,15 @@ public sealed class TileWallVariant
 }
 
 /// <summary>A spot on a tile where a variant applies (for the editor's swap markers).</summary>
-public sealed record WallJunction(WallPart Part, CellCoord Cell, Vector2 Point, WallDef Wall, int Index, bool Up)
+public sealed record WallJunction(WallPart Part, CellCoord Cell, Vector2 Point, WallDef Wall, int Index, bool Up, int Count)
 {
-    public int Count => Part switch
+    /// <summary>The name of the variant in use.</summary>
+    public string VariantName(FloorWall? entry) => Part switch
     {
-        WallPart.OuterCorner => Wall.OuterCorners.Count,
-        WallPart.InnerCorner => Wall.InnerCorners.Count,
-        _ => Wall.EndCapVariants.Count,
+        WallPart.OuterCorner => Wall.Outer(Index).Name,
+        WallPart.InnerCorner => Wall.Inner(Index).Name,
+        WallPart.EndCap => Wall.Cap(Index).Name,
+        _ => entry is { BottomEdges.Count: > 0 } e ? e.BottomEdges[Math.Clamp(Index, 0, e.BottomEdges.Count - 1)].Name : "",
     };
 }
 
@@ -200,6 +268,8 @@ public sealed class WallPiece
     public List<ClipZone> Clips { get; } = new();
     public List<CellStencil> Stencils { get; } = new();
     public EdgeFade? Fade { get; set; }
+    /// <summary>Bottom-edge shapes along the piece (need a fade to anchor to).</summary>
+    public List<BottomSegment> Bottom { get; } = new();
     /// <summary>Bevel faces: their own brightness.</summary>
     public float Shade { get; set; } = 1f;
     /// <summary>Highlight / shadow strips: how strong.</summary>
@@ -250,7 +320,8 @@ public static class AutoWalls
 {
     private const float Slope = 0.5f;
 
-    public static List<WallPiece> Build(TileDef tile, FloorDef? floor, bool up, Func<string, WallDef?> walls, List<WallJunction>? junctions = null)
+    public static List<WallPiece> Build(TileDef tile, FloorDef? floor, bool up, Func<string, WallDef?> walls, List<WallJunction>? junctions = null,
+        Func<string, EndCapComboDef?>? combos = null)
     {
         var lefts = new List<WallPiece>();
         var bevels = new List<WallPiece>();
@@ -308,6 +379,7 @@ public static class AutoWalls
             if (Walk(a) && Walk(b) && rightOpen.Contains(a) && leftOpen.Contains(b)) { notchRight[a] = v; notchLeft[b] = v; }
         }
         var reportedInner = new HashSet<CellCoord>();
+        var cornerExtras = new Dictionary<CellCoord, List<WallPiece>>();
 
         foreach (bool isLeft in new[] { true, false })
         {
@@ -393,7 +465,7 @@ public static class AutoWalls
                             : new ClipZone(null, x + bw / 2, KeepLeft: false, Ramp: true, v.Blend, v.Lean, point.Y));
                         // The point is on the left face's right-hand end and the right face's left-hand end.
                         if (isLeft) cornerAtMax = true; else cornerAtMin = true;
-                        if (isLeft) AddOuterCornerExtras(wall, v, col, point, fade, w);
+                        if (isLeft) cornerExtras[w] = AddOuterCornerExtras(wall, v, col, point, fade, w);
                     }
                 }
                 // Inner corner (notch) this cell shares.
@@ -410,7 +482,7 @@ public static class AutoWalls
                         if (isLeft) cornerAtMin = true; else cornerAtMax = true;
                         if (reportedInner.Add(notch))
                         {
-                            junctions?.Add(new WallJunction(WallPart.InnerCorner, notch, point, wall, VariantAt(WallPart.InnerCorner, notch), up));
+                            junctions?.Add(new WallJunction(WallPart.InnerCorner, notch, point, wall, VariantAt(WallPart.InnerCorner, notch), up, wall.InnerCorners.Count));
                             if (v.Shadow > 0)
                             {
                                 var shadow = Strip(wall, WallPieceKind.Shadow, Around(point, wall.Depth), point, v.ShadowWidth, v.Lean, fade);
@@ -432,12 +504,47 @@ public static class AutoWalls
                 var cap = wall.Cap(VariantAt(WallPart.EndCap, col[0]));
                 float cx = IsoGrid.CellCenter(col[0]).X;
                 bool endOnRight = cx >= piece.Lip.X;
-                junctions?.Add(new WallJunction(WallPart.EndCap, col[0], IsoGrid.CellCenter(col[0]), wall, VariantAt(WallPart.EndCap, col[0]), up));
+                junctions?.Add(new WallJunction(WallPart.EndCap, col[0], IsoGrid.CellCenter(col[0]), wall, VariantAt(WallPart.EndCap, col[0]), up, wall.EndCapVariants.Count));
                 if (cap.Style == EndCapStyle.Soft)
                     piece.Clips.Add(new ClipZone(null, cx, KeepLeft: endOnRight, Ramp: true, cap.Softness));
-                else if (cap.Style == EndCapStyle.Stencil && !string.IsNullOrEmpty(cap.Stencil))
-                    foreach (var c in col) piece.Stencils.Add(new CellStencil { Cell = c, Stencil = cap.Stencil, FlipX = !endOnRight });
+                else if (cap.Style == EndCapStyle.Stencil)
+                {
+                    // Row by row down the end's column: keep, shape with a mask, or hide. Masks are
+                    // drawn for a right-hand end and mirrored for a left-hand one.
+                    var rows = cap.RowsFrom(combos);
+                    for (int i = 0; i < col.Count && i < rows.Count; i++)
+                    {
+                        var row = rows[i];
+                        if (row.Mode == EndCapRowMode.Keep) continue;
+                        piece.Stencils.Add(new CellStencil
+                        {
+                            Cell = col[i], Hide = row.Mode == EndCapRowMode.Hide, Stencil = row.Stencil, FlipX = !endOnRight, FlipY = row.FlipY ^ up,
+                            Rotation = row.Rotation, OffsetX = row.OffsetX, OffsetY = up ? -row.OffsetY : row.OffsetY, Scale = row.Scale,
+                        });
+                    }
+                }
             }
+
+            // Bottom edges: each edge cell's stretch of the face can use its own variant.
+            if (fade is not null && entry.BottomEdges.Count > 0)
+                foreach (var w in run)
+                {
+                    float cx = IsoGrid.CellCenter(w).X;
+                    float a = isLeft ? cx - IsoGrid.HalfW : cx, b = isLeft ? cx : cx + IsoGrid.HalfW;
+                    var top = isLeft ? LeftN(w) : RightN(w);
+                    int vi = Math.Clamp(VariantAt(WallPart.BottomEdge, top), 0, entry.BottomEdges.Count - 1);
+                    var be = entry.BottomEdges[vi];
+                    // Corners: stretch the end segments over the seam so both sides of a corner match.
+                    if (outer.Contains(w) || (isLeft ? notchLeft : notchRight).ContainsKey(w)) { a -= 40; b += 40; }
+                    if (!string.IsNullOrEmpty(be.Stencil))
+                    {
+                        var seg = new BottomSegment(a, b, be.Stencil, be.Offset, be.Height, be.Repeat, be.FlipX);
+                        piece.Bottom.Add(seg);
+                        // The corner's bevel / highlight end the same way as the face beside them.
+                        if (cornerExtras.TryGetValue(w, out var extras)) foreach (var x in extras) x.Bottom.Add(seg with { MinX = cx - 80, MaxX = cx + 80 });
+                    }
+                    junctions?.Add(new WallJunction(WallPart.BottomEdge, top, EdgeMid(w, isLeft, up) + new Vector2(0, s * (fade.Value.StartCells + fade.Value.LengthCells * 0.5f) * EdgeFade.CellPx), wall, vi, up, entry.BottomEdges.Count));
+                }
 
             // Trim to the edges' width (whole mask: the soft edge spills past cell borders).
             if (!cornerAtMax) piece.Clips.Add(new ClipZone(null, maxX + 0.5f, KeepLeft: true, Ramp: false, 0));
@@ -450,10 +557,11 @@ public static class AutoWalls
             if (wall.Rim) rims.Add(MakeRim(wall, run, isLeft, piece));
         }
 
-        // Bevel face + highlight for an outer corner (added once, with the left face).
-        void AddOuterCornerExtras(WallDef wall, OuterCornerVariant v, List<CellCoord> col, Vector2 point, EdgeFade? fade, CellCoord w)
+        // Bevel face + highlight for an outer corner (added once, with the left face). Returns them.
+        List<WallPiece> AddOuterCornerExtras(WallDef wall, OuterCornerVariant v, List<CellCoord> col, Vector2 point, EdgeFade? fade, CellCoord w)
         {
-            junctions?.Add(new WallJunction(WallPart.OuterCorner, w, point, wall, VariantAt(WallPart.OuterCorner, w), up));
+            var made = new List<WallPiece>();
+            junctions?.Add(new WallJunction(WallPart.OuterCorner, w, point, wall, VariantAt(WallPart.OuterCorner, w), up, wall.OuterCorners.Count));
             float x = point.X;
             float edge = x;
             if (v.Style == CornerStyle.Bevel && v.BevelWidth > 0)
@@ -468,6 +576,7 @@ public static class AutoWalls
                 bevel.Clips.Add(new ClipZone(null, x - v.BevelWidth / 2, KeepLeft: false, Ramp: true, v.Blend, v.Lean, point.Y));
                 bevel.Clips.Add(new ClipZone(null, x + v.BevelWidth / 2, KeepLeft: true, Ramp: false, v.Blend, v.Lean, point.Y));
                 bevels.Add(bevel);
+                made.Add(bevel);
                 edge = x - v.BevelWidth / 2; // the lit edge: where the left face turns onto the bevel
             }
             if (v.Highlight > 0)
@@ -475,7 +584,9 @@ public static class AutoWalls
                 var hl = Strip(wall, WallPieceKind.Highlight, Around(point, wall.Depth), new Vector2(edge, point.Y), v.HighlightWidth, v.Lean, fade);
                 hl.Opacity = v.Highlight;
                 overlays.Add(hl);
+                made.Add(hl);
             }
+            return made;
         }
 
         // The empty cells under (or over) a corner point, one column either side included: a band down

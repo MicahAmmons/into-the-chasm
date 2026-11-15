@@ -156,7 +156,12 @@ public sealed class TileVisuals : IDisposable
 
     /// <summary>The tile's live walls (down and up), worked out from its walkable cells and its floor's wall lists.</summary>
     public List<WallPiece> WallsFor(TileDef tile, FloorDef? floor, List<WallJunction>? junctions = null) =>
-        AutoWalls.Build(tile, floor, up: false, FindWall, junctions).Concat(AutoWalls.Build(tile, floor, up: true, FindWall, junctions)).ToList();
+        AutoWalls.Build(tile, floor, up: false, FindWall, junctions, FindCombo).Concat(AutoWalls.Build(tile, floor, up: true, FindWall, junctions, FindCombo)).ToList();
+
+    /// <summary>Saved end-cap combos; editors can slip in an unsaved one.</summary>
+    public Func<string, EndCapComboDef?>? ComboOverride { get; set; }
+    private EndCapComboDef? FindCombo(string id) =>
+        ComboOverride?.Invoke(id) ?? (_defs.TryGet<EndCapComboDef>(id, out var c) ? c : null);
 
     private bool DrawLayer(TileDef tile, FloorDef? floor, PaintLayer layer, RenderTarget2D target)
     {
@@ -204,7 +209,7 @@ public sealed class TileVisuals : IDisposable
     /// <summary>One wall piece: its picture (pinned, slanted, maybe mirrored) cut to its cells, seams, caps and fade.</summary>
     private void DrawWallPiece(WallPiece piece, int feather, RenderTarget2D target)
     {
-        var (mask, rect, maskKey) = Mask(piece.Cells, feather, piece.Stencils, piece.Clips, piece.Fade);
+        var (mask, rect, maskKey) = Mask(piece.Cells, feather, piece.Stencils, piece.Clips, piece.Fade, piece.Bottom);
         if (mask is null) return;
         Texture2D tex = piece.IsOverlay ? _textures.Pixel : _textures.Get(piece.Texture);
         var corners = piece.IsOverlay
@@ -374,24 +379,26 @@ public sealed class TileVisuals : IDisposable
     public long WallsTicks, MaskTicks;
     public static double TicksToMs(long t) => t * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
 
-    private (Texture2D? mask, Rectangle rect, string key) Mask(IReadOnlyCollection<CellCoord> cells, int feather, IReadOnlyList<CellStencil> stencils, IReadOnlyList<ClipZone>? clips, EdgeFade? fade)
+    private (Texture2D? mask, Rectangle rect, string key) Mask(IReadOnlyCollection<CellCoord> cells, int feather, IReadOnlyList<CellStencil> stencils, IReadOnlyList<ClipZone>? clips, EdgeFade? fade,
+        IReadOnlyList<BottomSegment>? bottom = null)
     {
         long m0 = _bakeClock.ElapsedTicks;
-        try { return MaskCore(cells, feather, stencils, clips, fade); }
+        try { return MaskCore(cells, feather, stencils, clips, fade, bottom); }
         finally { MaskTicks += _bakeClock.ElapsedTicks - m0; }
     }
 
-    private (Texture2D? mask, Rectangle rect, string key) MaskCore(IReadOnlyCollection<CellCoord> cells, int feather, IReadOnlyList<CellStencil> stencils, IReadOnlyList<ClipZone>? clips, EdgeFade? fade)
+    private (Texture2D? mask, Rectangle rect, string key) MaskCore(IReadOnlyCollection<CellCoord> cells, int feather, IReadOnlyList<CellStencil> stencils, IReadOnlyList<ClipZone>? clips, EdgeFade? fade,
+        IReadOnlyList<BottomSegment>? bottom)
     {
         var sb = new StringBuilder();
         foreach (var c in cells.OrderBy(c => c.Q).ThenBy(c => c.R)) sb.Append(c.Q).Append(',').Append(c.R).Append(' ');
         sb.Append('|').Append(feather);
-        foreach (var st in stencils) sb.Append("|s").Append(st.Cell.Q).Append(',').Append(st.Cell.R).Append(':').Append(st.Stencil).Append(st.FlipX ? "x" : "").Append(st.FlipY ? "y" : "");
+        foreach (var st in stencils) sb.Append("|s").Append(st.Key);
         string shapeKey = sb.ToString();   // cells + soft edge: the expensive part
         if (clips is not null) foreach (var c in clips) sb.Append("|c").Append(c.Key);
         string baseKey = sb.ToString();    // + cut lines (corners, trims, caps): cheap to redo
         string slot = baseKey + "|" + (fade is { } f0 ? $"{f0.Lower}/{f0.Angle}" : "none");
-        string fadeKey = fade?.ToString() ?? "none";
+        string fadeKey = (fade?.ToString() ?? "none") + (bottom is { Count: > 0 } && fade is not null ? "|b" + string.Join(";", bottom.Select(x => x.Key)) : "");
         _tick++;
         if (_masks.TryGetValue(slot, out var hit) && _maskFade.TryGetValue(slot, out var had) && had == fadeKey && _maskArea.TryGetValue(slot, out var hitArea))
         {
@@ -431,6 +438,7 @@ public sealed class TileVisuals : IDisposable
             string edgeKey = shapeKey + "|" + f.Lower + "/" + f.Angle;
             if (!_edges.TryGetValue(edgeKey, out var edge)) _edges[edgeKey] = edge = RegionMask.EdgeIn(b.area, b.inside, f);
             RegionMask.ApplyFadeIn(b.area, a, edge, f);
+            if (bottom is { Count: > 0 }) RegionMask.ApplyBottomIn(b.area, a, edge, f, bottom, LoadStencil);
         }
         var colors = new Color[a.Length];
         for (int i = 0; i < a.Length; i++)

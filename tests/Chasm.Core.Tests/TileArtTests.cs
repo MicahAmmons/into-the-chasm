@@ -232,8 +232,77 @@ public class TileArtTests
         var w = Chasm.Core.Serialization.ChasmJson.Deserialize<WallDef>(json)!;
         Assert.Equal(20, w.OuterCorners[0].Blend);
         Assert.Equal(EndCapStyle.Stencil, w.EndCapVariants[0].Style);
-        Assert.Equal("stencils/a.png", w.EndCapVariants[0].Stencil);
+        Assert.Equal("stencils/a.png", w.EndCapVariants[0].Rows[0].Stencil);   // the old single stencil = row 1
         Assert.DoesNotContain("CornerBlend", Chasm.Core.Serialization.ChasmJson.Serialize(w));
+    }
+
+    [Fact]
+    public void Cell_stencils_can_hide_a_cell_or_move_and_turn_the_mask()
+    {
+        var cell = new CellCoord(12, 3);
+        var c = IsoGrid.CellCenter(cell);
+        var cells = new List<CellCoord> { cell };
+        var hide = RegionMask.BuildBase(cells, 0, new List<CellStencil> { new() { Cell = cell, Hide = true } }, _ => null).shape;
+        Assert.Equal(0f, At(hide, c.X, c.Y), 2);
+        // Left half kept, right half cut; moved 40 px right, the cut moves with it.
+        var half = new StencilImage(8, 1, new[] { 1f, 1f, 1f, 1f, 0f, 0f, 0f, 0f });
+        var moved = RegionMask.BuildBase(cells, 0, new List<CellStencil> { new() { Cell = cell, Stencil = "h", OffsetX = 40 } }, _ => half).shape;
+        Assert.Equal(1f, At(moved, c.X + 20, c.Y), 2);     // was cut, now inside the moved kept half
+        var turned = RegionMask.BuildBase(cells, 0, new List<CellStencil> { new() { Cell = cell, Stencil = "h", Rotation = 180 } }, _ => half).shape;
+        Assert.Equal(0f, At(turned, c.X - 20, c.Y), 2);    // turned around: the left half is now cut
+    }
+
+    [Fact]
+    public void End_caps_go_row_by_row_and_combos_stay_linked()
+    {
+        var t = WalkableTile(Enumerable.Range(4, 6).Select(q => new CellCoord(q, 3)).ToArray());
+        var (floor, walls, grey, _) = WallFloor();
+        grey.Depth = 4;
+        t.WallPaint.Add(new TileWallPaint { Side = "down", Wall = TileWallPaint.NoWall, Cells = { new(7, 4) } });
+        var combo = new EndCapComboDef { Id = "taper", Rows = { new EndCapRow { Mode = EndCapRowMode.Stencil, Stencil = "s1" }, new EndCapRow { Mode = EndCapRowMode.Stencil, Stencil = "s2" }, new EndCapRow { Mode = EndCapRowMode.Hide } } };
+        grey.EndCapVariants = new() { new EndCapVariant { Style = EndCapStyle.Stencil, Combo = "taper" } };
+        var pieces = AutoWalls.Build(t, floor, false, walls, null, id => id == "taper" ? combo : null);
+        var stencils = pieces.SelectMany(p => p.Stencils).ToList();
+        Assert.Contains(stencils, x => x.Stencil == "s1");
+        Assert.Contains(stencils, x => x.Stencil == "s2");
+        Assert.Contains(stencils, x => x.Hide);
+        Assert.DoesNotContain(stencils, x => x.Stencil == "" && !x.Hide);            // row 4 = keep (nothing added)
+        // Both ends of the gap: one mirrored.
+        Assert.Contains(stencils, x => x.Stencil == "s1" && x.FlipX);
+        Assert.Contains(stencils, x => x.Stencil == "s1" && !x.FlipX);
+        combo.Rows[0].Stencil = "s1b";                                                  // edit the combo: walls follow
+        Assert.Contains(AutoWalls.Build(t, floor, false, walls, null, id => id == "taper" ? combo : null).SelectMany(p => p.Stencils), x => x.Stencil == "s1b");
+    }
+
+    [Fact]
+    public void Bottom_edge_follows_the_fade_and_cells_can_swap_it()
+    {
+        var t = WalkableTile(Enumerable.Range(4, 6).Select(q => new CellCoord(q, 3)).ToArray());
+        var (floor, walls, _, _) = WallFloor();
+        floor.WallDownFade = new WallFade { Start = 1, Length = 2, Angle = FadeAngle.Level };
+        var entry = floor.WallsDown[0];
+        entry.BottomEdges.Add(new BottomEdgeVariant { Name = "A", Stencil = "teeth", Height = 64, Repeat = 128 });
+        entry.BottomEdges.Add(new BottomEdgeVariant { Name = "B", Stencil = "crumble" });
+        var junctions = new List<WallJunction>();
+        var face = AutoWalls.Build(t, floor, false, walls, junctions).First(p => p.Kind == WallPieceKind.Face && !p.RightFace);
+        Assert.All(face.Bottom, b => Assert.Equal("teeth", b.Stencil));
+        Assert.Contains(junctions, j => j.Part == WallPart.BottomEdge && j.Count == 2);
+        // The strip: kept above, its picture inside, cut below - measured from the fade.
+        var area = MaskArea.Full;
+        var a = Enumerable.Repeat(1f, RegionMask.Width * RegionMask.Height).ToArray();
+        var edge = Enumerable.Repeat(100f, RegionMask.Width).ToArray();          // wall edge at half-res y 100
+        var half = new StencilImage(1, 2, new[] { 1f, 0f });                       // strip: top kept, bottom cut
+        RegionMask.ApplyBottomIn(area, a, edge, floor.WallDownFade is var f ? new EdgeFade(true, f.Start, f.Length, f.Angle) : default,
+            new[] { new BottomSegment(0, 1920, "teeth", 0, 64, 128, false) }, _ => half);
+        // Strip bottom at (1 + 2*0.5) cells = 2 cells = 64 half-res px below the edge; 32 half-res tall.
+        Assert.Equal(1f, a[(100 + 20) * RegionMask.Width + 200], 2);               // above the strip
+        Assert.Equal(1f, a[(100 + 38) * RegionMask.Width + 200], 2);               // strip top half: kept
+        Assert.Equal(0f, a[(100 + 58) * RegionMask.Width + 200], 2);               // strip bottom half: cut
+        Assert.Equal(0f, a[(100 + 80) * RegionMask.Width + 200], 2);               // below: cut
+        // A tile swaps one cell to B.
+        t.WallVariants.Add(new TileWallVariant { Side = "down", Part = WallPart.BottomEdge, Cell = new(6, 4), Index = 1 });
+        face = AutoWalls.Build(t, floor, false, walls).First(p => p.Kind == WallPieceKind.Face && !p.RightFace);
+        Assert.Contains(face.Bottom, b => b.Stencil == "crumble");
     }
 
     [Fact]

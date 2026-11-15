@@ -108,6 +108,16 @@ public static class Ui
         ImGui.PopStyleColor();
     }
 
+    /// <summary>Coloured text that wraps to the panel width, shown exactly as written.</summary>
+    public static void ColoredWrapped(Num.Vector4 color, string text)
+    {
+        ImGui.PushStyleColor(ImGuiCol.Text, color);
+        ImGui.PushTextWrapPos(0f);
+        ImGui.TextUnformatted(text);
+        ImGui.PopTextWrapPos();
+        ImGui.PopStyleColor();
+    }
+
     /// <summary>A small coloured label like "unsaved" or "sketch".</summary>
     public static void Badge(string text, Num.Vector4 color)
     {

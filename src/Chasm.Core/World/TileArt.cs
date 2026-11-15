@@ -152,6 +152,16 @@ public sealed class CellStencil
     [Texture] public string Stencil { get; set; } = "";
     public bool FlipX { get; set; }
     public bool FlipY { get; set; }
+    /// <summary>Turns the mask around the cell's middle (degrees).</summary>
+    public float Rotation { get; set; }
+    /// <summary>Moves the mask within the cell (pixels).</summary>
+    public float OffsetX { get; set; }
+    public float OffsetY { get; set; }
+    public float Scale { get; set; } = 1f;
+    /// <summary>Cut the whole cell (draw nothing there).</summary>
+    public bool Hide { get; set; }
+
+    public string Key => $"{Cell.Q},{Cell.R}:{Stencil}{(FlipX ? "x" : "")}{(FlipY ? "y" : "")}{(Hide ? "H" : "")}{(Rotation != 0 || OffsetX != 0 || OffsetY != 0 || Scale != 1 ? $"/{Rotation:0.#},{OffsetX:0.#},{OffsetY:0.#},{Scale:0.##}" : "")}";
 }
 
 /// <summary>A stencil's alpha channel, 0..1, row by row.</summary>
