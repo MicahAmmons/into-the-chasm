@@ -437,6 +437,28 @@ public class TileArtTests
     }
 
     [Fact]
+    public void Long_walls_repeat_the_picture_on_a_fixed_grid()
+    {
+        var (floor, walls, grey, _) = WallFloor();
+        grey.Scale = 1; grey.MaxRun = 40;
+        float Cover(TileDef t, out List<System.Numerics.Vector2[]> copies)
+        {
+            var face = AutoWalls.Build(t, floor, false, walls).First(p => p.Kind == WallPieceKind.Face && !p.RightFace);
+            float min = face.Cells.Min(c => IsoGrid.CellCenter(c).X) - 64, max = face.Cells.Max(c => IsoGrid.CellCenter(c).X) + 64;
+            copies = face.Copies(256, 256, min, max);                 // a picture 2 cells wide
+            Assert.True(copies.Min(c => c.Min(p => p.X)) <= min && copies.Max(c => c.Max(p => p.X)) >= max);
+            return copies[0][0].X;
+        }
+        var shortPath = WalkableTile(Enumerable.Range(4, 3).Select(q => new CellCoord(q, 3)).ToArray());
+        var longPath = WalkableTile(Enumerable.Range(4, 12).Select(q => new CellCoord(q, 3)).ToArray());
+        Cover(shortPath, out var a);
+        Cover(longPath, out var b);
+        Assert.True(b.Count > a.Count);                               // more copies, not a stretched or slid picture
+        // Copies the two share sit in exactly the same place.
+        Assert.Contains(b, cb => a.Any(ca => ca.Zip(cb).All(z => System.Numerics.Vector2.Distance(z.First, z.Second) < 0.01f)));
+    }
+
+    [Fact]
     public void Cloud_direction_sets_scroll_offset()
     {
         var c = new CloudLayer { Speed = 10, Direction = 90 };
