@@ -1,0 +1,61 @@
+{
+  "Id": "stormy_sky",
+  "Name": "Stormy sky",
+  "Category": "Clouds",
+  "Layers": [
+    {
+      "Id": "layer_1",
+      "Name": "Deep storm",
+      "Enabled": true,
+      "Prefab": "",
+      "Texture": "Archive/Original Art/backgrounds/clouds/Cloud1.png",
+      "Tint": "#5a6380",
+      "Opacity": 1,
+      "Blend": "Normal",
+      "Speed": 12,
+      "Direction": 0,
+      "Scale": 1.6,
+      "Mirror": true,
+      "Pattern": "Scroll",
+      "PatternAmount": 40,
+      "PatternCycle": 8,
+      "RippleLength": 320
+    },
+    {
+      "Id": "layer_2",
+      "Name": "Purple drift",
+      "Enabled": true,
+      "Prefab": "",
+      "Texture": "Archive/Original Art/backgrounds/clouds/Cloud1.png",
+      "Tint": "#9a7fc0",
+      "Opacity": 0.5,
+      "Blend": "Screen",
+      "Speed": 35,
+      "Direction": 180,
+      "Scale": 1.0,
+      "Mirror": true,
+      "Pattern": "Scroll",
+      "PatternAmount": 40,
+      "PatternCycle": 8,
+      "RippleLength": 320
+    },
+    {
+      "Id": "layer_3",
+      "Name": "Fast wisps",
+      "Enabled": true,
+      "Prefab": "",
+      "Texture": "Archive/Original Art/backgrounds/clouds/Cloud1.png",
+      "Tint": "#ffffff",
+      "Opacity": 0.35,
+      "Blend": "Normal",
+      "Speed": 70,
+      "Direction": 20,
+      "Scale": 0.7,
+      "Mirror": true,
+      "Pattern": "Wave",
+      "PatternAmount": 60,
+      "PatternCycle": 10,
+      "RippleLength": 320
+    }
+  ]
+}

@@ -62,11 +62,24 @@ public sealed partial class MapEditorScene
             if (ImGui.Checkbox("##on", ref on)) { c.Enabled = on; Edited(); }
             if (ImGui.IsItemHovered()) ImGui.SetTooltip("Show this layer");
             ImGui.SameLine();
-            Thumb(c.Texture, 26);
+            Thumb(PrefabOf(c)?.Layers.FirstOrDefault()?.Texture ?? c.Texture, 26);
             ImGui.SameLine();
             bool open = _openCloud == c.Id;
-            if (ImGui.Selectable($"{c.Name}  [{c.Id}]", open, ImGuiSelectableFlags.None, new Num.Vector2(0, 26))) _openCloud = open ? null : c.Id;
-            if (open)
+            bool isPrefab = !string.IsNullOrEmpty(c.Prefab);
+            string label = isPrefab ? $"{c.Name}  [prefab, {PrefabOf(c)?.Layers.Count ?? 0} layers]" : $"{c.Name}  [{c.Id}]";
+            if (isPrefab) ImGui.PushStyleColor(ImGuiCol.Text, Ui.Blue);
+            if (ImGui.Selectable(label, open, ImGuiSelectableFlags.None, new Num.Vector2(0, 26))) _openCloud = open ? null : c.Id;
+            if (isPrefab) ImGui.PopStyleColor();
+            if (open && isPrefab)
+            {
+                ImGui.Indent();
+                if (PrefabEntry(floor, clouds, i)) Edited();
+                if (ImGui.Button("Delete")) remove = i;
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Takes it off this floor. The prefab itself stays saved.");
+                ImGui.Unindent();
+                ImGui.Spacing();
+            }
+            else if (open)
             {
                 ImGui.Indent();
                 if (CloudFields(c)) Edited();
@@ -94,6 +107,16 @@ public sealed partial class MapEditorScene
             Edited();
             Art.ArtBrowser.OpenPick(null, k => { layer.Texture = k; Edited(); });
         }
+        ImGui.SameLine();
+        if (ImGui.Button("+ Add prefab...")) _openAddCloudPrefab = true;
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Add a saved stack of cloud layers as one entry (or start a new one).");
+        if (clouds.Any(c => string.IsNullOrEmpty(c.Prefab)))
+        {
+            if (ImGui.Button("Save layers as prefab...")) OpenSaveCloudPrefab(clouds);
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Bundle some of these layers into a prefab you can use on other floors and tiles.");
+        }
+        AddCloudPrefabPopup(floor, clouds);
+        SaveCloudPrefabPopup(floor, clouds);
         ImGui.EndChild();
     }
 
@@ -114,7 +137,8 @@ public sealed partial class MapEditorScene
                 Edited();
             }
             ImGui.SameLine();
-            Thumb((o?.Settings ?? c).Texture, 26);
+            var shown = o?.Settings ?? c;
+            Thumb(PrefabOf(shown)?.Layers.FirstOrDefault()?.Texture ?? shown.Texture, 26);
             ImGui.SameLine();
             bool open = _openTileCloud == c.Id && o is not null;
             string state = o is null ? "(floor settings)" : o.Settings.Enabled ? "(overridden here)" : "(hidden on this tile)";
@@ -124,7 +148,7 @@ public sealed partial class MapEditorScene
             {
                 ImGui.Indent();
                 o.Settings.Id = c.Id;
-                if (CloudFields(o.Settings, nameEditable: false)) Edited();
+                if (!string.IsNullOrEmpty(o.Settings.Prefab) ? PrefabEntryFields(o.Settings) : CloudFields(o.Settings, nameEditable: false)) Edited();
                 if (ImGui.Button("Copy floor settings again")) { o.Settings = c.Copy(); Edited(); }
                 ImGui.SameLine();
                 if (ImGui.Button("Remove override")) { tile.CloudOverrides.Remove(o); Edited(); }
