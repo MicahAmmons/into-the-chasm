@@ -285,6 +285,8 @@ public sealed class WallPiece
     public List<CellCoord> Cells { get; } = new();
     /// <summary>Where the picture's lip sits.</summary>
     public Vector2 Lip { get; set; }
+    /// <summary>Slope (down per across) of the edge line the lip runs along; copies of the picture follow it.</summary>
+    public float EdgeSlope { get; set; }
     public float Skew { get; set; }
     public bool Mirror { get; set; }
     public List<ClipZone> Clips { get; } = new();
@@ -326,6 +328,32 @@ public sealed class WallPiece
         if (Mirror) pts = new[] { M(pts[1]), M(pts[0]), M(pts[3]), M(pts[2]) };
         return pts;
         Vector2 M(Vector2 p) => new(2 * anchor.X - p.X, p.Y);
+    }
+
+    /// <summary>
+    /// Faces and rims: the picture repeated along the edge so it covers <paramref name="minX"/> to
+    /// <paramref name="maxX"/> however long the wall is. The copies sit on a grid fixed in the world
+    /// (one picture width apart), so making a path longer never slides the art already there.
+    /// Other pieces: the one picture.
+    /// </summary>
+    public List<Vector2[]> Copies(int texW, int texH, float minX, float maxX)
+    {
+        var one = Corners(texW, texH);
+        float w = texW * Wall.Scale;
+        if (Kind is not (WallPieceKind.Face or WallPieceKind.Rim) || w < 8) return new() { one };
+        var list = new List<Vector2[]>();
+        int k0 = (int)MathF.Floor((minX - w / 2) / w) - 1, k1 = (int)MathF.Ceiling((maxX + w / 2) / w) + 1;
+        if (k1 - k0 > 60) return new() { one };
+        for (int k = k0; k <= k1; k++)
+        {
+            float dx = k * w - Lip.X;
+            var d = new Vector2(dx, EdgeSlope * dx);
+            var c = one.Select(p => p + d).ToArray();
+            // Only copies that reach into the span.
+            if (c.Max(p => p.X) < minX || c.Min(p => p.X) > maxX) continue;
+            list.Add(c);
+        }
+        return list.Count > 0 ? list : new() { one };
     }
 }
 
@@ -454,6 +482,7 @@ public static class AutoWalls
                 Wall = wall, RightFace = !isLeft, Up = up,
                 Skew = mirror ? -desired : desired, Mirror = mirror,
                 Lip = run.Select(w => EdgeMid(w, isLeft, up)).Aggregate(Vector2.Zero, (a, b) => a + b) / run.Count,
+                EdgeSlope = (isLeft ^ up) ? Slope : -Slope,
                 Fade = fade,
             };
             // The columns under both ends of each edge: one column alone stops in a zig-zag of half
@@ -651,7 +680,7 @@ public static class AutoWalls
 
         WallPiece MakeRim(WallDef wall, List<CellCoord> run, bool isLeft, WallPiece face)
         {
-            var rim = new WallPiece { Wall = wall, Kind = WallPieceKind.Rim, RightFace = face.RightFace, Up = up, Skew = face.Skew, Mirror = face.Mirror, Lip = face.Lip };
+            var rim = new WallPiece { Wall = wall, Kind = WallPieceKind.Rim, RightFace = face.RightFace, Up = up, Skew = face.Skew, Mirror = face.Mirror, Lip = face.Lip, EdgeSlope = face.EdgeSlope };
             rim.Cells.AddRange(run);
             float cells = Math.Max(0.05f, wall.RimHeight / EdgeFade.CellPx);
             var angle = !wall.SkewFaces ? FadeAngle.Level : (isLeft ^ up ? FadeAngle.DownRight : FadeAngle.DownLeft);

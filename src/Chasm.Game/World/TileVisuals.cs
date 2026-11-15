@@ -212,13 +212,14 @@ public sealed class TileVisuals : IDisposable
         var (mask, rect, maskKey) = Mask(piece.Cells, feather, piece.Stencils, piece.Clips, piece.Fade, piece.Bottom, piece.Ends);
         if (mask is null) return;
         Texture2D tex = piece.IsOverlay ? _textures.Pixel : _textures.Get(piece.Texture);
-        var corners = piece.IsOverlay
-            ? new[] { new System.Numerics.Vector2(rect.Left, rect.Top), new System.Numerics.Vector2(rect.Right, rect.Top), new System.Numerics.Vector2(rect.Right, rect.Bottom), new System.Numerics.Vector2(rect.Left, rect.Bottom) }
-            : piece.Corners(tex.Width, tex.Height);
-        string content = $"{maskKey}#{piece.Kind}|{(piece.IsOverlay ? "" : piece.Texture)}|{piece.Tint}|{piece.Opacity:0.###}|{piece.Wall.FlipX}{piece.Wall.FlipY}{CornersKey(corners)}";
+        // The picture, repeated along long walls (copies fixed to the world, so they never slide).
+        var copies = piece.IsOverlay
+            ? new() { new[] { new System.Numerics.Vector2(rect.Left, rect.Top), new System.Numerics.Vector2(rect.Right, rect.Top), new System.Numerics.Vector2(rect.Right, rect.Bottom), new System.Numerics.Vector2(rect.Left, rect.Bottom) } }
+            : piece.Copies(tex.Width, tex.Height, rect.Left, rect.Right);
+        string content = $"{maskKey}#{piece.Kind}|{(piece.IsOverlay ? "" : piece.Texture)}|{piece.Tint}|{piece.Opacity:0.###}|{piece.Wall.FlipX}{piece.Wall.FlipY}{string.Concat(copies.Select(CornersKey))}";
         string identity = $"wall:{piece.Kind}:{piece.Up}:{piece.RightFace}:{piece.Lip.X:0.#},{piece.Lip.Y:0.#}";
         bool flipX = !piece.IsOverlay && piece.Wall.FlipX, flipY = !piece.IsOverlay && piece.Wall.FlipY;
-        Piece(identity, content, mask, rect, target, r => DrawQuad(tex, corners, piece.Tint, flipX, flipY, piece.IsOverlay ? piece.Opacity : 1f, r));
+        Piece(identity, content, mask, rect, target, r => { foreach (var c in copies) DrawQuad(tex, c, piece.Tint, flipX, flipY, piece.IsOverlay ? piece.Opacity : 1f, r); });
     }
 
     // ------------------------------------------------------------------ piece cache
