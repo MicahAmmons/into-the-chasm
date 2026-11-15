@@ -185,6 +185,44 @@ public static class RegionMask
     }
 
     /// <summary>
+    /// Wall-end masks (see <see cref="EndStencil"/>): each one shapes one 64 px slice of the end.
+    /// Applied after the blur, like the cut lines.
+    /// </summary>
+    public static void ApplyEndsIn(MaskArea area, float[] a, IReadOnlyList<EndStencil> ends, Func<string, StencilImage?> loadStencil)
+    {
+        foreach (var e in ends)
+        {
+            var img = e.Hide ? null : loadStencil(e.Stencil);
+            if (!e.Hide && img is null) continue;
+            float w = e.EndX - e.InnerX, size = EndStencil.Size, aw = Math.Abs(w);
+            float rad = -e.Rotation * MathF.PI / 180f, cos = MathF.Cos(rad), sin = MathF.Sin(rad);
+            float scale = Math.Max(0.05f, e.Scale);
+            // Reach one slice inward too, so a mask moved or grown toward the wall still shows.
+            float xa = Math.Min(e.InnerX - w, e.EndX + 0.25f * w), xb = Math.Max(e.InnerX - w, e.EndX + 0.25f * w);
+            int x0 = Math.Max(area.X, (int)(xa / 2) - 1), x1 = Math.Min(area.X + area.W - 1, (int)(xb / 2) + 1);
+            for (int x = x0; x <= x1; x++)
+            {
+                float px = x * 2 + 1;
+                float u = (px - e.InnerX) / w;               // 0 inner side, 1 at the end
+                for (int y = 0; y < area.H; y++)
+                {
+                    float py = (area.Y + y) * 2 + 1;
+                    float v = e.Depth(px, py) / size - e.Row;   // 0..1 inside this slice
+                    if (v < 0 || (v >= 1 && !(e.Hide && e.Last))) continue;
+                    int i = y * area.W + (x - area.X);
+                    if (e.Hide) { if (u >= 0 && u <= 1) a[i] = 0f; continue; }
+                    float lx = (u - 0.5f) * aw - e.OffsetX, ly = (v - 0.5f) * size - e.OffsetY;
+                    float rx = (lx * cos - ly * sin) / scale, ry = (lx * sin + ly * cos) / scale;
+                    float su = rx / aw + 0.5f, sv = ry / size + 0.5f;
+                    if (e.FlipY) sv = 1 - sv;
+                    if (su < 0 || su > 1 || sv < 0 || sv > 1) continue; // outside the mask: keep
+                    a[i] *= img!.Sample(su, sv);
+                }
+            }
+        }
+    }
+
+    /// <summary>
     /// Bottom edges: along the wall, a strip mask replaces the smooth end of the fade with a shape
     /// (rock tips, crumbling...). The strip sits at the fade, so it moves with the cloud level.
     /// Above the strip: kept. In it: the strip's own picture (opaque keeps). Below it: cut.

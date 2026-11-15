@@ -99,38 +99,41 @@ public static class StencilArt
     /// that ENDS ON THE RIGHT (mirrored automatically for left ends). Opaque keeps, transparent cuts.
     /// taper_1..3 cut deeper and deeper, for stacking down a column (row 1 gentle, row 2 deeper...).
     /// </summary>
+    /// <summary>
+    /// Wall-end masks: square, one 64 px slice of a wall end. Left = toward the wall, right = where
+    /// the wall stops, top = toward the walkway. The tapers line up slice to slice (1, then 2, then 3).
+    /// </summary>
     public static IEnumerable<string> GenerateEndCaps(string artRoot)
     {
         string dir = Path.Combine(artRoot, "stencils", "end caps");
         Directory.CreateDirectory(dir);
+        const int S = 128;
         var shapes = new (string name, Func<float, float, bool> keep, bool guides)[]
         {
             ("_template_end_cap", (_, _) => true, true),
-            ("taper_1", (u, v) => u < 0.88f - 0.22f * v * v, false),
-            ("taper_2", (u, v) => u < 0.72f - 0.3f * MathF.Pow(v, 1.4f), false),
-            ("taper_3", (u, v) => u < 0.55f - 0.35f * v, false),
-            ("round_end", (u, v) => ((u - 0.25f) / 0.62f) * ((u - 0.25f) / 0.62f) + ((v - 0.1f) / 0.95f) * ((v - 0.1f) / 0.95f) < 1, false),
-            ("jagged_end", (u, v) => u < 0.68f + 0.1f * Tri(v * 5) - 0.1f * v, false),
-            ("crumble_end", (u, v) => u < 0.66f + 0.07f * Rough(v * 2.5f) - 0.15f * v, false),
-            ("overhang_end", (u, v) => u < 0.95f - 0.75f * MathF.Pow(v, 0.6f), false),
+            ("taper_1", (u, v) => u < 1.0f - 0.3f * v, false),
+            ("taper_2", (u, v) => u < 0.7f - 0.3f * v, false),
+            ("taper_3", (u, v) => u < 0.4f - 0.3f * v, false),
+            ("round_end", (u, v) => !(u > 0.5f && v > 0.5f && (u - 0.5f) * (u - 0.5f) + (v - 0.5f) * (v - 0.5f) > 0.25f), false),
+            ("jagged_end", (u, v) => u < 0.86f + 0.12f * Tri(v * 4), false),
+            ("crumble_end", (u, v) => u < 0.82f + 0.08f * Rough(v * 2.5f) - 0.12f * v, false),
+            ("overhang_end", (u, v) => u < 1.0f - 0.85f * MathF.Pow(v, 0.6f), false),
         };
         foreach (var (name, keep, guides) in shapes)
         {
-            var px = new byte[W * H * 4];
-            for (int y = 0; y < H; y++)
-                for (int x = 0; x < W; x++)
+            var px = new byte[S * S * 4];
+            for (int y = 0; y < S; y++)
+                for (int x = 0; x < S; x++)
                 {
-                    float u = (x + 0.5f) / W, v = (y + 0.5f) / H;
-                    bool inDiamond = Math.Abs(u - 0.5f) * 2 + Math.Abs(v - 0.5f) * 2 <= 1.0f;
-                    int i = (y * W + x) * 4;
-                    if (!inDiamond || !keep(u, v)) continue;
-                    bool guide = guides && (Math.Abs(u - 0.5f) < 0.004f || Math.Abs(v - 0.5f) < 0.008f
-                        || Math.Abs(Math.Abs(u - 0.5f) * 2 + Math.Abs(v - 0.5f) * 2 - 1f) < 0.012f);
+                    float u = (x + 0.5f) / S, v = (y + 0.5f) / S;
+                    int i = (y * S + x) * 4;
+                    if (!keep(u, v)) continue;
+                    bool guide = guides && (Math.Abs(u - 0.5f) < 0.006f || Math.Abs(v - 0.5f) < 0.006f || u > 0.985f || v < 0.015f);
                     byte c = guide ? (byte)90 : (byte)235;
                     px[i] = c; px[i + 1] = c; px[i + 2] = guide ? (byte)200 : (byte)235; px[i + 3] = 255;
                 }
             string path = Path.Combine(dir, name + ".png");
-            PngWriter.Write(path, W, H, px, alpha: true);
+            PngWriter.Write(path, S, S, px, alpha: true);
             yield return path;
         }
     }

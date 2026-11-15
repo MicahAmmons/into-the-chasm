@@ -21,6 +21,15 @@
       "FlipY": false
     },
     {
+      "Mode": "Stencil",
+      "Stencil": "stencils/end caps/taper_3.png",
+      "Rotation": 0,
+      "OffsetX": 0,
+      "OffsetY": 0,
+      "Scale": 1,
+      "FlipY": false
+    },
+    {
       "Mode": "Hide",
       "Stencil": "",
       "Rotation": 0,

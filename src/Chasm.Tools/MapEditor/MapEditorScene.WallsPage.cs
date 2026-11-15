@@ -834,7 +834,7 @@ public sealed partial class MapEditorScene
         int depth = Math.Max(1, _wall?.Depth ?? 4);
         while (rows.Count < depth) rows.Add(new EndCapRow());
         _rowTab = Math.Clamp(_rowTab, 0, rows.Count - 1);
-        Ui.Hint("Cell 1 is the top of the end (under the walkway). Masks are drawn for a wall ending on the right; left ends mirror them.");
+        Ui.Hint("The end is the last 64 px of the wall, in slices 64 px tall: Cell 1 is the top slice (under the walkway). In a mask, left is toward the wall and right is where it stops; left-hand ends mirror it.");
         for (int i = 0; i < rows.Count; i++)
         {
             if (i > 0) ImGui.SameLine(0, 4);
@@ -853,10 +853,10 @@ public sealed partial class MapEditorScene
         if (row.Mode == EndCapRowMode.Stencil)
         {
             string st = row.Stencil;
-            if (StencilGrid("stencils/end caps", ref st, 64, 32)) { row.Stencil = st; rc = true; }
+            if (StencilGrid("stencils/end caps", ref st, 44, 44)) { row.Stencil = st; rc = true; }
             rc |= SliderRow("Turn", label, () => row.Rotation, x => row.Rotation = x, -180, 180, "%.0f deg");
             rc |= SliderRow("Move X", label, () => row.OffsetX, x => row.OffsetX = x, -64, 64, "%.0f px");
-            rc |= SliderRow("Move Y", label, () => row.OffsetY, x => row.OffsetY = x, -32, 32, "%.0f px");
+            rc |= SliderRow("Move Y", label, () => row.OffsetY, x => row.OffsetY = x, -64, 64, "%.0f px");
             rc |= SliderRow("Size", label, () => row.Scale, x => row.Scale = x, 0.25f, 3f, "%.2fx");
             bool fy = row.FlipY;
             if (ImGui.Checkbox("Flip Y##rfy", ref fy)) { row.FlipY = fy; rc = true; }
