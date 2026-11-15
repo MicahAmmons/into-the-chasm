@@ -6,9 +6,28 @@
   "Theme": "",
   "Clouds": [
     {
+      "Id": "cloud_2",
+      "Name": "Bottom clouds 2",
+      "Enabled": true,
+      "Prefab": "",
+      "Texture": "backgrounds/clouds/cloud_sea_seamless_2208.png",
+      "Tint": "#ffffff",
+      "Opacity": 1,
+      "Blend": "Normal",
+      "Speed": 20,
+      "Direction": 0,
+      "Scale": 1,
+      "Mirror": false,
+      "Pattern": "Scroll",
+      "PatternAmount": 40,
+      "PatternCycle": 8,
+      "RippleLength": 320
+    },
+    {
       "Id": "cloud_1",
       "Name": "Cloud sea",
       "Enabled": true,
+      "Prefab": "",
       "Texture": "Archive/Original Art/backgrounds/clouds/Cloud1.png",
       "Tint": "#ffffff",
       "Opacity": 1,
@@ -74,9 +93,9 @@
   ],
   "Prefabs": [],
   "WallDownFade": {
-    "Start": 0.5,
-    "Length": 2.73,
-    "Angle": "Level"
+    "Start": 0.73,
+    "Length": 3.45,
+    "Angle": "Auto"
   },
   "WallUpFade": {
     "Start": 1,
@@ -95,7 +114,7 @@
       "BottomEdges": [
         {
           "Name": "Jagged rocks",
-          "Stencil": "stencils/bottom edges/jagged_rocks.png",
+          "Stencil": "stencils/bottom edges/wavy.png",
           "Offset": 0,
           "Height": 64,
           "Repeat": 256,

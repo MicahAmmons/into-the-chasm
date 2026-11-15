@@ -1,0 +1,62 @@
+{
+  "Id": "ping_tinge",
+  "Name": "Ping Tinge",
+  "Category": "Clouds",
+  "Layers": [
+    {
+      "Id": "layer_1",
+      "Name": "Bottom clouds 2",
+      "Enabled": true,
+      "Prefab": "",
+      "Texture": "backgrounds/clouds/cloud_sea_seamless_2208.png",
+      "Tint": "#98eaf2",
+      "Opacity": 1,
+      "Blend": "Add",
+      "Speed": 45,
+      "Direction": 124.69515,
+      "Scale": 1,
+      "Mirror": false,
+      "Pattern": "Scroll",
+      "PatternAmount": 40,
+      "PatternCycle": 8,
+      "RippleLength": 320
+    },
+    {
+      "Id": "layer_2",
+      "Name": "Cloud sea",
+      "Enabled": true,
+      "Prefab": "",
+      "Texture": "Archive/Original Art/backgrounds/clouds/Cloud1.png",
+      "Tint": "#ffffff",
+      "Opacity": 0.91,
+      "Blend": "Normal",
+      "Speed": 15,
+      "Direction": 0,
+      "Scale": 1,
+      "Mirror": true,
+      "Pattern": "Wave",
+      "PatternAmount": 40,
+      "PatternCycle": 8,
+      "RippleLength": 320
+    },
+    {
+      "Id": "layer_3",
+      "Name": "Bottom clouds 3",
+      "Enabled": true,
+      "Prefab": "",
+      "Texture": "backgrounds/clouds/cloud_sea_seamless_2208.png",
+      "Tint": "#7ab2b2",
+      "Opacity": 0.07,
+      "Blend": "Normal",
+      "Speed": 4,
+      "Direction": 318.8141,
+      "Scale": 1,
+      "Mirror": false,
+      "Pattern": "Scroll",
+      "PatternAmount": 40,
+      "PatternCycle": 8,
+      "RippleLength": 320
+    }
+  ],
+  "Notes": ""
+}

@@ -1,0 +1,61 @@
+{
+  "Id": "test",
+  "Name": "test",
+  "Rows": [
+    {
+      "Mode": "Stencil",
+      "Stencil": "stencils/end caps/jagged_end.png",
+      "Rotation": 0,
+      "OffsetX": 0,
+      "OffsetY": 0,
+      "Scale": 1,
+      "FlipY": false
+    },
+    {
+      "Mode": "Keep",
+      "Stencil": "",
+      "Rotation": 0,
+      "OffsetX": 0,
+      "OffsetY": 0,
+      "Scale": 1,
+      "FlipY": false
+    },
+    {
+      "Mode": "Keep",
+      "Stencil": "",
+      "Rotation": 0,
+      "OffsetX": 0,
+      "OffsetY": 0,
+      "Scale": 1,
+      "FlipY": false
+    },
+    {
+      "Mode": "Keep",
+      "Stencil": "",
+      "Rotation": 0,
+      "OffsetX": 0,
+      "OffsetY": 0,
+      "Scale": 1,
+      "FlipY": false
+    },
+    {
+      "Mode": "Keep",
+      "Stencil": "",
+      "Rotation": 0,
+      "OffsetX": 0,
+      "OffsetY": 0,
+      "Scale": 1,
+      "FlipY": false
+    },
+    {
+      "Mode": "Keep",
+      "Stencil": "",
+      "Rotation": 0,
+      "OffsetX": 0,
+      "OffsetY": 0,
+      "Scale": 1,
+      "FlipY": false
+    }
+  ],
+  "Notes": ""
+}

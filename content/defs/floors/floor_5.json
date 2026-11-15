@@ -1,0 +1,88 @@
+{
+  "Id": "floor_5",
+  "Name": "Test floor",
+  "Number": 5,
+  "EntryTile": "",
+  "Theme": "",
+  "Clouds": [
+    {
+      "Id": "cloud_1",
+      "Name": "Ping Tinge",
+      "Enabled": true,
+      "Prefab": "ping_tinge",
+      "Texture": "",
+      "Tint": "#ffffff",
+      "Opacity": 1,
+      "Blend": "Normal",
+      "Speed": 20,
+      "Direction": 0,
+      "Scale": 1,
+      "Mirror": false,
+      "Pattern": "Scroll",
+      "PatternAmount": 40,
+      "PatternCycle": 8,
+      "RippleLength": 320
+    },
+    {
+      "Id": "cloud_2",
+      "Name": "Bottom clouds 2",
+      "Enabled": true,
+      "Prefab": "",
+      "Texture": "",
+      "Tint": "#ffffff",
+      "Opacity": 1,
+      "Blend": "Normal",
+      "Speed": 20,
+      "Direction": 0,
+      "Scale": 1,
+      "Mirror": false,
+      "Pattern": "Scroll",
+      "PatternAmount": 40,
+      "PatternCycle": 8,
+      "RippleLength": 320
+    }
+  ],
+  "TopClouds": [],
+  "DefaultFeather": 6,
+  "BackgroundColor": "#1a1d2e",
+  "AmbientTint": "#ffffff",
+  "FogColor": "#000000",
+  "Music": "",
+  "DefaultEncounters": [],
+  "Materials": [],
+  "Prefabs": [],
+  "WallDownFade": {
+    "Start": 0,
+    "Length": 3.32,
+    "Angle": "Auto"
+  },
+  "WallUpFade": {
+    "Start": 1,
+    "Length": 1.5,
+    "Angle": "Auto"
+  },
+  "WallsDown": [
+    {
+      "Wall": "rock_cliff_alpha",
+      "FadeMode": "Default",
+      "Fade": {
+        "Start": 1,
+        "Length": 1.5,
+        "Angle": "Auto"
+      },
+      "BottomEdges": [
+        {
+          "Name": "Bottom 1",
+          "Stencil": "stencils/bottom edges/wavy.png",
+          "Offset": 0,
+          "Height": 45,
+          "Repeat": 150,
+          "FlipX": false
+        }
+      ]
+    }
+  ],
+  "WallsUp": [],
+  "Archived": false,
+  "Notes": ""
+}
