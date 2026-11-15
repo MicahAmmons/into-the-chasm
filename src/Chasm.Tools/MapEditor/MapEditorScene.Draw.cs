@@ -26,6 +26,7 @@ public sealed partial class MapEditorScene
         var s = Services;
         var t = _tile;
         if (_panel == Panel.WallEdit && _previewTile is not null && _wall is not null) { DrawWallPreview(batch); return; }
+        if (_panel == Panel.GroundEdit && _previewTile is not null && _ground is not null) { DrawGroundPreview(batch); return; }
         if (_gameView)
         {
             // As the game shows it: art, props and clouds only.
@@ -85,6 +86,7 @@ public sealed partial class MapEditorScene
         DrawFadeLines(b);
         DrawSheetHandles(b);
         DrawWallPaint(b);
+        DrawGroundPaint(b);
         DrawSwapMarkers(b);
         DrawPlacementOverlays(b);
         // Carved cells of the region being stencilled (or the selected region).

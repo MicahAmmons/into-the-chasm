@@ -221,6 +221,7 @@ public sealed partial class MapEditorScene
         _sheetMaterial = null;
         _prefabHandles = false;
         _wallBrush = null;
+        _groundBrush = null;
         _swapMode = false;
     }
 

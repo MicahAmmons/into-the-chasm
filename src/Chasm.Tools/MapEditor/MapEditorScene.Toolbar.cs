@@ -73,7 +73,9 @@ public sealed partial class MapEditorScene
             "Cliff and wall textures, in two lists: Wall down (cliffs fading into the bottom clouds) and Wall up (walls fading into the top clouds).");
         ImGui.SameLine();
         PanelButton("Clouds", Panel.Clouds, half, "Animated cloud layers behind the tile, in two lists: Bottom clouds and Top clouds. Tiles can override any layer.");
-        PanelButton("Properties", Panel.FloorProperties, full - 20,
+        PanelButton("Ground", Panel.Ground, half, "Ground on walkable cells (automatic, with painted exceptions) and on unwalkable cells (painted). Made of layered ground prefabs.");
+        ImGui.SameLine();
+        PanelButton("Properties", Panel.FloorProperties, half,
             "Floor-wide settings (name, look, numbers).\n\nWARNING: changes here affect EVERY tile on this floor.");
         ImGui.EndDisabled();
 

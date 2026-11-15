@@ -28,7 +28,7 @@ namespace Chasm.Tools.MapEditor;
 public sealed partial class MapEditorScene : Scene
 {
     private enum Tool { Select, Walkable, PlayerStarts, EnemySpawns, PaintTexture, PlaceProp, Interaction }
-    private enum Panel { Selection, FloorProperties, FloorTextures, Walls, Clouds, Reference, TileSettings, Prefab, WallEdit }
+    private enum Panel { Selection, FloorProperties, FloorTextures, Walls, Clouds, Reference, TileSettings, Prefab, WallEdit, Ground, GroundEdit }
 
     private const int LeftW = 310, RightW = 480, MenuH = 24, StatusH = 28;
 
@@ -117,6 +117,13 @@ public sealed partial class MapEditorScene : Scene
             if (parts.Contains("noregions")) { _tile.PaintRegions.Clear(); Services.TileVisuals.Invalidate(_tile); }
             if (parts.FirstOrDefault(x => x.StartsWith("groundpaint=")) is { } gp)
                 foreach (var c in IsoGrid.AllCells.Where(c => _tile.Walkable[c] && IsoGrid.CellCenter(c).X > 1000)) { var e = _tile.GroundPaint.FirstOrDefault(p => p.Ground == gp[12..]) ?? new TileGroundPaint { Side = "walk", Ground = gp[12..] }; if (!_tile.GroundPaint.Contains(e)) _tile.GroundPaint.Add(e); e.Cells.Add(c); }
+            // ground=<id>[:gstep=<n>]: open the ground builder at a step (0 = Base).
+            if (parts.FirstOrDefault(x => x.StartsWith("ground=")) is { } gd && Services.Defs.TryGet<GroundPrefabDef>(gd[7..], out var gDev))
+            {
+                OpenGroundEditor(gDev, isNew: false);
+                if (parts.FirstOrDefault(x => x.StartsWith("gstep=")) is { } gs && int.TryParse(gs[6..], out int gi)) GoToGroundStep((GroundStep)gi);
+                if (parts.FirstOrDefault(x => x.StartsWith("glayer=")) is { } gl) _openGroundLayer = gl[7..];
+            }
             if (parts.Contains("swap")) _swapMode = true;
             if (parts.Contains("bench")) _bench = true;
             if (parts.Contains("slider")) { _bench = true; _benchSlider = true; }
@@ -403,8 +410,8 @@ public sealed partial class MapEditorScene : Scene
         if (_bench && _benchFrames < 40)
         {
             if (_benchSlider && _wall is not null) { _wall.OuterCorners[0].BevelWidth = 10 + _benchFrames % 20; PreviewChanged(); }
-            var bt = _panel == Panel.WallEdit && _previewTile is not null ? _previewTile : _tile!;
-            var bf = _panel == Panel.WallEdit && _previewTile is not null ? _previewFloor : _floor;
+            var bt = InBuilderPreview ? _previewTile! : _tile!;
+            var bf = InBuilderPreview ? _previewFloor : _floor;
             var tv = Services.TileVisuals;
             if (_benchFrames == 10) { tv.WallsTicks = 0; tv.MaskTicks = 0; _benchTotal = 0; _benchRedrawn = 0; }
             tv.Invalidate(bt);

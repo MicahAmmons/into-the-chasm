@@ -30,6 +30,8 @@ public sealed partial class MapEditorScene
             case Panel.Prefab: PrefabPanel(); break;
             case Panel.WallEdit: WallEditPanel(); break;
             case Panel.Clouds: CloudsPanel(); break;
+            case Panel.Ground: GroundPanel(); break;
+            case Panel.GroundEdit: GroundEditPanel(); break;
             case Panel.Reference: ReferencePanel(); break;
             case Panel.TileSettings: TileSettingsPanel(); break;
             default:
@@ -56,6 +58,8 @@ public sealed partial class MapEditorScene
             Panel.Prefab => _prefab is null ? "Prefab" : $"Prefab: {_prefab.DisplayName}",
             Panel.WallEdit => _wall is null ? "Wall" : $"Wall: {(_wall.Name.Length > 0 ? _wall.Name : "(new)")}",
             Panel.Clouds => "Clouds",
+            Panel.Ground => $"Floor {_floor?.Number} ground",
+            Panel.GroundEdit => _ground is null ? "Ground" : $"Ground: {(_ground.Name.Length > 0 ? _ground.Name : "(new)")}",
             Panel.Reference => "Reference tile",
             Panel.TileSettings => "Tile settings",
             _ => _tool switch

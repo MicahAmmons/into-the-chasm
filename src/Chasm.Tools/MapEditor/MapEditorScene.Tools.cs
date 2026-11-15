@@ -48,6 +48,7 @@ public sealed partial class MapEditorScene
         var t = _tile!;
         if (UpdateWallPreviewInput(input)) return;
         if (UpdateWallBrush(input)) return;
+        if (UpdateGroundBrush(input)) return;
         if (UpdateWallSwap(input)) return;
         if (UpdatePrefabInput(input)) return;
         if (UpdateSheetHandles(input)) return;

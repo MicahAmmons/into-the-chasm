@@ -124,7 +124,7 @@ public sealed partial class MapEditorScene
             SetFloor(null);
             Services.Defs.Delete(typeof(FloorDef), id);
             _savedFloorJson = "";
-            if (_panel is Panel.FloorProperties or Panel.FloorTextures or Panel.Walls or Panel.Clouds or Panel.WallEdit) _panel = Panel.Selection;
+            if (_panel is Panel.FloorProperties or Panel.FloorTextures or Panel.Walls or Panel.Clouds or Panel.WallEdit or Panel.Ground or Panel.GroundEdit) _panel = Panel.Selection;
             Edited();
             Status($"Deleted floor {number}. Save the tile to keep it as a sketch.");
             ImGui.CloseCurrentPopup();

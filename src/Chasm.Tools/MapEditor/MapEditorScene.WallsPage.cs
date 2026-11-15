@@ -1034,7 +1034,7 @@ public sealed partial class MapEditorScene
     /// <summary>Wall builder: the map only previews (H toggles grid & captions).</summary>
     private bool UpdateWallPreviewInput(InputState input)
     {
-        if (_panel != Panel.WallEdit || _previewTile is null) return false;
+        if (!InBuilderPreview) return false;
         if (input.KeyPressed(Microsoft.Xna.Framework.Input.Keys.H) && !input.KeyboardCapturedByUi) _previewHelpers = !_previewHelpers;
         return true;
     }
