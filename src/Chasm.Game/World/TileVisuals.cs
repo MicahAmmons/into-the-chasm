@@ -439,7 +439,7 @@ public sealed class TileVisuals : IDisposable
             // The fade's edge only depends on the cells and direction, not on the cut lines.
             string edgeKey = shapeKey + "|" + f.Lower + "/" + f.Angle;
             if (!_edges.TryGetValue(edgeKey, out var edge)) _edges[edgeKey] = edge = RegionMask.EdgeIn(b.area, b.inside, f);
-            RegionMask.ApplyFadeIn(b.area, a, edge, f);
+            RegionMask.ApplyFadeIn(b.area, a, edge, f, bottom);
             if (bottom is { Count: > 0 }) RegionMask.ApplyBottomIn(b.area, a, edge, f, bottom, LoadStencil);
         }
         var colors = new Color[a.Length];
