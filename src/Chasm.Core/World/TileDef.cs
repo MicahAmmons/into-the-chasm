@@ -195,7 +195,7 @@ public sealed class FloorDef : Def
     public string EntryTile { get; set; } = "";
     [Multiline] public string Theme { get; set; } = "";
 
-    [Hidden, Tooltip("Animated cloud layers behind every tile on this floor. First = furthest back.")]
+    [Hidden, Tooltip("Bottom clouds: animated layers behind every tile on this floor (cliffs fade down into them). First = furthest back.")]
     public List<CloudLayer> Clouds
     {
         get => _clouds;
@@ -204,20 +204,23 @@ public sealed class FloorDef : Def
     private List<CloudLayer> _clouds = new() { new CloudLayer { Id = "cloud_1", Name = "Cloud sea", Texture = CloudStack.DefaultTexture, Mirror = true } };
     private bool _cloudsAreDefault = true;
 
+    [Hidden, Tooltip("Top clouds: drawn after (in front of) the bottom clouds, still behind the tile art. Walls fade up into them.")]
+    public List<CloudLayer> TopClouds { get; set; } = new();
+
     // Old floor files had two cloud bands; they become cloud layers when loaded (and vanish on save).
     [Hidden, JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public CloudLayerDef? LowerClouds { get => null; set => MigrateLegacy(value, "Lower clouds"); }
     [Hidden, JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public CloudLayerDef? UpperClouds { get => null; set => MigrateLegacy(value, "Upper clouds"); }
+    public CloudLayerDef? UpperClouds { get => null; set => MigrateLegacy(value, "Upper clouds", top: true); }
 
-    private void MigrateLegacy(CloudLayerDef? old, string name)
+    private void MigrateLegacy(CloudLayerDef? old, string name, bool top = false)
     {
         if (old is null) return;
-        if (_cloudsAreDefault) { _clouds.Clear(); _cloudsAreDefault = false; }
+        if (!top && _cloudsAreDefault) { _clouds.Clear(); _cloudsAreDefault = false; }
         if (!old.Enabled) return;
-        _clouds.Add(new CloudLayer
+        (top ? TopClouds : _clouds).Add(new CloudLayer
         {
-            Id = "cloud_" + (_clouds.Count + 1), Name = name, Texture = old.Texture, Tint = old.Tint,
+            Id = (top ? "top_cloud_" : "cloud_") + ((top ? TopClouds : _clouds).Count + 1), Name = name, Texture = old.Texture, Tint = old.Tint,
             Opacity = old.Opacity, Speed = old.Speed, Direction = 0, Mirror = true,
         });
     }

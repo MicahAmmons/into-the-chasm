@@ -26,6 +26,7 @@ public sealed partial class MapEditorScene
         {
             case Panel.FloorProperties: FloorPanel(); break;
             case Panel.FloorTextures: FloorTexturesPanel(); break;
+            case Panel.Walls: WallsPanel(); break;
             case Panel.Clouds: CloudsPanel(); break;
             case Panel.Reference: ReferencePanel(); break;
             case Panel.TileSettings: TileSettingsPanel(); break;
@@ -49,6 +50,7 @@ public sealed partial class MapEditorScene
         {
             Panel.FloorProperties => $"Floor {_floor?.Number} properties",
             Panel.FloorTextures => $"Floor {_floor?.Number} textures",
+            Panel.Walls => $"Floor {_floor?.Number} walls",
             Panel.Clouds => "Clouds",
             Panel.Reference => "Reference tile",
             Panel.TileSettings => "Tile settings",
@@ -139,7 +141,7 @@ public sealed partial class MapEditorScene
             if (ImGui.IsItemHovered()) MaterialTooltip(mat);
             ImGui.PopID();
         }
-        if (ImGui.Button("+ Local material (this tile only)")) AddMaterial(t.LocalMaterials, "local");
+        if (ImGui.Button("+ Local material (this tile only)")) AddMaterial(t.LocalMaterials, MaterialKind.General);
         if (_floor is not null) { ImGui.SameLine(); if (ImGui.Button("Edit floor library")) _panel = Panel.FloorTextures; }
 
         Ui.Section("Regions  (lower in the list = drawn on top)");
@@ -228,20 +230,30 @@ public sealed partial class MapEditorScene
     private string _newMaterialName = "";
     private List<MaterialDef>? _addingTo;
 
-    private void AddMaterial(List<MaterialDef> list, string scope)
+    private MaterialKind _addingKind;
+
+    private void AddMaterial(List<MaterialDef> list, MaterialKind kind)
     {
         _addingTo = list;
+        _addingKind = kind;
         _newMaterialName = "";
         ImGui.OpenPopup("newmat");
     }
 
-    private void MaterialsEditor(List<MaterialDef> list, bool isFloor)
+    /// <summary>
+    /// A material list. For the floor library, <paramref name="kind"/> picks the page (Textures,
+    /// Wall down, Wall up); a tile's local materials pass null (all of them).
+    /// </summary>
+    private void MaterialsEditor(List<MaterialDef> list, bool isFloor, MaterialKind? kind = null)
     {
-        ImGui.PushID(isFloor ? "floormats" : "localmats");
+        ImGui.PushID(isFloor ? "floormats" + kind : "localmats");
         int remove = -1;
+        int shown = 0;
         for (int i = 0; i < list.Count; i++)
         {
             var m = list[i];
+            if (kind is { } k && m.EffectiveKind != k) continue;
+            shown++;
             ImGui.PushID(m.Id);
             bool open = _editingMaterial == (isFloor ? "" : "local:") + m.Id;
             Thumb(m.Texture, 28);
@@ -254,18 +266,8 @@ public sealed partial class MapEditorScene
                 MaterialFields(m, isFloor);
                 int uses = _tile!.PaintRegions.Count(r => r.Material == (isFloor ? m.Id : "local:" + m.Id));
                 Ui.Hint($"Used by {uses} region(s) on this tile{(isFloor ? " (other tiles on the floor may use it too)" : "")}.");
-                if (ImGui.Button("Duplicate (e.g. Left -> Right)"))
-                {
-                    var copy = ChasmJson.Clone(m);
-                    copy.Name = m.Name + " copy";
-                    copy.Id = UniqueMaterialId(list, copy.Name);
-                    list.Insert(i + 1, copy);
-                    _editingMaterial = (isFloor ? "" : "local:") + copy.Id;
-                    _focusMaterialName = true;
-                    _cutOutMaterial = null;
-                    Edited();
-                    Status($"Duplicated as '{copy.Name}'. Rename it, change what you need, then Save (Ctrl+S).");
-                }
+                if (ImGui.Button("Duplicate...")) AskDuplicateMaterial(m, list, isFloor);
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Copy it to this list (e.g. Left -> Right, mirrored) or to the other side / another page.");
                 ImGui.SameLine();
                 if (ImGui.Button("Delete")) remove = i;
                 if (!isFloor && _floor is not null)
@@ -288,8 +290,15 @@ public sealed partial class MapEditorScene
             }
             ImGui.PopID();
         }
+        if (shown == 0) ImGui.TextDisabled("Nothing here yet.");
         if (remove >= 0) { list.RemoveAt(remove); _editingMaterial = null; Edited(); }
-        if (ImGui.Button(isFloor ? "+ Add material to floor library" : "+ Add local material")) AddMaterial(list, isFloor ? "floor" : "local");
+        string add = !isFloor ? "+ Add local material" : kind switch
+        {
+            MaterialKind.WallDown => "+ Add wall (down)",
+            MaterialKind.WallUp => "+ Add wall (up)",
+            _ => "+ Add texture",
+        };
+        if (Ui.AccentButton(add)) AddMaterial(list, kind ?? MaterialKind.General);
         NewMaterialPopup();
         ImGui.PopID();
     }
@@ -298,12 +307,14 @@ public sealed partial class MapEditorScene
     {
         CenterNextWindow();
         if (!ImGui.BeginPopupModal("newmat", ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoTitleBar)) return;
-        ImGui.Text("New material name (e.g. 'Cliff Left'):");
+        ImGui.Text(_addingKind == MaterialKind.General ? "Name (e.g. 'Mossy path'):" : "Name (e.g. 'Cliff left'):");
         ImGui.SetNextItemWidth(260);
+        if (ImGui.IsWindowAppearing()) ImGui.SetKeyboardFocusHere();
         bool enter = ImGui.InputText("##n", ref _newMaterialName, 80, ImGuiInputTextFlags.EnterReturnsTrue);
         if ((ImGui.Button("Create") || enter) && _newMaterialName.Trim().Length > 0 && _addingTo is not null)
         {
             var m = new MaterialDef { Name = _newMaterialName.Trim(), Id = UniqueMaterialId(_addingTo, _newMaterialName) };
+            ApplyKind(m, _addingKind);
             var created = m;
             Art.ArtBrowser.OpenPick(null, k => { created.Texture = k; Edited(); });
             _addingTo.Add(m);
@@ -314,6 +325,18 @@ public sealed partial class MapEditorScene
         ImGui.SameLine();
         if (ImGui.Button("Cancel")) ImGui.CloseCurrentPopup();
         ImGui.EndPopup();
+    }
+
+    /// <summary>Puts a material on a page: walls fade into their clouds and are cut-outs by default.</summary>
+    private static void ApplyKind(MaterialDef m, MaterialKind kind)
+    {
+        m.Kind = kind;
+        switch (kind)
+        {
+            case MaterialKind.WallDown: m.Fade = CloudFade.IntoLowerClouds; m.UseForCutOut = true; break;
+            case MaterialKind.WallUp: m.Fade = CloudFade.IntoUpperClouds; m.UseForCutOut = true; break;
+            default: m.Fade = CloudFade.None; break;
+        }
     }
 
     private static string UniqueMaterialId(List<MaterialDef> list, string name)
@@ -345,9 +368,9 @@ public sealed partial class MapEditorScene
     private void FloorTexturesPanel()
     {
         if (_floor is null) { ImGui.TextDisabled("This tile has no floor."); return; }
-        Ui.Hint("Materials here are shared by every tile on this floor. Cut-out cells are saved per tile.");
+        Ui.Hint("Ground, paths and anything else. Shared by every tile on this floor; cut-out cells are saved per tile. Cliffs and walls live under Walls.");
         ImGui.BeginChild("floortex");
-        MaterialsEditor(_floor.Materials, isFloor: true);
+        MaterialsEditor(_floor.Materials, isFloor: true, MaterialKind.General);
         ImGui.EndChild();
     }
 

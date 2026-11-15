@@ -11,6 +11,14 @@ public enum CloudFade
     [Label("Fades into the upper clouds (walls going up)")] IntoUpperClouds,
 }
 
+/// <summary>Which floor page a material lives on.</summary>
+public enum MaterialKind
+{
+    [Label("Texture (ground, paths, anything)")] General,
+    [Label("Wall down (cliffs into the bottom clouds)")] WallDown,
+    [Label("Wall up (walls into the top clouds)")] WallUp,
+}
+
 /// <summary>The angle of the fade's lines: along the cell edges (iso angle) or level.</summary>
 public enum FadeAngle
 {
@@ -57,6 +65,17 @@ public sealed class MaterialDef
     public float FadeLength { get; set; } = 1f;
     [Tooltip("Angle of the fade lines. Auto picks the cell-edge angle that matches the cliff's top edge.")]
     public FadeAngle FadeAngle { get; set; } = FadeAngle.Auto;
+    [Hidden, Tooltip("Which page it lives on. Empty = worked out from its cloud fade (older files).")]
+    public MaterialKind? Kind { get; set; }
+
+    /// <summary>Its page: the stored kind, else walls by fade direction, else a general texture.</summary>
+    public MaterialKind EffectiveKind => Kind ?? Fade switch
+    {
+        CloudFade.IntoLowerClouds => MaterialKind.WallDown,
+        CloudFade.IntoUpperClouds => MaterialKind.WallUp,
+        _ => MaterialKind.General,
+    };
+
     [Label("Use for cut out"), Tooltip("Pick cells on a tile and this texture shows through them (one region per tile).")]
     public bool UseForCutOut { get; set; }
     public override string ToString() => string.IsNullOrEmpty(Name) ? Id : Name;
@@ -251,11 +270,12 @@ public static class CloudStack
 {
     public const string DefaultTexture = "Original Art/backgrounds/clouds/Cloud1.png";
 
+    /// <summary>The tile's clouds, back to front: the bottom clouds, then the top clouds (each with overrides).</summary>
     public static List<CloudLayer> Resolve(FloorDef? floor, TileDef tile)
     {
         var result = new List<CloudLayer>();
         if (floor is null) return result;
-        foreach (var layer in floor.Clouds)
+        foreach (var layer in floor.Clouds.Concat(floor.TopClouds))
         {
             var o = tile.CloudOverrides.FirstOrDefault(x => x.Layer == layer.Id);
             var effective = o?.Settings ?? layer;
@@ -267,7 +287,11 @@ public static class CloudStack
     /// <summary>A fresh layer id not used on the floor.</summary>
     public static string NewId(FloorDef floor)
     {
-        for (int n = 1; ; n++) { string id = "cloud_" + n; if (floor.Clouds.All(c => c.Id != id)) return id; }
+        for (int n = 1; ; n++)
+        {
+            string id = "cloud_" + n;
+            if (floor.Clouds.All(c => c.Id != id) && floor.TopClouds.All(c => c.Id != id)) return id;
+        }
     }
 }
 

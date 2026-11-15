@@ -51,6 +51,21 @@ public class TileArtTests
         Assert.Equal(33, f.Clouds[0].Speed);
         Assert.DoesNotContain("LowerClouds", Chasm.Core.Serialization.ChasmJson.Serialize(f));
         Assert.Single(new FloorDef().Clouds); // new floors start with one default layer
+        Assert.Empty(f.TopClouds);             // upper band was off
+    }
+
+    [Fact]
+    public void Top_clouds_draw_after_bottom_clouds_and_walls_sort_by_kind()
+    {
+        var floor = new FloorDef { Id = "f" };
+        floor.Clouds = new() { new CloudLayer { Id = "b1", Texture = "b.png" } };
+        floor.TopClouds.Add(new CloudLayer { Id = "t1", Texture = "t.png" });
+        Assert.Equal(new[] { "b1", "t1" }, CloudStack.Resolve(floor, new TileDef { Id = "x" }).Select(c => c.Id));
+        Assert.Equal("cloud_1", CloudStack.NewId(floor));
+        Assert.Equal(MaterialKind.WallDown, new MaterialDef { Fade = CloudFade.IntoLowerClouds }.EffectiveKind);
+        Assert.Equal(MaterialKind.WallUp, new MaterialDef { Fade = CloudFade.IntoUpperClouds }.EffectiveKind);
+        Assert.Equal(MaterialKind.General, new MaterialDef().EffectiveKind);
+        Assert.Equal(MaterialKind.General, new MaterialDef { Kind = MaterialKind.General, Fade = CloudFade.IntoLowerClouds }.EffectiveKind);
     }
 
     [Fact]

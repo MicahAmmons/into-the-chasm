@@ -74,11 +74,27 @@ public sealed partial class MapEditorScene
         ImGui.SameLine(0, 20);
         if (ImGui.Checkbox("Flip Y", ref fy)) { m.FlipY = fy; changed = true; }
 
-        // Cloud fade
-        ImGui.TextUnformatted("Cloud fade"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
-        string[] fades = { "No fade", "Fades into the lower clouds", "Fades into the upper clouds" };
-        int fade = (int)m.Fade;
-        if (ImGui.Combo("##fade", ref fade, fades, fades.Length)) { m.Fade = (CloudFade)fade; changed = true; }
+        // Cloud fade: walls fade into their own clouds; general textures can pick.
+        var kind = m.EffectiveKind;
+        if (isFloor && kind != MaterialKind.General)
+        {
+            bool down = kind == MaterialKind.WallDown;
+            ImGui.TextUnformatted("Cloud fade"); ImGui.SameLine(label);
+            bool fades = m.Fade != CloudFade.None;
+            if (ImGui.Checkbox(down ? "Fades into the bottom clouds##fd" : "Fades into the top clouds##fd", ref fades))
+            {
+                m.Fade = fades ? (down ? CloudFade.IntoLowerClouds : CloudFade.IntoUpperClouds) : CloudFade.None;
+                m.Kind = kind; // keep it on its page even with the fade off
+                changed = true;
+            }
+        }
+        else
+        {
+            ImGui.TextUnformatted("Cloud fade"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
+            string[] fades = { "No fade", "Fades into the bottom clouds", "Fades into the top clouds" };
+            int fade = (int)m.Fade;
+            if (ImGui.Combo("##fade", ref fade, fades, fades.Length)) { m.Fade = (CloudFade)fade; if (isFloor) m.Kind = kind; changed = true; }
+        }
         if (m.Fade != CloudFade.None)
         {
             float start = m.FadeStart, length = m.FadeLength;

@@ -18,34 +18,39 @@ public sealed partial class MapEditorScene
     private void CloudsPanel()
     {
         if (_floor is null) { ImGui.TextDisabled("This tile has no floor, so it has no clouds."); return; }
+        SideSwitch("Bottom clouds", "Top clouds", ref _cloudsTop,
+            "The clouds far below: cliffs (Wall down) fade into these. Drawn first.",
+            "The clouds above: walls (Wall up) fade into these. Drawn over the bottom clouds, still behind the tile art.");
         Ui.Hint("Animated, always behind the tile art, never baked. Tip: Game view (G) shows them without the grid.");
+        var list = _cloudsTop ? _floor.TopClouds : _floor.Clouds;
         if (!ImGui.BeginTabBar("cloudtabs")) return;
         if (ImGui.BeginTabItem("Floor (every tile)"))
         {
-            FloorCloudsTab(_floor);
+            FloorCloudsTab(_floor, list);
             ImGui.EndTabItem();
         }
-        int overrides = _tile!.CloudOverrides.Count(o => _floor.Clouds.Any(c => c.Id == o.Layer));
+        int overrides = _tile!.CloudOverrides.Count(o => list.Any(c => c.Id == o.Layer));
         if (ImGui.BeginTabItem(overrides > 0 ? $"This tile ({overrides})###tilecl" : "This tile###tilecl"))
         {
-            TileCloudsTab(_floor, _tile);
+            TileCloudsTab(_floor, _tile, list);
             ImGui.EndTabItem();
         }
         ImGui.EndTabBar();
     }
 
-    private void FloorCloudsTab(FloorDef floor)
+    private void FloorCloudsTab(FloorDef floor, List<CloudLayer> clouds)
     {
         ImGui.PushStyleColor(ImGuiCol.Text, Ui.Warn);
         ImGui.TextWrapped("Floor-wide: every tile on this floor uses these (unless a tile overrides one).");
         ImGui.PopStyleColor();
-        if (_openCloud is null && floor.Clouds.Count == 1) _openCloud = floor.Clouds[0].Id;
+        if (_openCloud is null && clouds.Count == 1) _openCloud = clouds[0].Id;
         Ui.Colored(Ui.Muted, "Top of the list = furthest back.");
         ImGui.BeginChild("floorclouds");
-        int up = -1, down = -1, remove = -1, dup = -1;
-        for (int i = 0; i < floor.Clouds.Count; i++)
+        int up = -1, down = -1, remove = -1;
+        if (clouds.Count == 0) ImGui.TextDisabled(_cloudsTop ? "No top clouds yet." : "No bottom clouds yet.");
+        for (int i = 0; i < clouds.Count; i++)
         {
-            var c = floor.Clouds[i];
+            var c = clouds[i];
             ImGui.PushID(c.Id);
             if (ImGui.ArrowButton("up", ImGuiDir.Up)) up = i;
             if (ImGui.IsItemHovered()) ImGui.SetTooltip("Move back");
@@ -65,7 +70,8 @@ public sealed partial class MapEditorScene
             {
                 ImGui.Indent();
                 if (CloudFields(c)) Edited();
-                if (ImGui.Button("Duplicate")) dup = i;
+                if (ImGui.Button("Duplicate...")) AskDuplicateCloud(c);
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Copy it to this list or to the other side (Top / Bottom).");
                 ImGui.SameLine();
                 if (ImGui.Button("Delete")) remove = i;
                 int tileOverrides = Services.Defs.All<TileDef>().Count(t => t.Floor == floor.Number && t.CloudOverrides.Any(o => o.Layer == c.Id));
@@ -75,24 +81,15 @@ public sealed partial class MapEditorScene
             }
             ImGui.PopID();
         }
-        if (up > 0) { (floor.Clouds[up - 1], floor.Clouds[up]) = (floor.Clouds[up], floor.Clouds[up - 1]); Edited(); }
-        if (down >= 0 && down < floor.Clouds.Count - 1) { (floor.Clouds[down + 1], floor.Clouds[down]) = (floor.Clouds[down], floor.Clouds[down + 1]); Edited(); }
-        if (dup >= 0)
-        {
-            var copy = floor.Clouds[dup].Copy();
-            copy.Id = CloudStack.NewId(floor);
-            copy.Name += " copy";
-            floor.Clouds.Insert(dup + 1, copy);
-            _openCloud = copy.Id;
-            Edited();
-        }
-        if (remove >= 0) { floor.Clouds.RemoveAt(remove); _openCloud = null; Edited(); }
+        if (up > 0) { (clouds[up - 1], clouds[up]) = (clouds[up], clouds[up - 1]); Edited(); }
+        if (down >= 0 && down < clouds.Count - 1) { (clouds[down + 1], clouds[down]) = (clouds[down], clouds[down + 1]); Edited(); }
+        if (remove >= 0) { clouds.RemoveAt(remove); _openCloud = null; Edited(); }
 
         ImGui.Spacing();
         if (Ui.AccentButton("+ Add cloud layer"))
         {
-            var layer = new CloudLayer { Id = CloudStack.NewId(floor), Name = $"Clouds {floor.Clouds.Count + 1}", Texture = "" };
-            floor.Clouds.Add(layer);
+            var layer = new CloudLayer { Id = CloudStack.NewId(floor), Name = $"{(_cloudsTop ? "Top" : "Bottom")} clouds {clouds.Count + 1}", Texture = "" };
+            clouds.Add(layer);
             _openCloud = layer.Id;
             Edited();
             Art.ArtBrowser.OpenPick(null, k => { layer.Texture = k; Edited(); });
@@ -100,12 +97,12 @@ public sealed partial class MapEditorScene
         ImGui.EndChild();
     }
 
-    private void TileCloudsTab(FloorDef floor, TileDef tile)
+    private void TileCloudsTab(FloorDef floor, TileDef tile, List<CloudLayer> clouds)
     {
         Ui.Hint("By default this tile shows the floor's clouds. Turn on Override to give one layer different settings here only (or hide it on this tile).");
         ImGui.BeginChild("tileclouds");
-        if (floor.Clouds.Count == 0) ImGui.TextDisabled("The floor has no cloud layers yet (Floor tab).");
-        foreach (var c in floor.Clouds)
+        if (clouds.Count == 0) ImGui.TextDisabled("The floor has no layers here yet (Floor tab).");
+        foreach (var c in clouds)
         {
             ImGui.PushID(c.Id);
             var o = tile.CloudOverrides.FirstOrDefault(x => x.Layer == c.Id);
@@ -137,7 +134,7 @@ public sealed partial class MapEditorScene
             ImGui.PopID();
         }
         // Overrides for layers the floor no longer has.
-        int stale = tile.CloudOverrides.RemoveAll(x => floor.Clouds.All(c => c.Id != x.Layer));
+        int stale = tile.CloudOverrides.RemoveAll(x => floor.Clouds.All(c => c.Id != x.Layer) && floor.TopClouds.All(c => c.Id != x.Layer));
         if (stale > 0) Edited();
         ImGui.EndChild();
     }

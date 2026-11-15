@@ -68,11 +68,13 @@ public sealed partial class MapEditorScene
         FloorMapPopup();
         ImGui.SameLine();
         PanelButton("Textures", Panel.FloorTextures, half,
-            "The floor's texture library: materials (texture + rotation, tint, flips, cloud fade) and cut-out cells.\n\nMaterials are shared by every tile on this floor.");
-        PanelButton("Properties", Panel.FloorProperties, half,
-            "Floor-wide settings (name, look, numbers).\n\nWARNING: changes here affect EVERY tile on this floor.");
+            "The floor's general textures (ground, paths...): texture + rotation, tint, flips, cut-out cells.\n\nShared by every tile on this floor.");
+        PanelButton("Walls", Panel.Walls, half,
+            "Cliff and wall textures, in two lists: Wall down (cliffs fading into the bottom clouds) and Wall up (walls fading into the top clouds).");
         ImGui.SameLine();
-        PanelButton("Clouds", Panel.Clouds, half, "Animated cloud layers behind the tile: the floor's layers (every tile) and this tile's overrides.");
+        PanelButton("Clouds", Panel.Clouds, half, "Animated cloud layers behind the tile, in two lists: Bottom clouds and Top clouds. Tiles can override any layer.");
+        PanelButton("Properties", Panel.FloorProperties, full - 20,
+            "Floor-wide settings (name, look, numbers).\n\nWARNING: changes here affect EVERY tile on this floor.");
         ImGui.EndDisabled();
 
         // ---- tools
