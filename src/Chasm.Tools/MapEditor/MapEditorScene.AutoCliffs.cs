@@ -114,7 +114,9 @@ public sealed partial class MapEditorScene
 
     private PrefabDef? _deletePrefabTarget;
 
-    private void AskDeletePrefab(PrefabDef p) { _deletePrefabTarget = p; _openDeletePrefab = true; }
+    private bool _deleteWholeSet = true;
+
+    private void AskDeletePrefab(PrefabDef p) { _deletePrefabTarget = p; _openDeletePrefab = true; _deleteWholeSet = p.IsSetLeader; }
 
     private void DeletePrefabPopup()
     {
@@ -132,6 +134,9 @@ public sealed partial class MapEditorScene
             foreach (var u in uses.Take(10)) ImGui.BulletText(u);
             Ui.Hint("It's taken off every floor's list and kit. Placements already on tiles stay but show as missing until removed.");
         }
+        var set = p.InSet ? Services.Defs.All<PrefabDef>().Where(x => x.SetId == p.SetId).ToList() : new List<PrefabDef>();
+        if (set.Count > 1)
+            ImGui.Checkbox($"Delete the whole set ({set.Count} prefabs: {string.Join(", ", set.Select(x => x.DisplayName))})", ref _deleteWholeSet);
         ImGui.PushStyleColor(ImGuiCol.Button, new Num.Vector4(0.55f, 0.16f, 0.16f, 1));
         bool del = ImGui.Button("Delete prefab", new Num.Vector2(150, 0));
         ImGui.PopStyleColor();
@@ -139,7 +144,19 @@ public sealed partial class MapEditorScene
         if (ImGui.Button("Cancel", new Num.Vector2(120, 0))) ImGui.CloseCurrentPopup();
         if (del)
         {
-            DeletePrefab(p.Id);
+            if (set.Count > 1 && _deleteWholeSet) foreach (var m in set) DeletePrefab(m.Id);
+            else
+            {
+                DeletePrefab(p.Id);
+                // The rest of the set loses its leader: they become ordinary prefabs.
+                if (p.IsSetLeader)
+                    foreach (var m in set.Where(x => x.Id != p.Id))
+                    {
+                        var copy = Chasm.Core.Serialization.ChasmJson.Clone(m);
+                        copy.SetId = ""; copy.Role = PrefabRole.Single; copy.Shade = 1;
+                        Services.Defs.Save(copy);
+                    }
+            }
             ImGui.CloseCurrentPopup();
         }
         ImGui.EndPopup();

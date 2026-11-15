@@ -29,12 +29,113 @@ public sealed class PrefabDef : Def
     /// <summary>Perspective warp in the picture's own frame (null = none).</summary>
     public MaterialWarp? Warp { get; set; }
 
+    [Tooltip("Linked set this belongs to (the left face's id). Empty = stands alone.")] public string SetId { get; set; } = "";
+    [Tooltip("Its job in the set.")] public PrefabRole Role { get; set; } = PrefabRole.Single;
+    [Range(0.2f, 1.5f), Tooltip("Set members: brightness compared with the left face (1 = same, lower = in shadow).")]
+    public float Shade { get; set; } = 1f;
+
+    public bool InSet => !string.IsNullOrEmpty(SetId);
+    public bool IsSetLeader => InSet && Role == PrefabRole.LeftFace;
+
     /// <summary>The prefab as a material, for drawing with the shared texture code.</summary>
     public MaterialDef AsMaterial(bool extraFlipX = false) => new()
     {
         Id = Id, Name = Name, Texture = Texture, Rotation = Rotation, Tint = Tint,
         FlipX = FlipX ^ extraFlipX, FlipY = FlipY, Scale = Scale, Warp = Warp, Kind = Kind,
     };
+}
+
+/// <summary>A prefab's job in a linked set (made together from one left face).</summary>
+public enum PrefabRole
+{
+    [Label("On its own")] Single,
+    [Label("Left face (leads the set)")] LeftFace,
+    [Label("Right face")] RightFace,
+    [Label("Outer corner")] OuterCorner,
+    [Label("Inner corner")] InnerCorner,
+}
+
+/// <summary>
+/// Linked prefab sets: make a left face and get the right face (mirrored) and both corners.
+/// The left face leads; its picture, zoom, rotation, lip line and warp are copied to the others,
+/// each of which only keeps its own name and shade.
+/// </summary>
+public static class PrefabSets
+{
+    public static readonly (PrefabRole role, string suffix, float shade)[] Members =
+    {
+        (PrefabRole.RightFace, "right", 0.72f),
+        (PrefabRole.OuterCorner, "outer corner", 0.86f),
+        (PrefabRole.InnerCorner, "inner corner", 0.62f),
+    };
+
+    /// <summary>"Rock columns - left" -> "Rock columns".</summary>
+    public static string BaseName(string name)
+    {
+        string n = name.Trim();
+        foreach (var tail in new[] { " - left", " -left", "-left", " left", " (left)" })
+            if (n.EndsWith(tail, StringComparison.OrdinalIgnoreCase)) return n[..^tail.Length].TrimEnd(' ', '-');
+        return n;
+    }
+
+    /// <summary>
+    /// Turns <paramref name="leader"/> into a set's left face and returns the new members (not
+    /// saved): right face, outer corner, inner corner. Ids come from <paramref name="newId"/>.
+    /// </summary>
+    public static List<PrefabDef> MakeSet(PrefabDef leader, Func<string, string> newId)
+    {
+        leader.SetId = leader.Id;
+        leader.Role = PrefabRole.LeftFace;
+        leader.Shade = 1f;
+        string baseName = BaseName(leader.DisplayName);
+        var list = new List<PrefabDef>();
+        foreach (var (role, suffix, shade) in Members)
+        {
+            var m = new PrefabDef { Name = $"{baseName} - {suffix}", Role = role, Shade = shade, SetId = leader.Id };
+            m.Id = newId(m.Name);
+            Sync(leader, m);
+            list.Add(m);
+        }
+        return list;
+    }
+
+    /// <summary>Copies the leader's shared look onto a member (right face mirrored), with the member's shade.</summary>
+    public static void Sync(PrefabDef leader, PrefabDef m)
+    {
+        m.Category = leader.Category;
+        m.Kind = leader.Kind;
+        m.Texture = leader.Texture;
+        m.Rotation = leader.Rotation;
+        m.Scale = leader.Scale;
+        m.LipLine = leader.LipLine;
+        m.FlipY = leader.FlipY;
+        bool mirror = m.Role == PrefabRole.RightFace;
+        m.FlipX = mirror ? !leader.FlipX : leader.FlipX;
+        m.Warp = leader.Warp is null ? null : mirror ? Mirrored(leader.Warp) : Copy(leader.Warp);
+        m.Tint = Shaded(leader.Tint, m.Shade);
+    }
+
+    private static MaterialWarp Copy(MaterialWarp w) => new()
+    {
+        TopLeftX = w.TopLeftX, TopLeftY = w.TopLeftY, TopRightX = w.TopRightX, TopRightY = w.TopRightY,
+        BottomRightX = w.BottomRightX, BottomRightY = w.BottomRightY, BottomLeftX = w.BottomLeftX, BottomLeftY = w.BottomLeftY,
+    };
+
+    /// <summary>The same warp seen in a mirror: left and right corners swap, sideways pulls flip.</summary>
+    public static MaterialWarp Mirrored(MaterialWarp w) => new()
+    {
+        TopLeftX = -w.TopRightX, TopLeftY = w.TopRightY, TopRightX = -w.TopLeftX, TopRightY = w.TopLeftY,
+        BottomLeftX = -w.BottomRightX, BottomLeftY = w.BottomRightY, BottomRightX = -w.BottomLeftX, BottomRightY = w.BottomLeftY,
+    };
+
+    /// <summary>"#RRGGBB" times a brightness factor.</summary>
+    public static string Shaded(string hex, float shade)
+    {
+        var h = (hex ?? "#ffffff").TrimStart('#');
+        if (h.Length < 6 || !uint.TryParse(h[..6], System.Globalization.NumberStyles.HexNumber, null, out uint v)) v = 0xffffff;
+        int Ch(int shift) => Math.Clamp((int)MathF.Round(((v >> shift) & 255) * shade), 0, 255);
+        return $"#{Ch(16):x2}{Ch(8):x2}{Ch(0):x2}";
+    }
 }
 
 /// <summary>Per-floor fade defaults for walls: the "cloud level" of a floor.</summary>

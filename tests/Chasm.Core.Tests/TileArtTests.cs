@@ -191,6 +191,41 @@ public class TileArtTests
     }
 
     [Fact]
+    public void Making_a_left_face_makes_the_whole_set_and_syncs_it()
+    {
+        var left = new PrefabDef { Id = "rock_left", Name = "Rock columns - left", Kind = MaterialKind.WallDown, Texture = "rock.png",
+            Scale = 0.7f, Tint = "#c8c8c8", Warp = new MaterialWarp { BottomLeftX = 40, BottomRightX = -10 } };
+        var members = PrefabSets.MakeSet(left, name => name.ToLowerInvariant().Replace(' ', '_'));
+        Assert.Equal(PrefabRole.LeftFace, left.Role);
+        Assert.Equal(new[] { "Rock columns - right", "Rock columns - outer corner", "Rock columns - inner corner" }, members.Select(m => m.Name));
+        var right = members[0];
+        Assert.True(right.FlipX);                                  // mirrored
+        Assert.Equal("rock.png", right.Texture);
+        Assert.Equal(0.7f, right.Scale);
+        Assert.Equal(10, right.Warp!.BottomLeftX);                  // warp mirrored: right's BL = -left's BR
+        Assert.Equal(-40, right.Warp.BottomRightX);
+        Assert.Equal(PrefabSets.Shaded("#c8c8c8", 0.72f), right.Tint); // darker side
+        Assert.All(members, m => Assert.Equal("rock_left", m.SetId));
+        // Change the leader, sync: shared look follows, shade stays.
+        left.Scale = 1.2f; left.Tint = "#ffffff";
+        PrefabSets.Sync(left, right);
+        Assert.Equal(1.2f, right.Scale);
+        Assert.Equal("#b8b8b8", right.Tint);
+        Assert.Equal("Rock columns", PrefabSets.BaseName("Rock columns - left"));
+    }
+
+    [Fact]
+    public void Mask_base_plus_fade_equals_the_full_build()
+    {
+        var cells = new List<CellCoord> { new(8, 1), new(9, 2), new(10, 3) };
+        var fade = new EdgeFade(true, 0.5f, 1f, FadeAngle.Level);
+        var full = RegionMask.Build(cells, 8, fade);
+        var (inside, shape) = RegionMask.BuildBase(cells, 8);
+        RegionMask.ApplyFade(shape, RegionMask.Edge(inside, fade), fade);
+        Assert.Equal(full, shape);
+    }
+
+    [Fact]
     public void Cloud_direction_sets_scroll_offset()
     {
         var c = new CloudLayer { Speed = 10, Direction = 90 };

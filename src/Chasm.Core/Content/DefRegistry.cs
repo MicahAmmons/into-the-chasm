@@ -129,6 +129,7 @@ public sealed class DefRegistry
     {
         string baseId = new string(name.Trim().ToLowerInvariant()
             .Select(c => char.IsLetterOrDigit(c) ? c : '_').ToArray()).Trim('_');
+        while (baseId.Contains("__")) baseId = baseId.Replace("__", "_");
         if (baseId.Length == 0) baseId = type.Name.Replace("Def", "").ToLowerInvariant();
         string id = baseId;
         for (int n = 2; Exists(type, id); n++) id = $"{baseId}_{n}";

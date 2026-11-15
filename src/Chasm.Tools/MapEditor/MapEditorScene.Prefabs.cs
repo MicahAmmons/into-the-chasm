@@ -340,12 +340,23 @@ public sealed partial class MapEditorScene
         const float label = 120;
         Ui.Hint("A prefab is made once and placed on any tile or floor. It has no fade: each placement fades by its floor's default (or its own).");
         Ui.Colored(_prefabIsNew ? Ui.Warn : Ui.Muted, _prefabIsNew ? "New prefab (not saved yet)" : $"content/defs/prefabs/{p.Id}.json");
+        bool member = p.InSet && !p.IsSetLeader;
+        PrefabSetBanner(p, member);
         ImGui.BeginChild("prefabed", new Num.Vector2(0, -40));
 
         ImGui.TextUnformatted("Name"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
         string name = p.Name;
         if (ImGui.InputText("##pname", ref name, 80)) p.Name = name;
 
+        // A set member's look comes from its left face: only its name and shade are its own.
+        if (member)
+        {
+            ImGui.TextUnformatted("Shade"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
+            float shade = p.Shade;
+            if (ImGui.SliderFloat("##pshade", ref shade, 0.2f, 1.5f, "%.2f x the left face")) p.Shade = shade;
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("1 = as bright as the left face; lower = in shadow. Applied when you save.");
+        }
+        ImGui.BeginDisabled(member);
         ImGui.TextUnformatted("Category"); ImGui.SameLine(label); ImGui.SetNextItemWidth(-1);
         string cat = p.Category;
         var cats = Services.Defs.All<PrefabDef>().Select(x => x.Category).Where(c => !string.IsNullOrWhiteSpace(c)).Distinct().OrderBy(c => c).ToList();
@@ -421,6 +432,13 @@ public sealed partial class MapEditorScene
             ImGui.SameLine();
             if (Ui.ToggleButton(_prefabHandles ? "Hide handles" : "Corner handles", _prefabHandles, new Num.Vector2(150, 0), "Drag the corners on the map preview.")) _prefabHandles = !_prefabHandles;
         }
+        ImGui.EndDisabled();
+        if (_prefabIsNew && !p.InSet && p.Kind != MaterialKind.General)
+        {
+            ImGui.Spacing();
+            ImGui.Checkbox("Also make the right face and both corners (a linked set)", ref _makeSet);
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("On save: '<name> - right' (mirrored, darker), '- outer corner' and '- inner corner'.\nThey follow this left face whenever you save it, and fill the floor's auto-cliff kit if it's empty.");
+        }
         Ui.Hint("The map shows a preview of the prefab. The orange line is its lip (or foot): that line sits on the edge of its cells when placed.");
         ImGui.EndChild();
 
@@ -429,22 +447,91 @@ public sealed partial class MapEditorScene
         if (Ui.AccentButton(PrefabDirty ? "Save prefab *" : "Save prefab", new Num.Vector2(140, 0))) SavePrefab();
         ImGui.EndDisabled();
         ImGui.SameLine();
-        if (!_prefabIsNew && ImGui.Button("Duplicate")) DuplicatePrefab();
-        if (!_prefabIsNew) ImGui.SameLine();
+        if (!_prefabIsNew && !member && ImGui.Button("Duplicate")) DuplicatePrefab();
+        if (!_prefabIsNew && !member) ImGui.SameLine();
         if (!_prefabIsNew && ImGui.Button("Delete...") && Services.Defs.TryGet<PrefabDef>(p.Id, out var savedP)) AskDeletePrefab(savedP);
         ImGui.SameLine();
         if (ImGui.Button("Close")) { _prefab = null; _panel = _prefabReturn == Panel.Prefab ? Panel.Walls : _prefabReturn; }
     }
 
-    private void SavePrefab()
+    private bool _makeSet = true;
+
+    private void SavePrefab(bool makeSetNow = false)
     {
         var p = _prefab!;
         if (string.IsNullOrWhiteSpace(p.Id)) p.Id = Services.Defs.SuggestId(typeof(PrefabDef), p.Name);
+        var added = new List<string> { p.Id };
+        var made = new List<PrefabDef>();
+        if (!p.InSet && p.Kind != MaterialKind.General && ((_prefabIsNew && _makeSet) || makeSetNow))
+            made = PrefabSets.MakeSet(p, name => Services.Defs.SuggestId(typeof(PrefabDef), name));
+        // A member's tint always comes from its leader and its shade.
+        if (p.InSet && !p.IsSetLeader && Services.Defs.TryGet<PrefabDef>(p.SetId, out var lead)) PrefabSets.Sync(lead, p);
         Services.Defs.Save(ChasmJson.Clone(p));
-        if (_prefabIsNew && _floor is not null && !_floor.Prefabs.Contains(p.Id)) { _floor.Prefabs.Add(p.Id); Edited(); }
+        foreach (var m in made) { Services.Defs.Save(m); added.Add(m.Id); }
+        int synced = 0;
+        if (p.IsSetLeader && made.Count == 0)
+            foreach (var m in Services.Defs.All<PrefabDef>().Where(x => x.SetId == p.Id && x.Id != p.Id).ToList())
+            {
+                var copy = ChasmJson.Clone(m);
+                PrefabSets.Sync(p, copy);
+                Services.Defs.Save(copy);
+                synced++;
+            }
+        if (_floor is not null && (_prefabIsNew || made.Count > 0))
+        {
+            foreach (var id in added) if (!_floor.Prefabs.Contains(id)) _floor.Prefabs.Add(id);
+            if (made.Count > 0 && string.IsNullOrEmpty(KitFor(p.Kind).LeftFace)) UseSetAsKit(p.Id, quiet: true);
+            Edited();
+        }
         _prefabIsNew = false;
         Services.TileVisuals.InvalidateAll();
-        Status($"Saved prefab '{p.DisplayName}'. Every placement of it updates.");
+        Status(made.Count > 0 ? $"Saved '{p.DisplayName}' and made {made.Count} matching prefabs (right face, outer and inner corner)."
+            : synced > 0 ? $"Saved '{p.DisplayName}' and updated {synced} prefab(s) in its set."
+            : $"Saved prefab '{p.DisplayName}'. Every placement of it updates.");
+    }
+
+    private CliffKit KitFor(MaterialKind kind) => kind == MaterialKind.WallUp ? _floor!.CliffKitUp : _floor!.CliffKitDown;
+
+    /// <summary>Fills this floor's auto-cliff kit (for the set's side) with the set's four prefabs.</summary>
+    private void UseSetAsKit(string setId, bool quiet = false)
+    {
+        if (_floor is null) return;
+        var members = Services.Defs.All<PrefabDef>().Where(x => x.SetId == setId).ToList();
+        var lead = members.FirstOrDefault(x => x.Role == PrefabRole.LeftFace);
+        if (lead is null) return;
+        var kit = KitFor(lead.Kind);
+        string Id(PrefabRole r) => members.FirstOrDefault(x => x.Role == r)?.Id ?? "";
+        kit.LeftFace = lead.Id;
+        kit.RightFace = Id(PrefabRole.RightFace);
+        kit.OuterCorner = Id(PrefabRole.OuterCorner);
+        kit.InnerCorner = Id(PrefabRole.InnerCorner);
+        foreach (var m in members) if (!_floor.Prefabs.Contains(m.Id)) _floor.Prefabs.Add(m.Id);
+        Edited();
+        if (!quiet) Status($"Floor {_floor.Number}'s {(lead.Kind == MaterialKind.WallUp ? "wall up" : "cliff")} kit now uses the '{PrefabSets.BaseName(lead.DisplayName)}' set.");
+    }
+
+    /// <summary>Set info at the top of the prefab editor (and the set's buttons).</summary>
+    private void PrefabSetBanner(PrefabDef p, bool member)
+    {
+        if (p.IsSetLeader)
+        {
+            int n = Services.Defs.All<PrefabDef>().Count(x => x.SetId == p.Id && x.Id != p.Id);
+            Ui.Colored(Ui.Good, $"Leads a set of {n + 1}: saving it updates the right face and corners too.");
+            if (!_prefabIsNew && _floor is not null && ImGui.Button("Use this set as the floor's kit")) UseSetAsKit(p.Id);
+        }
+        else if (member)
+        {
+            var lead = Services.Defs.TryGet<PrefabDef>(p.SetId, out var l) ? l : null;
+            Ui.Colored(Ui.Blue, $"{p.Role switch { PrefabRole.RightFace => "Right face", PrefabRole.OuterCorner => "Outer corner", _ => "Inner corner" }} of the '{(lead is null ? p.SetId : PrefabSets.BaseName(lead.DisplayName))}' set: its look follows the left face.");
+            if (lead is not null && ImGui.Button("Edit the left face")) OpenPrefabEditor(lead, isNew: false);
+            ImGui.SameLine();
+            if (_floor is not null && lead is not null && ImGui.Button("Use set as kit")) UseSetAsKit(lead.Id);
+            ImGui.SameLine();
+            if (ImGui.Button("Unlink")) { p.SetId = ""; p.Role = PrefabRole.Single; p.Shade = 1; Status("Unlinked: it no longer follows the set (save to keep)."); }
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Make it a normal prefab you can change freely.");
+        }
+        else if (!_prefabIsNew && p.Kind != MaterialKind.General && ImGui.Button("Make matching set (right face + corners)"))
+            SavePrefab(makeSetNow: true);
     }
 
     /// <summary>Copy as a new prefab: Left/Right (or Down/Up) swapped in the name and Flip X toggled.</summary>
@@ -453,6 +540,7 @@ public sealed partial class MapEditorScene
         var src = _prefab!;
         var copy = ChasmJson.Clone(src);
         copy.Id = "";
+        copy.SetId = ""; copy.Role = PrefabRole.Single; copy.Shade = 1;
         copy.Name = SwapWords(src.Name, ("Left", "Right"), ("left", "right")) is var n && n != src.Name ? n : src.Name + " copy";
         copy.FlipX = !copy.FlipX;
         _prefab = copy;

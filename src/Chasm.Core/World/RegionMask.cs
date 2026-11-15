@@ -22,6 +22,18 @@ public static class RegionMask
     public static float[] Build(IReadOnlyCollection<CellCoord> cells, int featherPx, EdgeFade? fade,
         IReadOnlyList<CellStencil>? stencils = null, Func<string, StencilImage?>? loadStencil = null)
     {
+        var (inside, a) = BuildBase(cells, featherPx, stencils, loadStencil);
+        if (fade is { } f) ApplyFade(a, Edge(inside, f), f);
+        return a;
+    }
+
+    /// <summary>
+    /// The part of a mask that doesn't depend on the fade: which pixels are in the cells (for the
+    /// edge), and the carved + softened shape. Editors cache this so fade sliders stay quick.
+    /// </summary>
+    public static (float[] inside, float[] shape) BuildBase(IReadOnlyCollection<CellCoord> cells, int featherPx,
+        IReadOnlyList<CellStencil>? stencils = null, Func<string, StencilImage?>? loadStencil = null)
+    {
         var inside = Inside(cells);
         var a = (float[])inside.Clone();
         // Carve first, so the soft edge and fade apply to the carved shape. The fade itself is
@@ -34,22 +46,23 @@ public static class RegionMask
             var tmp = new float[a.Length];
             for (int i = 0; i < 2; i++) { BoxBlur(a, tmp, pass, horizontal: true); BoxBlur(tmp, a, pass, horizontal: false); }
         }
-        if (fade is { } f)
+        return (inside, a);
+    }
+
+    /// <summary>Multiplies a mask by the edge fade, measured from <paramref name="edge"/> (see <see cref="Edge"/>).</summary>
+    public static void ApplyFade(float[] a, float[] edge, EdgeFade f)
+    {
+        float start = f.StartCells * EdgeFade.CellPx / 2, len = Math.Max(0.5f, f.LengthCells * EdgeFade.CellPx / 2);
+        for (int x = 0; x < Width; x++)
         {
-            var edge = Edge(inside, f);
-            float start = f.StartCells * EdgeFade.CellPx / 2, len = Math.Max(0.5f, f.LengthCells * EdgeFade.CellPx / 2);
-            for (int x = 0; x < Width; x++)
+            if (float.IsNaN(edge[x])) continue;
+            for (int y = 0; y < Height; y++)
             {
-                if (float.IsNaN(edge[x])) continue;
-                for (int y = 0; y < Height; y++)
-                {
-                    float depth = f.Lower ? (y + 0.5f) - edge[x] : edge[x] - (y + 0.5f);
-                    if (depth <= start) continue;
-                    a[y * Width + x] *= Math.Clamp(1f - (depth - start) / len, 0f, 1f);
-                }
+                float depth = f.Lower ? (y + 0.5f) - edge[x] : edge[x] - (y + 0.5f);
+                if (depth <= start) continue;
+                a[y * Width + x] *= Math.Clamp(1f - (depth - start) / len, 0f, 1f);
             }
         }
-        return a;
     }
 
     /// <summary>Multiplies each stencilled cell's pixels by its stencil (stretched over the cell's box).</summary>

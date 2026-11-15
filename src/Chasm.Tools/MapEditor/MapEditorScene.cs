@@ -68,7 +68,7 @@ public sealed partial class MapEditorScene : Scene
         ToolContext.Wizards.Inspector.CellPicker = cb => { _cellPick = cb; Status("Click a cell on the map (Esc cancels)."); };
         Art.ArtLibrary.KeysMoved += OnArtMoved;
         if (_openOnStart is not null && Services.Defs.TryGet<TileDef>(_openOnStart, out var t)) Open(t);
-        // Dev convenience for automated screenshots: CHASM_EDITOR=tool[:panel][:neighbours][:mat=<id>][:cut][:dup][:warp][:place=<prefab>][:prefab=<prefab>][:autodemo][:game]
+        // Dev convenience for automated screenshots: CHASM_EDITOR=tool[:panel][:neighbours][:mat=<id>][:cut][:dup][:warp][:place=<prefab>][:prefab=<prefab>][:autodemo][:newset][:game]
         if (_tile is not null && Environment.GetEnvironmentVariable("CHASM_EDITOR") is { } dev)
         {
             var parts = dev.Split(':');
@@ -108,6 +108,12 @@ public sealed partial class MapEditorScene : Scene
                 _floor.CliffKitDown.Depth = 3;
                 GenerateAutoCliffs(_floor.CliffKitDown, up: false);
             }
+            if (parts.Contains("newset"))
+            {
+                OpenPrefabEditor(new PrefabDef { Name = "Test rock - left", Texture = "placeholder/textures/rock_strata.png", Kind = MaterialKind.WallDown, Category = "Cliff walls", Scale = 0.7f }, isNew: true);
+                SavePrefab();
+                if (Services.Defs.TryGet<PrefabDef>("test_rock_right", out var rightDev)) OpenPrefabEditor(rightDev, isNew: false);
+            }
             if (parts.Contains("selectall")) foreach (var c in IsoGrid.AllCells.Where(c => _tile.Walkable[c])) _selection.Add(c);
         }
     }
@@ -116,6 +122,7 @@ public sealed partial class MapEditorScene : Scene
     {
         Services.Canvas.Region = null;
         Services.Canvas.ResetView();
+        Services.TileVisuals.LiveEditing = false;
         ToolContext.Wizards.Inspector.CellPicker = null;
         Art.ArtLibrary.KeysMoved -= OnArtMoved;
         if (_tile is not null && _history.Count > 0) WriteRecovery();
@@ -383,6 +390,8 @@ public sealed partial class MapEditorScene : Scene
         if (_cellPick is not null) UpdateCellPick(input);
         else if (!_panning) UpdateTool(input);
 
+        // Sliders / drags in progress: let the tile bake skip frames so the editor stays smooth.
+        Services.TileVisuals.LiveEditing = ImGui.IsAnyItemActive() || (_dragMode is not null) || _nudgeDragging || _sheetHandle >= 0 || _prefabHandle >= 0;
         MaybeCommitSnapshot();
         UpdateRecovery(dt);
     }

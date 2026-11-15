@@ -44,6 +44,11 @@ public sealed class TileVisuals : IDisposable
     private readonly HashSet<string> _dirty = new();
     private long _tick;
 
+    /// <summary>Editors set this while a slider or drag is active: rebakes are spaced out so it stays smooth.</summary>
+    public bool LiveEditing { get; set; }
+    private readonly System.Diagnostics.Stopwatch _bakeClock = System.Diagnostics.Stopwatch.StartNew();
+    private readonly Dictionary<string, long> _lastBake = new();
+
     /// <summary>How many tile bakes to keep (current + 8 neighbours by default).</summary>
     public int MaxBakes { get; set; } = 9;
     public int MaxMasks { get; set; } = 160;
@@ -67,6 +72,9 @@ public sealed class TileVisuals : IDisposable
             {
                 foreach (var (m, _) in _masks.Values) m.Dispose();
                 _masks.Clear();
+                _maskFade.Clear();
+                _maskBases.Clear();
+                _edges.Clear();
             }
             InvalidateAll();
         };
@@ -94,12 +102,15 @@ public sealed class TileVisuals : IDisposable
         string key = Key(tile);
         var node = _bakes.First;
         while (node is not null && node.Value.key != key) node = node.Next;
-        if (node is not null && !_dirty.Contains(key))
+        // While an editor slider is being dragged, rebake at most ~12 times a second.
+        bool throttled = node is not null && LiveEditing && _bakeClock.ElapsedMilliseconds - _lastBake.GetValueOrDefault(key) < 80;
+        if (node is not null && (!_dirty.Contains(key) || throttled))
         {
             _bakes.Remove(node);
             _bakes.AddFirst(node);
             return node.Value.bake;
         }
+        _lastBake[key] = _bakeClock.ElapsedMilliseconds;
         var target = node?.Value.bake ?? NewBake();
         if (node is not null) _bakes.Remove(node);
         var bake = Bake(tile, floor, target);
@@ -249,24 +260,74 @@ public sealed class TileVisuals : IDisposable
 
     // ------------------------------------------------------------------ masks
 
+    // Masks are built in two steps so fade changes stay cheap:
+    //   base (cells, stencils, soft edge)  - cached by its shape
+    //   edge line for a fade direction     - cached by shape + direction + angle
+    //   final texture                      - one per shape + direction, refilled when only the fade numbers change
+    private readonly Dictionary<string, (float[] inside, float[] shape, long used)> _maskBases = new();
+    private readonly Dictionary<string, float[]> _edges = new();
+    private readonly Dictionary<string, string> _maskFade = new();
+    private float[]? _maskWork;
+    private Color[]? _maskColors;
+    private const int MaxBases = 64;
+
     private Texture2D Mask(PaintRegion region, EdgeFade? fade, FloorDef? floor)
     {
         int feather = region.Feather ?? floor?.DefaultFeather ?? 6;
         var sb = new StringBuilder();
         foreach (var c in region.Cells.OrderBy(c => c.Q).ThenBy(c => c.R)) sb.Append(c.Q).Append(',').Append(c.R).Append(' ');
-        sb.Append('|').Append(feather).Append('|').Append(fade?.ToString() ?? "nofade");
+        sb.Append('|').Append(feather);
         foreach (var st in region.Stencils) sb.Append("|s").Append(st.Cell.Q).Append(',').Append(st.Cell.R).Append(':').Append(st.Stencil).Append(st.FlipX ? "x" : "").Append(st.FlipY ? "y" : "");
-        string key = sb.ToString();
+        string baseKey = sb.ToString();
+        string slot = baseKey + "|" + (fade is { } f0 ? $"{f0.Lower}/{f0.Angle}" : "none");
+        string fadeKey = fade?.ToString() ?? "none";
         _tick++;
-        if (_masks.TryGetValue(key, out var hit)) { _masks[key] = (hit.mask, _tick); return hit.mask; }
+        if (_masks.TryGetValue(slot, out var hit) && _maskFade.TryGetValue(slot, out var had) && had == fadeKey)
+        {
+            _masks[slot] = (hit.mask, _tick);
+            return hit.mask;
+        }
 
-        var tex = new Texture2D(_device, RegionMask.Width, RegionMask.Height, false, SurfaceFormat.Color);
-        tex.SetData(BuildMask(region.Cells, feather, fade, region.Stencils, LoadStencil));
-        _masks[key] = (tex, _tick);
-        if (_masks.Count > MaxMasks)
-            foreach (var old in _masks.OrderBy(kv => kv.Value.used).Take(_masks.Count - MaxMasks).ToList())
-            { old.Value.mask.Dispose(); _masks.Remove(old.Key); }
-        return tex;
+        // Base shape (expensive: cells, carving, blur) - reused while only the fade changes.
+        if (!_maskBases.TryGetValue(baseKey, out var b))
+        {
+            var (inside, shape) = RegionMask.BuildBase(region.Cells, feather, region.Stencils, LoadStencil);
+            b = (inside, shape, _tick);
+            if (_maskBases.Count >= MaxBases)
+                foreach (var old in _maskBases.OrderBy(kv => kv.Value.used).Take(_maskBases.Count - MaxBases + 1).ToList())
+                {
+                    _maskBases.Remove(old.Key);
+                    foreach (var k in _edges.Keys.Where(k => k.StartsWith(old.Key + "|", StringComparison.Ordinal)).ToList()) _edges.Remove(k);
+                }
+        }
+        _maskBases[baseKey] = (b.inside, b.shape, _tick);
+
+        var a = _maskWork ??= new float[RegionMask.Width * RegionMask.Height];
+        Array.Copy(b.shape, a, a.Length);
+        if (fade is { } f)
+        {
+            string edgeKey = slot;
+            if (!_edges.TryGetValue(edgeKey, out var edge)) _edges[edgeKey] = edge = RegionMask.Edge(b.inside, f);
+            RegionMask.ApplyFade(a, edge, f);
+        }
+        var colors = _maskColors ??= new Color[a.Length];
+        for (int i = 0; i < a.Length; i++)
+        {
+            byte v = (byte)Math.Clamp((int)(a[i] * 255f + 0.5f), 0, 255);
+            colors[i] = new Color(v, v, v, v);
+        }
+        // Refill the existing texture for this shape + direction instead of making a new one.
+        if (!_masks.TryGetValue(slot, out var existing))
+        {
+            existing = (new Texture2D(_device, RegionMask.Width, RegionMask.Height, false, SurfaceFormat.Color), _tick);
+            if (_masks.Count >= MaxMasks)
+                foreach (var old in _masks.OrderBy(kv => kv.Value.used).Take(_masks.Count - MaxMasks + 1).ToList())
+                { old.Value.mask.Dispose(); _masks.Remove(old.Key); _maskFade.Remove(old.Key); }
+        }
+        existing.mask.SetData(colors);
+        _masks[slot] = (existing.mask, _tick);
+        _maskFade[slot] = fadeKey;
+        return existing.mask;
     }
 
     /// <summary>Region mask as texture data (alpha in every channel: white * alpha).</summary>
